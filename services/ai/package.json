@@ -1,0 +1,12 @@
+{
+  "name": "@broflo/ai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "uvicorn app.main:app --reload --port 8000",
+    "lint": "echo \"python lint not configured\" && exit 0",
+    "typecheck": "echo \"python typecheck not configured\" && exit 0",
+    "test": "echo \"no tests yet\" && exit 0",
+    "clean": "rm -rf __pycache__ .pytest_cache"
+  }
+}
