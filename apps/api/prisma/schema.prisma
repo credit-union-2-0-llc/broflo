@@ -8,10 +8,31 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now()) @map("created_at")
+  id               String    @id @default(uuid())
+  email            String    @unique
+  name             String?
+  passwordHash     String?   @map("password_hash")
+  refreshToken     String?   @map("refresh_token")
+  resetToken       String?   @map("reset_token")
+  resetTokenExpires DateTime? @map("reset_token_expires")
+  googleId         String?   @unique @map("google_id")
+  avatarUrl        String?   @map("avatar_url")
+  subscriptionTier String    @default("free") @map("subscription_tier")
+  brofloScore      Int       @default(0) @map("broflo_score")
+  failedLogins     Int       @default(0) @map("failed_logins")
+  lockedUntil      DateTime? @map("locked_until")
+  isActive         Boolean   @default(true) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+model RevokedToken {
+  id        String   @id @default(uuid())
+  jti       String   @unique
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime @default(now()) @map("revoked_at")
+
+  @@map("revoked_tokens")
 }
