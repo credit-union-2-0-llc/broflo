@@ -4,6 +4,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { EventsService } from "../events/events.service";
 import type {
   CreatePersonDto,
   UpdatePersonDto,
@@ -12,7 +13,10 @@ import type {
 
 @Injectable()
 export class PersonsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventsService: EventsService,
+  ) {}
 
   async list(userId: string) {
     return this.prisma.person.findMany({
@@ -32,7 +36,7 @@ export class PersonsService {
   }
 
   async create(userId: string, dto: CreatePersonDto) {
-    return this.prisma.person.create({
+    const person = await this.prisma.person.create({
       data: {
         userId,
         name: dto.name,
@@ -53,18 +57,34 @@ export class PersonsService {
       },
       include: { neverAgainItems: true },
     });
+
+    await this.eventsService.autoSyncEvents(
+      userId,
+      person.id,
+      person.birthday,
+      person.anniversary,
+    );
+
+    return person;
   }
 
   async update(userId: string, id: string, dto: UpdatePersonDto) {
     const person = await this.ensureOwnership(userId, id);
 
-    return this.prisma.person.update({
+    const oldBirthday = person.birthday;
+    const oldAnniversary = person.anniversary;
+
+    const updated = await this.prisma.person.update({
       where: { id: person.id },
       data: {
         name: dto.name,
         relationship: dto.relationship,
-        birthday: dto.birthday ? new Date(dto.birthday) : undefined,
-        anniversary: dto.anniversary ? new Date(dto.anniversary) : undefined,
+        birthday: dto.birthday !== undefined
+          ? (dto.birthday ? new Date(dto.birthday) : null)
+          : undefined,
+        anniversary: dto.anniversary !== undefined
+          ? (dto.anniversary ? new Date(dto.anniversary) : null)
+          : undefined,
         budgetMinCents: dto.budgetMinCents,
         budgetMaxCents: dto.budgetMaxCents,
         clothingSizeTop: dto.clothingSizeTop,
@@ -79,6 +99,19 @@ export class PersonsService {
       },
       include: { neverAgainItems: true },
     });
+
+    if (dto.birthday !== undefined || dto.anniversary !== undefined) {
+      await this.eventsService.autoSyncEvents(
+        userId,
+        person.id,
+        updated.birthday,
+        updated.anniversary,
+        oldBirthday,
+        oldAnniversary,
+      );
+    }
+
+    return updated;
   }
 
   async softDelete(userId: string, id: string) {

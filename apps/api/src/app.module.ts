@@ -1,10 +1,13 @@
 import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { ScheduleModule } from "@nestjs/schedule";
 import { HealthController } from "./health/health.controller";
 import { PrismaService } from "./prisma/prisma.service";
 import { AuthModule } from "./auth/auth.module";
 import { PersonsModule } from "./persons/persons.module";
+import { EventsModule } from "./events/events.module";
+import { RemindersModule } from "./reminders/reminders.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 
 @Module({
@@ -16,8 +19,11 @@ import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
         limit: 10,
       },
     ]),
+    ScheduleModule.forRoot(),
     AuthModule,
     PersonsModule,
+    EventsModule,
+    RemindersModule,
   ],
   controllers: [HealthController],
   providers: [

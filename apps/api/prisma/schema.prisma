@@ -26,6 +26,8 @@ model User {
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
   persons          Person[]
+  events           Event[]
+  reminders        Reminder[]
 
   @@map("users")
 }
@@ -63,6 +65,7 @@ model Person {
 
   user             User      @relation(fields: [userId], references: [id])
   neverAgainItems  NeverAgainItem[]
+  events           Event[]
 
   @@index([userId, deletedAt])
   @@map("persons")
@@ -77,4 +80,68 @@ model NeverAgainItem {
   person    Person   @relation(fields: [personId], references: [id])
 
   @@map("never_again_items")
+}
+
+enum OccasionType {
+  birthday
+  anniversary
+  holiday
+  graduation
+  promotion
+  custom
+
+  @@map("occasion_type")
+}
+
+enum RecurrenceRule {
+  annual
+  one_time @map("one_time")
+
+  @@map("recurrence_rule")
+}
+
+model Event {
+  id             String         @id @default(uuid())
+  personId       String         @map("person_id")
+  userId         String         @map("user_id")
+  name           String
+  occasionType   OccasionType   @map("occasion_type")
+  date           DateTime       @db.Date
+  isRecurring    Boolean        @default(false) @map("is_recurring")
+  recurrenceRule RecurrenceRule @default(one_time) @map("recurrence_rule")
+  budgetMinCents Int?           @map("budget_min_cents")
+  budgetMaxCents Int?           @map("budget_max_cents")
+  notes          String?
+  isAutoCreated  Boolean        @default(false) @map("is_auto_created")
+  userModified   Boolean        @default(false) @map("user_modified")
+  userDeleted    Boolean        @default(false) @map("user_deleted")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  person    Person     @relation(fields: [personId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminders Reminder[]
+
+  @@unique([personId, occasionType, isAutoCreated], name: "uq_person_auto_event", map: "uq_person_auto_event")
+  @@index([userId, date], map: "idx_events_user_date")
+  @@index([personId], map: "idx_events_person")
+  @@index([userId, occasionType], map: "idx_events_user_occasion")
+  @@map("events")
+}
+
+model Reminder {
+  id           String    @id @default(uuid())
+  eventId      String    @map("event_id")
+  userId       String    @map("user_id")
+  leadDays     Int       @map("lead_days")
+  scheduledFor DateTime  @map("scheduled_for") @db.Date
+  dismissedAt  DateTime? @map("dismissed_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, leadDays, scheduledFor], map: "uq_reminder_event_lead_scheduled")
+  @@index([userId, dismissedAt, scheduledFor], map: "idx_reminders_user_active")
+  @@map("reminders")
 }
