@@ -1,4 +1,11 @@
-export default function Home() {
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { auth } from "@/lib/auth";
+
+export default async function Home() {
+  const session = await auth();
+  if (session?.user) redirect("/dashboard");
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center bg-background">
       <main className="flex flex-col items-center gap-8">
@@ -9,6 +16,20 @@ export default function Home() {
           You&apos;re busy. We remembered. She&apos;s impressed. You&apos;re
           welcome.
         </p>
+        <div className="flex gap-4">
+          <Link
+            href="/login"
+            className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/signup"
+            className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-6 text-sm font-medium text-foreground shadow-sm hover:bg-accent hover:text-accent-foreground"
+          >
+            Sign up
+          </Link>
+        </div>
       </main>
     </div>
   );
