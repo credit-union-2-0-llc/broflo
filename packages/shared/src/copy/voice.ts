@@ -20,6 +20,8 @@ export const VOICE = {
       "We're thinking. Give us a second. Good gifts take a moment.",
     neverAgain:
       "No banned gifts yet. Give it time. You'll learn.",
+    recentGifts:
+      "No gifts recorded yet. Once you start giving, we'll track everything here.",
   },
 
   people: {
@@ -95,6 +97,10 @@ export const VOICE = {
       "Bold mode is a Pro feature. Safe is great. But bold is better.",
     historyContext:
       "Pro members get smarter suggestions that learn from your gift history. Upgrade to unlock.",
+    yearView:
+      "Year-over-year view is a Pro feature.",
+    exportHistory:
+      "Export is a Pro feature.",
   },
 
   errors: {
@@ -106,6 +112,20 @@ export const VOICE = {
       "Easy there. Even genius needs a break. Try again in a few minutes.",
     aiGeneric:
       "Something went wrong with our gift engine. Try again.",
+  },
+
+  gifts: {
+    recorded: "Gift logged. Your memory is officially outsourced.",
+    nailedIt: "That's how it's done.",
+    feedbackThanks: "Noted. This makes us smarter next time.",
+    neverAgainConfirm: "Banished forever. Good call.",
+  },
+
+  feedback: {
+    recorded: "Noted. We'll remember that for next time.",
+    nailedIt: "Nailed it. Broflo Score updated.",
+    neverAgainPrompt:
+      "Want to make sure we never suggest this again?",
   },
 
   cancelWindow:

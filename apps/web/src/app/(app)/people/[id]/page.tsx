@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { DeletePersonButton } from "@/components/delete-person-button";
 import { PersonEventsClient } from "./person-events-client";
+import { GiftHistorySection } from "@/components/gifts/gift-history-section";
 
 function initials(name: string) {
   return name
@@ -187,6 +188,15 @@ export default async function PersonDetailPage({
 
             <Separator className="my-3" />
             <PersonEventsClient events={events} person={person} people={people} />
+
+            <Separator className="my-3" />
+            <GiftHistorySection
+              personId={person.id}
+              personName={person.name}
+              events={events.filter((e) => e.personId === person.id)}
+              token={session.accessToken}
+              tier={(session.user as Record<string, unknown>)?.subscriptionTier as string ?? "free"}
+            />
 
             <Separator className="my-3" />
             <div>

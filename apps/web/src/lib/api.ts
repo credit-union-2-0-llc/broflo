@@ -116,6 +116,72 @@ export interface SelectSuggestionResponse {
   scoreChange: number;
 }
 
+// S-5 Gift History types
+export interface GiftRecord {
+  id: string;
+  personId: string;
+  eventId: string | null;
+  userId: string;
+  suggestionId: string | null;
+  title: string;
+  description: string | null;
+  priceCents: number | null;
+  givenAt: string;
+  rating: number | null;
+  feedbackNote: string | null;
+  imageUrl: string | null;
+  source: "suggestion" | "manual";
+  suggestionSnapshot: {
+    title: string;
+    estimatedPriceMinCents: number;
+    estimatedPriceMaxCents: number;
+    reasoning: string;
+    confidenceScore: number;
+  } | null;
+  feedbackScored: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GiftRecordListResponse {
+  data: GiftRecord[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    year?: number;
+    totalSpendCents?: number;
+    averageRating?: number;
+  };
+}
+
+export interface CreateGiftRecordData {
+  title: string;
+  description?: string;
+  priceCents?: number;
+  eventId?: string;
+  givenAt: string;
+}
+
+export interface FeedbackResponse {
+  giftRecord: GiftRecord;
+  scoreChange: number;
+  newScore: number;
+  newLevel: string;
+  promptNeverAgain: boolean;
+}
+
+export interface RecentGiftsResponse {
+  gifts: Array<GiftRecord & { personName: string; eventName: string | null }>;
+}
+
+export interface CreateGiftResponse {
+  giftRecord: GiftRecord;
+  scoreChange: number;
+  newScore: number;
+  newLevel: string;
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 type FetchOptions = RequestInit & {
@@ -286,4 +352,31 @@ export const api = {
       `/suggestions/${suggestionId}/dismiss`,
       { method: "POST", body: JSON.stringify({ reason }), token },
     ),
+
+  // Gift History (S-5)
+  getPersonGifts: (token: string, personId: string, params?: { page?: number; limit?: number; year?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.limit) q.set("limit", String(params.limit));
+    if (params?.year) q.set("year", String(params.year));
+    const qs = q.toString();
+    return apiFetch<GiftRecordListResponse>(`/persons/${personId}/gifts${qs ? `?${qs}` : ""}`, { token });
+  },
+
+  createGift: (token: string, personId: string, data: CreateGiftRecordData) =>
+    apiFetch<CreateGiftResponse>(`/persons/${personId}/gifts`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  recordFeedback: (token: string, giftId: string, data: { rating: number; note?: string }) =>
+    apiFetch<FeedbackResponse>(`/gifts/${giftId}/feedback`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  getRecentGifts: (token: string) =>
+    apiFetch<RecentGiftsResponse>("/gifts/recent", { token }),
 };

@@ -2,14 +2,10 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { api } from "@/lib/api";
 import type { UpcomingEvent, Reminder } from "@/lib/api";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { ComingUpWidget } from "@/components/coming-up-widget";
 import { DashboardReminders } from "./dashboard-reminders";
+import { RecentGiftsWidget } from "@/components/gifts/recent-gifts-widget";
+import { BrofloScoreWidget } from "@/components/gifts/broflo-score-widget";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -43,24 +39,12 @@ export default async function DashboardPage() {
         )}
 
         <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl">
-                Welcome, {session.user?.name || "friend"}.
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <p className="text-muted-foreground">
-                {session.user?.email}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Tier: {session.user?.subscriptionTier || "free"} | Score:{" "}
-                {session.user?.brofloScore || 0}
-              </p>
-            </CardContent>
-          </Card>
-
+          <BrofloScoreWidget score={session.user?.brofloScore ?? 0} />
           <ComingUpWidget events={events} />
+        </div>
+
+        <div className="mt-6">
+          <RecentGiftsWidget token={session.accessToken} />
         </div>
       </div>
     </div>
