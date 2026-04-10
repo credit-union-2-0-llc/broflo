@@ -38,11 +38,6 @@ export const VOICE = {
     updated: "Updated. We're on it.",
   },
 
-  errors: {
-    eventsLoad: "Something went wrong loading your events. Try again.",
-    generic: "Something went wrong. Try again.",
-  },
-
   alerts: {
     thirtyDay: (name: string) =>
       `Heads up: ${name}'s birthday is in 30 days. Plenty of time. For now.`,
@@ -64,6 +59,54 @@ export const VOICE = {
 
   levelUp: (level: string) =>
     `Welcome to ${level}. People notice. They just won't say it.`,
+
+  nudges: {
+    setBudget: (name: string) =>
+      `Set a budget for ${name} to get more targeted suggestions.`,
+    enrichDossier: (name: string) =>
+      `Want better suggestions? Tell us more about ${name}.`,
+  },
+
+  suggestions: {
+    topPick: "We'd pick this one.",
+    empty:
+      "We came up empty. Try updating their dossier or adjusting the budget.",
+    lowCount:
+      "We're running low on ideas. Consider updating their dossier or never-again list.",
+    selected: (name: string) =>
+      `Good choice. ${name} is going to love this.`,
+    surpriseMe: "Let us pick. Trust us.",
+    surpriseMeResult: (name: string) =>
+      `We picked this for ${name}. You're welcome.`,
+    surpriseMeUndo: "Fine. Be that way. Here are your options.",
+    loading: [
+      "We're thinking. Give us a second. Good gifts take a moment.",
+      "Reading the dossier. Cross-referencing taste. Almost there.",
+      "Considering options that aren't socks. Stand by.",
+    ] as readonly string[],
+  },
+
+  upsell: {
+    moreSuggestions:
+      "Pro members get 5 suggestions with deeper personalization. See what you're missing.",
+    reRoll:
+      "Want more options? Upgrade to Pro for up to 3 re-rolls.",
+    boldMode:
+      "Bold mode is a Pro feature. Safe is great. But bold is better.",
+    historyContext:
+      "Pro members get smarter suggestions that learn from your gift history. Upgrade to unlock.",
+  },
+
+  errors: {
+    eventsLoad: "Something went wrong loading your events. Try again.",
+    generic: "Something went wrong. Try again.",
+    aiTimeout:
+      "The gift oracle is temporarily offline. Even we have bad days.",
+    rateLimited:
+      "Easy there. Even genius needs a break. Try again in a few minutes.",
+    aiGeneric:
+      "Something went wrong with our gift engine. Try again.",
+  },
 
   cancelWindow:
     "You've got 2 hours to cancel. After that, it's in the mail and you're a hero.",

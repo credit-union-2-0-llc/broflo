@@ -1,0 +1,109 @@
+"use client";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { X, Check } from "lucide-react";
+import { VOICE } from "@broflo/shared";
+import type { GiftSuggestion } from "@/lib/api";
+
+function dollars(cents: number) {
+  return `$${(cents / 100).toFixed(0)}`;
+}
+
+function confidenceColor(score: number) {
+  if (score >= 0.8) return "bg-emerald-500";
+  if (score >= 0.5) return "bg-amber-400";
+  return "bg-gray-300";
+}
+
+interface SuggestionCardProps {
+  suggestion: GiftSuggestion;
+  isTopPick: boolean;
+  onSelect: (id: string) => void;
+  onDismiss: (id: string) => void;
+  selecting?: boolean;
+}
+
+export function SuggestionCard({
+  suggestion,
+  isTopPick,
+  onSelect,
+  onDismiss,
+  selecting,
+}: SuggestionCardProps) {
+  const s = suggestion;
+  const priceRange = `${dollars(s.estimatedPriceMinCents)} – ${dollars(s.estimatedPriceMaxCents)}`;
+
+  return (
+    <Card
+      className={`transition-shadow hover:shadow-md ${
+        s.isSelected
+          ? "ring-2 ring-broflo-electric bg-broflo-electric-subtle/20"
+          : ""
+      }`}
+      role="listitem"
+      aria-label={`Gift suggestion: ${s.title}, ${priceRange}, ${Math.round(s.confidenceScore * 100)} percent confidence`}
+    >
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div
+              className={`h-2.5 w-2.5 rounded-full shrink-0 ${confidenceColor(s.confidenceScore)}`}
+              aria-label={s.confidenceScore >= 0.8 ? "Strong match" : s.confidenceScore >= 0.5 ? "Good match" : "Fair match"}
+            />
+            <CardTitle className="text-base font-semibold">{s.title}</CardTitle>
+          </div>
+          <span className="font-mono text-sm text-muted-foreground shrink-0">
+            {priceRange}
+          </span>
+        </div>
+        {isTopPick && s.confidenceScore >= 0.8 && (
+          <Badge className="bg-broflo-electric-subtle text-broflo-electric text-xs w-fit">
+            {VOICE.suggestions.topPick}
+          </Badge>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-foreground">{s.description}</p>
+
+        <blockquote className="text-sm italic text-muted-foreground border-l-2 border-broflo-electric-light pl-3">
+          {s.reasoning}
+        </blockquote>
+
+        {s.retailerHint && (
+          <p className="text-xs text-muted-foreground">
+            Available at: {s.retailerHint}
+          </p>
+        )}
+
+        <div className="flex items-center justify-between pt-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDismiss(s.id)}
+            disabled={s.isSelected}
+          >
+            <X className="mr-1 h-3.5 w-3.5" />
+            Not this one
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => onSelect(s.id)}
+            disabled={s.isSelected || selecting}
+          >
+            {s.isSelected ? (
+              <>
+                <Check className="mr-1 h-3.5 w-3.5" />
+                Selected
+              </>
+            ) : (
+              "Select This Gift"
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, Gift } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { EventDetailActions } from "./event-detail-actions";
+import { SuggestionsView } from "@/components/suggestions/suggestions-view";
 
 function initials(name: string) {
   return name
@@ -150,24 +151,14 @@ export default async function EventDetailPage({
           </CardContent>
         </Card>
 
-        {/* Gift Ideas — placeholder for S-4 */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Gift Ideas for This Event</CardTitle>
-            <Button variant="default" size="sm" disabled className="gap-1.5">
-              <Gift className="h-4 w-4" />
-              Find Gift Ideas
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              No suggestions yet. Click &ldquo;Find Gift Ideas&rdquo; to get started.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 italic">
-              (Gift Brain activates in S-4)
-            </p>
-          </CardContent>
-        </Card>
+        {/* Gift Ideas — S-4 Gift Brain */}
+        <SuggestionsView
+          eventId={event.id}
+          personId={event.personId}
+          personName={event.personName}
+          token={session.accessToken}
+          tier={(session.user as Record<string, unknown>)?.subscriptionTier as "free" | "pro" | "elite" ?? "free"}
+        />
 
         {/* Past Gifts — placeholder for S-5 */}
         <Card>

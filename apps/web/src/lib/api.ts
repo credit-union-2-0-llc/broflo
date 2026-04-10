@@ -58,6 +58,64 @@ export interface Reminder {
   };
 }
 
+// S-4 Suggestion types
+export interface GiftSuggestion {
+  id: string;
+  personId: string;
+  eventId: string;
+  title: string;
+  description: string;
+  estimatedPriceMinCents: number;
+  estimatedPriceMaxCents: number;
+  reasoning: string;
+  confidenceScore: number;
+  delightScore: number;
+  noveltyScore: number;
+  retailerHint: string | null;
+  suggestedMessage: string | null;
+  requestIndex: number;
+  surpriseFactor: "safe" | "bold";
+  isSelected: boolean;
+  isDismissed: boolean;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface SuggestionsResponse {
+  suggestions: GiftSuggestion[];
+  meta: {
+    cached: boolean;
+    tier: string;
+    model: string;
+    requestIndex: number;
+    budgetApplied: { minCents: number; maxCents: number; source: string };
+  };
+}
+
+export interface EventSuggestionsResponse {
+  suggestions: GiftSuggestion[];
+  meta: { requestIndex: number; total: number; dismissed: number };
+}
+
+export interface SuggestionMetaResponse {
+  eventId: string;
+  requestCount: number;
+  maxRequests: number;
+  canReroll: boolean;
+  sets: Array<{
+    requestIndex: number;
+    suggestionCount: number;
+    surpriseFactor: string;
+    createdAt: string;
+  }>;
+}
+
+export interface SelectSuggestionResponse {
+  suggestion: GiftSuggestion;
+  giftRecord: Record<string, unknown>;
+  scoreChange: number;
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 type FetchOptions = RequestInit & {
@@ -196,4 +254,36 @@ export const api = {
       method: "PATCH",
       token,
     }),
+
+  // Suggestions (S-4)
+  generateSuggestions: (
+    token: string,
+    data: { personId: string; eventId: string; surpriseFactor?: "safe" | "bold"; guidanceText?: string },
+  ) =>
+    apiFetch<SuggestionsResponse>("/ai/suggestions", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  getEventSuggestions: (token: string, eventId: string, requestIndex?: number) => {
+    const qs = requestIndex !== undefined ? `?requestIndex=${requestIndex}` : "";
+    return apiFetch<EventSuggestionsResponse>(`/events/${eventId}/suggestions${qs}`, { token });
+  },
+
+  getSuggestionMeta: (token: string, eventId: string) =>
+    apiFetch<SuggestionMetaResponse>(`/events/${eventId}/suggestions/meta`, { token }),
+
+  selectSuggestion: (token: string, eventId: string, suggestionId: string) =>
+    apiFetch<SelectSuggestionResponse>(`/events/${eventId}/select-suggestion`, {
+      method: "POST",
+      body: JSON.stringify({ suggestionId }),
+      token,
+    }),
+
+  dismissSuggestion: (token: string, suggestionId: string, reason?: string) =>
+    apiFetch<{ id: string; isDismissed: boolean; dismissalReason: string | null }>(
+      `/suggestions/${suggestionId}/dismiss`,
+      { method: "POST", body: JSON.stringify({ reason }), token },
+    ),
 };

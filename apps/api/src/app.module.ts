@@ -8,6 +8,8 @@ import { AuthModule } from "./auth/auth.module";
 import { PersonsModule } from "./persons/persons.module";
 import { EventsModule } from "./events/events.module";
 import { RemindersModule } from "./reminders/reminders.module";
+import { SuggestionsModule } from "./suggestions/suggestions.module";
+import { RedisModule } from "./redis/redis.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 
 @Module({
@@ -24,6 +26,8 @@ import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
     PersonsModule,
     EventsModule,
     RemindersModule,
+    RedisModule,
+    SuggestionsModule,
   ],
   controllers: [HealthController],
   providers: [
