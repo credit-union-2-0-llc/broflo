@@ -10,6 +10,7 @@ import {
   HttpStatus,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import { Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
 import type { User } from "@prisma/client";
 import { AuthService } from "./auth.service";
@@ -23,6 +24,7 @@ import type {
   ResetPasswordDto,
 } from "./dto/auth.dto";
 
+@Throttle({ short: { ttl: 60000, limit: 5 } })
 @Controller("auth")
 export class AuthController {
   constructor(private readonly auth: AuthService) {}

@@ -117,6 +117,8 @@ export class AuthService {
       throw new UnauthorizedException("Invalid refresh token");
     }
 
+    // Rotation: issueTokens generates a new refresh token and persists it,
+    // so the old refresh token is automatically invalidated.
     return this.issueTokens(user);
   }
 
