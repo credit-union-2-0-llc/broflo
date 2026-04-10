@@ -41,9 +41,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       async authorize(credentials) {
         try {
+          const password = credentials.password as string;
+
+          // OAuth exchange: callback page passes tokens via __oauth__ prefix
+          if (password?.startsWith("__oauth__:")) {
+            const accessToken = password.slice("__oauth__:".length);
+            const me = await api.me(accessToken);
+            // Fetch refresh token from the exchange response passed through
+            // The callback stores the full exchange result
+            return {
+              id: me.id as string,
+              email: me.email as string,
+              name: me.name as string | null,
+              accessToken,
+              refreshToken: (credentials as Record<string, string>).refreshToken || "",
+              avatarUrl: me.avatarUrl as string | null,
+              subscriptionTier: me.subscriptionTier as string,
+              brofloScore: me.brofloScore as number,
+            };
+          }
+
           const result = await api.login({
             email: credentials.email as string,
-            password: credentials.password as string,
+            password,
           });
 
           return {

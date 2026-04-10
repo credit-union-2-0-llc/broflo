@@ -22,6 +22,7 @@ import type {
   RefreshDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  OAuthExchangeDto,
 } from "./dto/auth.dto";
 
 @Throttle({ short: { ttl: 60000, limit: 5 } })
@@ -98,13 +99,16 @@ export class AuthController {
   @UseGuards(AuthGuard("google"))
   async googleCallback(@Req() req: Request, @Res() res: Response) {
     const user = req.user as User;
-    const tokens = await this.auth.issueTokensForOAuthUser(user);
+    const code = await this.auth.createOAuthCode(user);
 
     const webUrl = process.env.WEB_URL || "http://localhost:3000";
-    const params = new URLSearchParams({
-      token: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-    });
-    res.redirect(`${webUrl}/auth/callback?${params.toString()}`);
+    res.redirect(`${webUrl}/auth/callback?code=${code}`);
+  }
+
+  @Public()
+  @Post("oauth-exchange")
+  @HttpCode(HttpStatus.OK)
+  async oauthExchange(@Body() dto: OAuthExchangeDto) {
+    return this.auth.exchangeOAuthCode(dto.code);
   }
 }

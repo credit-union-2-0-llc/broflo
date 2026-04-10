@@ -22,6 +22,7 @@ const LOCKOUT_THRESHOLD = 5;
 const LOCKOUT_MINUTES = 30;
 const RESET_TOKEN_HOURS = 1;
 const SALT_ROUNDS = 12;
+const OAUTH_CODE_TTL_MS = 60_000; // 60 seconds
 
 @Injectable()
 export class AuthService {
@@ -188,6 +189,32 @@ export class AuthService {
     });
 
     return { message: "Password reset successful" };
+  }
+
+  // --- OAuth auth code exchange (F-04: tokens must not appear in URLs) ---
+
+  private oauthCodes = new Map<string, { tokens: Record<string, unknown>; expiresAt: number }>();
+
+  async createOAuthCode(user: User): Promise<string> {
+    const tokens = await this.issueTokens(user);
+    const code = uuidv4();
+    this.oauthCodes.set(code, {
+      tokens,
+      expiresAt: Date.now() + OAUTH_CODE_TTL_MS,
+    });
+    return code;
+  }
+
+  exchangeOAuthCode(code: string) {
+    const entry = this.oauthCodes.get(code);
+    if (!entry) {
+      throw new UnauthorizedException("Invalid or expired auth code");
+    }
+    this.oauthCodes.delete(code);
+    if (Date.now() > entry.expiresAt) {
+      throw new UnauthorizedException("Invalid or expired auth code");
+    }
+    return entry.tokens;
   }
 
   async issueTokensForOAuthUser(user: User) {

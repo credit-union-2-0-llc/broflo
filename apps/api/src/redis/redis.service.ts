@@ -103,16 +103,35 @@ export class RedisService implements OnModuleDestroy {
 
   // --- Spend tracking (F-05: $50/day global cap) ---
 
+  private readonly DAILY_CAP_CENTS = 5000; // $50/day
+
+  private getDailySpendKey(): string {
+    return `spend:daily:${new Date().toISOString().slice(0, 10)}`;
+  }
+
+  async checkSpendCap(): Promise<{ withinCap: boolean; currentCents: number }> {
+    const key = this.getDailySpendKey();
+
+    if (!this.isConnected) {
+      const raw = this.memGet(key);
+      const current = raw ? parseInt(raw, 10) : 0;
+      return { withinCap: current < this.DAILY_CAP_CENTS, currentCents: current };
+    }
+
+    const raw = await this.getClient().get(key);
+    const current = raw ? parseInt(raw, 10) : 0;
+    return { withinCap: current < this.DAILY_CAP_CENTS, currentCents: current };
+  }
+
   async trackSpend(costCents: number): Promise<{ withinCap: boolean }> {
-    const key = `spend:daily:${new Date().toISOString().slice(0, 10)}`;
-    const capCents = 5000; // $50/day
+    const key = this.getDailySpendKey();
 
     if (!this.isConnected) {
       const raw = this.memGet(key);
       const current = raw ? parseInt(raw, 10) : 0;
       const newTotal = current + costCents;
       this.memSet(key, String(newTotal), 86400);
-      return { withinCap: newTotal <= capCents };
+      return { withinCap: newTotal <= this.DAILY_CAP_CENTS };
     }
 
     const client = this.getClient();
@@ -120,7 +139,7 @@ export class RedisService implements OnModuleDestroy {
     if (newTotal === costCents) {
       await client.expire(key, 86400);
     }
-    return { withinCap: newTotal <= capCents };
+    return { withinCap: newTotal <= this.DAILY_CAP_CENTS };
   }
 
   async onModuleDestroy(): Promise<void> {

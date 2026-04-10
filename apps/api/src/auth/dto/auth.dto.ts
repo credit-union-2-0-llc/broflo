@@ -48,3 +48,9 @@ export class ResetPasswordDto {
   @MinLength(8)
   password!: string;
 }
+
+export class OAuthExchangeDto {
+  @IsString()
+  @IsNotEmpty()
+  code!: string;
+}

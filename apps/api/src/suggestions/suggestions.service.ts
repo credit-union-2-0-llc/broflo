@@ -48,6 +48,13 @@ export class SuggestionsService {
       throw new HttpException("Rate limit exceeded", 429);
     }
 
+    // Daily spend cap (F-05)
+    const spendCheck = await this.redis.checkSpendCap();
+    if (!spendCheck.withinCap) {
+      this.logger.warn(`Daily AI spend cap reached: ${spendCheck.currentCents} cents`);
+      throw new HttpException("AI service temporarily unavailable. Please try again later.", 503);
+    }
+
     // Validate ownership
     const person = await this.prisma.person.findFirst({
       where: { id: dto.personId, userId, deletedAt: null },
