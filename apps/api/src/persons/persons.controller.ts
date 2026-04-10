@@ -12,7 +12,7 @@ import {
 import type { User } from "@prisma/client";
 import { PersonsService } from "./persons.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import type {
+import {
   CreatePersonDto,
   UpdatePersonDto,
   CreateNeverAgainDto,

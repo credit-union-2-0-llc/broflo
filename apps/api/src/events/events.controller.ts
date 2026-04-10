@@ -13,7 +13,7 @@ import {
 import type { User } from "@prisma/client";
 import { EventsService } from "./events.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import type { CreateEventDto, UpdateEventDto } from "./dto/events.dto";
+import { CreateEventDto, UpdateEventDto } from "./dto/events.dto";
 
 @Controller()
 export class EventsController {

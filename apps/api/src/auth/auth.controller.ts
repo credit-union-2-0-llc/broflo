@@ -16,7 +16,7 @@ import type { User } from "@prisma/client";
 import { AuthService } from "./auth.service";
 import { Public } from "./decorators/public.decorator";
 import { CurrentUser } from "./decorators/current-user.decorator";
-import type {
+import {
   SignupDto,
   LoginDto,
   RefreshDto,
