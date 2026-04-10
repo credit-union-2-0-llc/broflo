@@ -32,11 +32,24 @@ export const VOICE = {
   orderSuccess:
     "Done. They have no idea how easy that was. Keep it that way.",
 
+  events: {
+    created: "Noted. We'll make sure you're ready.",
+    deleted: "Event removed. We'll stop reminding you.",
+    updated: "Updated. We're on it.",
+  },
+
+  errors: {
+    eventsLoad: "Something went wrong loading your events. Try again.",
+    generic: "Something went wrong. Try again.",
+  },
+
   alerts: {
     thirtyDay: (name: string) =>
       `Heads up: ${name}'s birthday is in 30 days. Plenty of time. For now.`,
     sevenDay: (name: string) =>
       `${name}'s birthday is in 7 days. Time to stop procrastinating.`,
+    oneDay: (name: string) =>
+      `${name}'s event is TOMORROW. This is not a drill.`,
     missedEvent:
       "We tried to warn you. The Groveling Package awaits.",
   },

@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { api } from "@/lib/api";
+import type { UpcomingEvent } from "@/lib/api";
 import { VOICE } from "@broflo/shared";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { DeletePersonButton } from "@/components/delete-person-button";
+import { PersonEventsClient } from "./person-events-client";
 
 function initials(name: string) {
   return name
@@ -40,8 +42,17 @@ export default async function PersonDetailPage({
   const { id } = await params;
 
   let person;
+  let events: UpcomingEvent[] = [];
+  let people: Awaited<ReturnType<typeof api.listPersons>> = [];
   try {
-    person = await api.getPerson(session.accessToken, id);
+    const [personRes, eventsRes, peopleRes] = await Promise.all([
+      api.getPerson(session.accessToken, id),
+      api.getUpcomingEvents(session.accessToken, { limit: 100 }),
+      api.listPersons(session.accessToken),
+    ]);
+    person = personRes;
+    events = eventsRes.data;
+    people = peopleRes;
   } catch {
     notFound();
   }
@@ -173,6 +184,9 @@ export default async function PersonDetailPage({
                 </div>
               </>
             )}
+
+            <Separator className="my-3" />
+            <PersonEventsClient events={events} person={person} people={people} />
 
             <Separator className="my-3" />
             <div>

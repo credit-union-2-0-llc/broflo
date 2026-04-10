@@ -1,5 +1,63 @@
 import type { Person, NeverAgainItem, CreatePersonData } from "@broflo/shared";
 
+export interface BrofloEvent {
+  id: string;
+  personId: string;
+  userId: string;
+  name: string;
+  occasionType: string;
+  date: string;
+  isRecurring: boolean;
+  recurrenceRule: string;
+  budgetMinCents: number | null;
+  budgetMaxCents: number | null;
+  notes: string | null;
+  isAutoCreated: boolean;
+  userModified: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpcomingEvent extends BrofloEvent {
+  personName: string;
+  nextOccurrence: string;
+  daysUntil: number;
+}
+
+export interface UpcomingEventsResponse {
+  data: UpcomingEvent[];
+  meta: { page: number; limit: number; total: number };
+}
+
+export interface CreateEventData {
+  name: string;
+  date: string;
+  occasionType: string;
+  isRecurring?: boolean;
+  recurrenceRule?: string;
+  budgetMinCents?: number;
+  budgetMaxCents?: number;
+  notes?: string;
+}
+
+export interface Reminder {
+  id: string;
+  eventId: string;
+  userId: string;
+  leadDays: number;
+  scheduledFor: string;
+  dismissedAt: string | null;
+  createdAt: string;
+  event: {
+    id: string;
+    name: string;
+    occasionType: string;
+    date: string;
+    personId: string;
+    person: { name: string };
+  };
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 type FetchOptions = RequestInit & {
@@ -96,6 +154,46 @@ export const api = {
   removeNeverAgain: (token: string, personId: string, itemId: string) =>
     apiFetch<void>(`/persons/${personId}/never-again/${itemId}`, {
       method: "DELETE",
+      token,
+    }),
+
+  // Events
+  getUpcomingEvents: (token: string, params?: { page?: number; limit?: number; days?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.limit) q.set("limit", String(params.limit));
+    if (params?.days) q.set("days", String(params.days));
+    const qs = q.toString();
+    return apiFetch<UpcomingEventsResponse>(`/events/upcoming${qs ? `?${qs}` : ""}`, { token });
+  },
+
+  createEvent: (token: string, personId: string, data: CreateEventData) =>
+    apiFetch<BrofloEvent>(`/persons/${personId}/events`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  updateEvent: (token: string, personId: string, eventId: string, data: Partial<CreateEventData>) =>
+    apiFetch<BrofloEvent>(`/persons/${personId}/events/${eventId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  deleteEvent: (token: string, personId: string, eventId: string) =>
+    apiFetch<void>(`/persons/${personId}/events/${eventId}`, {
+      method: "DELETE",
+      token,
+    }),
+
+  // Reminders
+  getReminders: (token: string) =>
+    apiFetch<Reminder[]>("/reminders", { token }),
+
+  dismissReminder: (token: string, reminderId: string) =>
+    apiFetch<Reminder>(`/reminders/${reminderId}/dismiss`, {
+      method: "PATCH",
       token,
     }),
 };
