@@ -1,0 +1,202 @@
+import { auth } from "@/lib/auth";
+import { redirect, notFound } from "next/navigation";
+import { api } from "@/lib/api";
+import { VOICE } from "@broflo/shared";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { DeletePersonButton } from "@/components/delete-person-button";
+
+function initials(name: string) {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function dollars(cents: number | null) {
+  if (cents === null) return null;
+  return `$${(cents / 100).toFixed(0)}`;
+}
+
+export default async function PersonDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const session = await auth();
+  if (!session) redirect("/login");
+
+  const { id } = await params;
+
+  let person;
+  try {
+    person = await api.getPerson(session.accessToken, id);
+  } catch {
+    notFound();
+  }
+
+  const sections = [
+    {
+      label: "Sizes",
+      items: [
+        { label: "Top", value: person.clothingSizeTop },
+        { label: "Bottom", value: person.clothingSizeBottom },
+        { label: "Shoes", value: person.shoeSize },
+      ].filter((i) => i.value),
+    },
+    {
+      label: "Preferences",
+      items: [
+        { label: "Music", value: person.musicTaste },
+        { label: "Brands", value: person.favoriteBrands },
+        { label: "Hobbies", value: person.hobbies },
+        { label: "Food", value: person.foodPreferences },
+      ].filter((i) => i.value),
+    },
+  ];
+
+  return (
+    <div className="min-h-screen bg-background px-4 py-8">
+      <div className="mx-auto max-w-2xl space-y-6">
+        <div className="flex items-center justify-between">
+          <Link href="/people">
+            <Button variant="ghost" size="sm">&larr; Back</Button>
+          </Link>
+          <div className="flex gap-2">
+            <Link href={`/people/${person.id}/edit`}>
+              <Button variant="outline" size="sm">Edit</Button>
+            </Link>
+            <DeletePersonButton personId={person.id} personName={person.name} />
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-4">
+            <Avatar className="h-14 w-14">
+              <AvatarFallback className="bg-primary text-primary-foreground text-lg font-bold">
+                {initials(person.name)}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <CardTitle className="text-2xl">{person.name}</CardTitle>
+              <Badge variant="secondary" className="mt-1 capitalize">
+                {person.relationship}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              {person.birthday && (
+                <div>
+                  <span className="text-muted-foreground">Birthday</span>
+                  <p className="font-medium">
+                    {new Date(person.birthday).toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+              )}
+              {person.anniversary && (
+                <div>
+                  <span className="text-muted-foreground">Anniversary</span>
+                  <p className="font-medium">
+                    {new Date(person.anniversary).toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+              )}
+              {(person.budgetMinCents || person.budgetMaxCents) && (
+                <div>
+                  <span className="text-muted-foreground">Budget Range</span>
+                  <p className="font-medium">
+                    {dollars(person.budgetMinCents) || "$0"} &ndash;{" "}
+                    {dollars(person.budgetMaxCents) || "..."}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {sections.map(
+              (section) =>
+                section.items.length > 0 && (
+                  <div key={section.label}>
+                    <Separator className="my-3" />
+                    <h3 className="text-sm font-semibold text-muted-foreground mb-2">
+                      {section.label}
+                    </h3>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      {section.items.map((item) => (
+                        <div key={item.label}>
+                          <span className="text-muted-foreground">{item.label}</span>
+                          <p>{item.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ),
+            )}
+
+            {person.wishlistUrls && (
+              <>
+                <Separator className="my-3" />
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">
+                    Wishlist URLs
+                  </h3>
+                  <p className="text-sm whitespace-pre-line">{person.wishlistUrls}</p>
+                </div>
+              </>
+            )}
+
+            {person.notes && (
+              <>
+                <Separator className="my-3" />
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">Notes</h3>
+                  <p className="text-sm whitespace-pre-line">{person.notes}</p>
+                </div>
+              </>
+            )}
+
+            <Separator className="my-3" />
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground mb-2">
+                Never Again List
+              </h3>
+              {person.neverAgainItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">
+                  {VOICE.emptyStates.neverAgain}
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {person.neverAgainItems.map((item) => (
+                    <li key={item.id} className="text-sm flex items-center gap-2">
+                      <span className="text-destructive">&#x2717;</span>
+                      {item.description}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

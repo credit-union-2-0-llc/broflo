@@ -1,3 +1,5 @@
+import type { Person, NeverAgainItem, CreatePersonData } from "@broflo/shared";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 type FetchOptions = RequestInit & {
@@ -20,6 +22,7 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
     throw new Error(body.message || `API error ${res.status}`);
   }
 
+  if (res.status === 204) return undefined as T;
   return res.json();
 }
 
@@ -58,4 +61,41 @@ export const api = {
     }),
 
   getGoogleLoginUrl: () => `${API_URL}/auth/google`,
+
+  // Persons
+  listPersons: (token: string) =>
+    apiFetch<Person[]>("/persons", { token }),
+
+  getPerson: (token: string, id: string) =>
+    apiFetch<Person>(`/persons/${id}`, { token }),
+
+  createPerson: (token: string, data: CreatePersonData) =>
+    apiFetch<Person>("/persons", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  updatePerson: (token: string, id: string, data: Partial<CreatePersonData>) =>
+    apiFetch<Person>(`/persons/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  deletePerson: (token: string, id: string) =>
+    apiFetch<void>(`/persons/${id}`, { method: "DELETE", token }),
+
+  addNeverAgain: (token: string, personId: string, description: string) =>
+    apiFetch<NeverAgainItem>(`/persons/${personId}/never-again`, {
+      method: "POST",
+      body: JSON.stringify({ description }),
+      token,
+    }),
+
+  removeNeverAgain: (token: string, personId: string, itemId: string) =>
+    apiFetch<void>(`/persons/${personId}/never-again/${itemId}`, {
+      method: "DELETE",
+      token,
+    }),
 };

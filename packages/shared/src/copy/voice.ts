@@ -18,6 +18,15 @@ export const VOICE = {
     events: "Your calendar is empty. Suspicious. Add someone worth remembering.",
     suggestions:
       "We're thinking. Give us a second. Good gifts take a moment.",
+    neverAgain:
+      "No banned gifts yet. Give it time. You'll learn.",
+  },
+
+  people: {
+    addFirst: "Add your first person. We'll handle the rest.",
+    addAnother: "Add another person worth impressing.",
+    deleted: "Gone. We won't ask questions.",
+    neverAgainAdded: "Noted. We'll never suggest that again.",
   },
 
   orderSuccess:

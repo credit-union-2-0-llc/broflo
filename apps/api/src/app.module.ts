@@ -4,6 +4,7 @@ import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { HealthController } from "./health/health.controller";
 import { PrismaService } from "./prisma/prisma.service";
 import { AuthModule } from "./auth/auth.module";
+import { PersonsModule } from "./persons/persons.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 
 @Module({
@@ -16,6 +17,7 @@ import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
       },
     ]),
     AuthModule,
+    PersonsModule,
   ],
   controllers: [HealthController],
   providers: [
