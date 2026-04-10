@@ -3,14 +3,20 @@ import { Resend } from "resend";
 
 @Injectable()
 export class EmailService {
-  private resend: Resend;
+  private resend: Resend | null;
 
   constructor() {
-    this.resend = new Resend(process.env.RESEND_API_KEY || "");
+    const apiKey = process.env.RESEND_API_KEY;
+    this.resend = apiKey ? new Resend(apiKey) : null;
   }
 
   async sendPasswordReset(email: string, resetToken: string): Promise<void> {
     const resetUrl = `${process.env.WEB_URL || "http://localhost:3000"}/reset-password?token=${resetToken}`;
+
+    if (!this.resend) {
+      console.log(`[broflo-email] DEV MODE — reset link for ${email}: ${resetUrl}`);
+      return;
+    }
 
     await this.resend.emails.send({
       from: process.env.EMAIL_FROM || "Broflo <noreply@broflo.com>",

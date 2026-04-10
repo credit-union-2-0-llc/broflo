@@ -20,7 +20,7 @@ import { PrismaService } from "../prisma/prisma.service";
   providers: [
     AuthService,
     JwtStrategy,
-    GoogleStrategy,
+    ...(process.env.GOOGLE_CLIENT_ID ? [GoogleStrategy] : []),
     EmailService,
     PrismaService,
   ],
