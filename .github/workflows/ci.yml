@@ -107,14 +107,13 @@ jobs:
       - name: Prepare deploy package
         run: |
           cd apps/web
-          mkdir -p deploy/.next
-          cp -r .next/standalone/* deploy/
-          cp -r .next/standalone/apps/web/* deploy/
-          cp -r .next/static deploy/.next/static
-          cp -r public deploy/public 2>/dev/null || true
+          # Deploy standalone as-is (preserves monorepo node_modules resolution)
+          mkdir -p .next/standalone/apps/web/.next
+          cp -r .next/static .next/standalone/apps/web/.next/static
+          cp -r public .next/standalone/apps/web/public 2>/dev/null || true
 
       - name: Zip deploy package
-        run: cd apps/web/deploy && zip -r ../../../deploy-web.zip . -x '*.map'
+        run: cd apps/web/.next/standalone && zip -r ../../../../deploy-web.zip . -x '*.map'
 
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3
