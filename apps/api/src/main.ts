@@ -28,7 +28,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3001;
   await app.listen(port);
-  console.log(`[broflo-api] listening on port ${port}`);
+  console.log(`[broflo-api] v0.6.0 listening on port ${port}`);
 }
 
 bootstrap();
