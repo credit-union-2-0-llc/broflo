@@ -12,7 +12,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 # Model routing by tier
 TIER_MODELS: dict[SubscriptionTier, str] = {
-    SubscriptionTier.free: "claude-haiku-4-5-20250315",
+    SubscriptionTier.free: "claude-haiku-4-5-20251001",
     SubscriptionTier.pro: "claude-sonnet-4-20250514",
     SubscriptionTier.elite: "claude-sonnet-4-6-20260217",
 }
