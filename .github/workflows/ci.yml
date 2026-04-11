@@ -151,32 +151,15 @@ jobs:
 
       - name: Prepare deploy package
         run: |
-          cd apps/api
-          mkdir -p deploy
-          cp -r dist deploy/dist
-          cp package.json deploy/
-          cp -r node_modules deploy/node_modules 2>/dev/null || true
-          # Copy Prisma artifacts
-          cp -r prisma deploy/prisma 2>/dev/null || true
-          cp -r src/generated deploy/src/generated 2>/dev/null || true
-          # Copy root node_modules for hoisted deps
-          cd ../..
-          cp -r node_modules apps/api/deploy/node_modules_root 2>/dev/null || true
-
-      - name: Create startup script
-        run: |
-          cat > apps/api/deploy/startup.sh << 'STARTUP'
-          #!/bin/bash
-          # Merge hoisted node_modules
-          if [ -d "/home/site/wwwroot/node_modules_root" ]; then
-            cp -rn /home/site/wwwroot/node_modules_root/* /home/site/wwwroot/node_modules/ 2>/dev/null || true
-          fi
-          node dist/main
-          STARTUP
-          chmod +x apps/api/deploy/startup.sh
+          # Use pnpm deploy to create self-contained directory with resolved deps
+          pnpm --filter @broflo/api deploy apps/api/deploy
+          # Copy build output and Prisma artifacts into deploy dir
+          cp -r apps/api/dist apps/api/deploy/dist
+          cp -r apps/api/prisma apps/api/deploy/prisma 2>/dev/null || true
+          cp -r apps/api/src/generated apps/api/deploy/src/generated 2>/dev/null || true
 
       - name: Zip deploy package
-        run: cd apps/api/deploy && zip -r ../../../deploy-api.zip .
+        run: cd apps/api/deploy && zip -r ../../../deploy-api.zip . -x '*.map'
 
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3
