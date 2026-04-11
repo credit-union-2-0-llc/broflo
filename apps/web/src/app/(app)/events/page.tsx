@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import type { UpcomingEvent } from "@/lib/api";
 import { VOICE } from "@broflo/shared";
@@ -40,9 +41,9 @@ export default async function EventsPage() {
           </div>
           <div className="text-center py-12">
             <p className="text-sm text-destructive">{VOICE.errors.eventsLoad}</p>
-            <a href="/events" className="text-sm text-broflo-electric hover:underline mt-2 inline-block">
+            <Link href="/events" className="text-sm text-broflo-electric hover:underline mt-2 inline-block">
               Try Again
-            </a>
+            </Link>
           </div>
         </div>
       </div>

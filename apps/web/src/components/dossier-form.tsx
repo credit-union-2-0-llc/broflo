@@ -183,7 +183,7 @@ export function DossierForm({
           <Card>
             <CardContent className="space-y-4 pt-6">
               <p className="text-sm text-muted-foreground">
-                Set a budget range for gifts. We'll stay in bounds.
+                Set a budget range for gifts. We&apos;ll stay in bounds.
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
