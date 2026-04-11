@@ -108,10 +108,14 @@ jobs:
         run: |
           cd apps/web
           mkdir -p deploy/.next
-          # Root node_modules first (has hoisted deps like @swc/helpers)
-          cp -r .next/standalone/node_modules deploy/node_modules
-          # Merge workspace node_modules (has next) without overwriting root
-          cp -rn .next/standalone/apps/web/node_modules/* deploy/node_modules/ 2>/dev/null || true
+          # Copy root node_modules (dereference pnpm symlinks)
+          cp -rL .next/standalone/node_modules deploy/node_modules
+          # Hoist packages from pnpm virtual store to top level
+          if [ -d ".next/standalone/node_modules/.pnpm/node_modules" ]; then
+            cp -rLn .next/standalone/node_modules/.pnpm/node_modules/* deploy/node_modules/ 2>/dev/null || true
+          fi
+          # Merge workspace node_modules
+          cp -rLn .next/standalone/apps/web/node_modules/* deploy/node_modules/ 2>/dev/null || true
           cp .next/standalone/package.json deploy/package.json 2>/dev/null || true
           # Server + compiled pages from workspace
           cp .next/standalone/apps/web/server.js deploy/
