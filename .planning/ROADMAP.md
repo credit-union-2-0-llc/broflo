@@ -19,9 +19,17 @@
 
 **Goal:** Place real orders at retailers on user's behalf via Stripe Connect. One-tap approve flow with 2-hour cancel window. Mock adapter until retailer credentials secured.
 
-**Status:** Not started
+**Status:** Planning complete
 
 **Depends on:** S-6 (payment vault required), S-4 (suggestions required)
+
+**Plans:** 4 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — OrdersModule backend: schema, RetailerAdapter, MockAdapter, API endpoints, unit tests
+- [ ] 07-02-PLAN.md — Stripe Connect integration: destination charges, refunds with reverse_transfer
+- [ ] 07-03-PLAN.md — Frontend order flow: preview modal, cancel countdown, cancel dialog, suggestion card updates
+- [ ] 07-04-PLAN.md — Integration: DB schema push, SuggestionsView wiring, e2e verification checkpoint
 
 **Canonical refs:**
 - `docs/slices/S7-first-retailer-api.md`
