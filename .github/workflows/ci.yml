@@ -106,7 +106,7 @@ jobs:
       - name: Prepare deploy package
         run: |
           cd apps/web
-          mkdir -p deploy
+          mkdir -p deploy/.next
           cp -r .next/standalone/* deploy/
           cp -r .next/standalone/apps/web/* deploy/
           cp -r .next/static deploy/.next/static
