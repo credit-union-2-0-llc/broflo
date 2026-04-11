@@ -15,12 +15,15 @@
 | G4 | Security Fixes | Complete |
 | S-6 | Stripe Payment Vault | Complete |
 
-### Active Phases
-| Phase | Name | Goal | Status |
-|-------|------|------|--------|
-| 7 | First Retailer API | Place real orders at retailers on user's behalf via Stripe Connect. One-tap approve flow with 2-hour cancel window. Mock adapter until retailer credentials secured. | Not started |
+### Phase 7: First Retailer API
 
-Canonical refs:
+**Goal:** Place real orders at retailers on user's behalf via Stripe Connect. One-tap approve flow with 2-hour cancel window. Mock adapter until retailer credentials secured.
+
+**Status:** Not started
+
+**Depends on:** S-6 (payment vault required), S-4 (suggestions required)
+
+**Canonical refs:**
 - `docs/slices/S7-first-retailer-api.md`
 
 ### Future Phases
