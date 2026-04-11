@@ -184,7 +184,6 @@ jobs:
           app-name: broflo-api
           publish-profile: ${{ secrets.BROFLO_API_PUBLISH_PROFILE }}
           package: deploy-api.zip
-          startup-command: bash /home/site/wwwroot/startup.sh
 
   # ─────────────────────────────────────────────
   # Deploy: AI (FastAPI → ACR → Container App)
