@@ -184,6 +184,17 @@ export interface CreateGiftResponse {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
+export class ApiError extends Error {
+  status: number;
+  upgradeUrl?: string;
+  constructor(message: string, status: number, upgradeUrl?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.upgradeUrl = upgradeUrl;
+  }
+}
+
 type FetchOptions = RequestInit & {
   token?: string;
 };
@@ -201,7 +212,11 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(body.message || `API error ${res.status}`);
+    throw new ApiError(
+      body.message || `API error ${res.status}`,
+      res.status,
+      body.upgrade_url,
+    );
   }
 
   if (res.status === 204) return undefined as T;

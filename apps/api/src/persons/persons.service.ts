@@ -46,7 +46,8 @@ export class PersonsService {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
     });
-    const maxPeople = TIER_MAX_PEOPLE[user.subscriptionTier] ?? 3;
+    const tierLimit = TIER_MAX_PEOPLE[user.subscriptionTier];
+    const maxPeople = tierLimit === undefined ? 3 : tierLimit;
     if (maxPeople !== null) {
       const count = await this.prisma.person.count({
         where: { userId, deletedAt: null },

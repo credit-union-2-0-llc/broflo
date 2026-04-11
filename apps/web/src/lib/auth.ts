@@ -87,7 +87,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         const u = user as Record<string, unknown>;
         token.accessToken = u.accessToken as string;
@@ -100,6 +100,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           subscriptionTier: u.subscriptionTier as string,
           brofloScore: u.brofloScore as number,
         };
+      }
+      if (trigger === "update" && token.accessToken) {
+        try {
+          const sub = await api.getSubscription(token.accessToken as string);
+          (token.user as { subscriptionTier: string }).subscriptionTier =
+            sub.subscriptionTier;
+        } catch {
+          // keep existing tier on failure
+        }
       }
       return token;
     },

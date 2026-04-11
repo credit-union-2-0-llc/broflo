@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -31,10 +31,16 @@ async function openPortal(token: string) {
 }
 
 function BillingContent() {
-  const { data: session } = useSession();
+  const { data: session, update } = useSession();
   const searchParams = useSearchParams();
   const success = searchParams.get("success");
   const tier = session?.user?.subscriptionTier || "free";
+
+  useEffect(() => {
+    if (success) {
+      update();
+    }
+  }, [success, update]);
   const isPaid = tier !== "free";
 
   return (
