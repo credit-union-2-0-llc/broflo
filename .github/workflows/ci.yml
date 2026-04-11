@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -6,9 +6,20 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "20"
+  ACR_NAME: cu2registry
+  ACR_LOGIN_SERVER: cu2registry.azurecr.io
+
 jobs:
-  lint-and-typecheck:
-    name: Lint & Typecheck
+  # ─────────────────────────────────────────────
+  # CI: Lint, Typecheck, Test, Build
+  # ─────────────────────────────────────────────
+  ci:
+    name: CI
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,8 +28,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: "pnpm"
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
 
       - run: pnpm install --frozen-lockfile
 
@@ -31,32 +42,50 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    needs: lint-and-typecheck
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "pnpm"
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Generate Prisma Client
-        run: pnpm --filter @broflo/api prisma:generate
-
       - name: Test
         run: pnpm test
 
-  build:
-    name: Build
+      - name: Build API
+        run: pnpm build:api
+
+      - name: Build Web
+        run: pnpm build:web
+
+  # ─────────────────────────────────────────────
+  # Detect which services changed
+  # ─────────────────────────────────────────────
+  changes:
+    name: Detect changes
     runs-on: ubuntu-latest
-    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      api: ${{ steps.filter.outputs.api }}
+      ai: ${{ steps.filter.outputs.ai }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            web:
+              - 'apps/web/**'
+              - 'packages/shared/**'
+            api:
+              - 'apps/api/**'
+              - 'packages/shared/**'
+            ai:
+              - 'services/ai/**'
+
+  # ─────────────────────────────────────────────
+  # Deploy: Web (Next.js standalone → Azure App Service)
+  # ─────────────────────────────────────────────
+  deploy-web:
+    name: Deploy Web
+    runs-on: ubuntu-latest
+    needs: [ci, changes]
+    if: needs.changes.outputs.web == 'true'
+    environment: production
     steps:
       - uses: actions/checkout@v4
 
@@ -64,8 +93,53 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: "pnpm"
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build standalone
+        run: pnpm build:web
+        env:
+          NEXT_PUBLIC_API_URL: https://broflo-api.azurewebsites.net
+
+      - name: Prepare deploy package
+        run: |
+          cd apps/web
+          mkdir -p deploy
+          cp -r .next/standalone/* deploy/
+          cp -r .next/standalone/apps/web/* deploy/
+          cp -r .next/static deploy/.next/static
+          cp -r public deploy/public 2>/dev/null || true
+
+      - name: Zip deploy package
+        run: cd apps/web/deploy && zip -r ../../../deploy-web.zip . -x '*.map'
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: broflo-web
+          publish-profile: ${{ secrets.BROFLO_WEB_PUBLISH_PROFILE }}
+          package: deploy-web.zip
+
+  # ─────────────────────────────────────────────
+  # Deploy: API (NestJS → Azure App Service)
+  # ─────────────────────────────────────────────
+  deploy-api:
+    name: Deploy API
+    runs-on: ubuntu-latest
+    needs: [ci, changes]
+    if: needs.changes.outputs.api == 'true'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
 
       - run: pnpm install --frozen-lockfile
 
@@ -75,17 +149,71 @@ jobs:
       - name: Build API
         run: pnpm build:api
 
-      - name: Build Web
-        run: pnpm build:web
+      - name: Prepare deploy package
+        run: |
+          cd apps/api
+          mkdir -p deploy
+          cp -r dist deploy/dist
+          cp package.json deploy/
+          cp -r node_modules deploy/node_modules 2>/dev/null || true
+          # Copy Prisma artifacts
+          cp -r prisma deploy/prisma 2>/dev/null || true
+          cp -r src/generated deploy/src/generated 2>/dev/null || true
+          # Copy root node_modules for hoisted deps
+          cd ../..
+          cp -r node_modules apps/api/deploy/node_modules_root 2>/dev/null || true
 
-  deploy-dev:
-    name: Deploy to Dev
+      - name: Create startup script
+        run: |
+          cat > apps/api/deploy/startup.sh << 'STARTUP'
+          #!/bin/bash
+          # Merge hoisted node_modules
+          if [ -d "/home/site/wwwroot/node_modules_root" ]; then
+            cp -rn /home/site/wwwroot/node_modules_root/* /home/site/wwwroot/node_modules/ 2>/dev/null || true
+          fi
+          node dist/main
+          STARTUP
+          chmod +x apps/api/deploy/startup.sh
+
+      - name: Zip deploy package
+        run: cd apps/api/deploy && zip -r ../../../deploy-api.zip .
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: broflo-api
+          publish-profile: ${{ secrets.BROFLO_API_PUBLISH_PROFILE }}
+          package: deploy-api.zip
+          startup-command: bash /home/site/wwwroot/startup.sh
+
+  # ─────────────────────────────────────────────
+  # Deploy: AI (FastAPI → ACR → Container App)
+  # ─────────────────────────────────────────────
+  deploy-ai:
+    name: Deploy AI
     runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: development
+    needs: [ci, changes]
+    if: needs.changes.outputs.ai == 'true'
+    environment: production
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy placeholder
-        run: echo "Azure deployment will be configured with federated identity"
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build and push to ACR
+        run: |
+          az acr build \
+            --registry ${{ env.ACR_NAME }} \
+            --image broflo-ai:${{ github.sha }} \
+            --image broflo-ai:latest \
+            services/ai/
+
+      - name: Deploy to Container App
+        run: |
+          az containerapp update \
+            --name broflo-ai \
+            --resource-group rg-broflo \
+            --image ${{ env.ACR_LOGIN_SERVER }}/broflo-ai:${{ github.sha }}
