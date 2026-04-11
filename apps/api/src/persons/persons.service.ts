@@ -2,7 +2,14 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
 } from "@nestjs/common";
+const TIER_MAX_PEOPLE: Record<string, number | null> = {
+  free: 3,
+  pro: null,
+  elite: null,
+};
 import { PrismaService } from "../prisma/prisma.service";
 import { EventsService } from "../events/events.service";
 import type {
@@ -36,6 +43,28 @@ export class PersonsService {
   }
 
   async create(userId: string, dto: CreatePersonDto) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+    });
+    const maxPeople = TIER_MAX_PEOPLE[user.subscriptionTier] ?? 3;
+    if (maxPeople !== null) {
+      const count = await this.prisma.person.count({
+        where: { userId, deletedAt: null },
+      });
+      if (count >= maxPeople) {
+        throw new HttpException(
+          {
+            statusCode: HttpStatus.PAYMENT_REQUIRED,
+            message: `You've hit the Free limit. Three people is a lot... for a free tier. Upgrade and we'll remember everyone.`,
+            upgradeUrl: "/upgrade",
+            currentTier: user.subscriptionTier,
+            requiredTier: "pro",
+          },
+          HttpStatus.PAYMENT_REQUIRED,
+        );
+      }
+    }
+
     const person = await this.prisma.person.create({
       data: {
         userId,

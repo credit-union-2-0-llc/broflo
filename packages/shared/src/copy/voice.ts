@@ -130,4 +130,24 @@ export const VOICE = {
 
   cancelWindow:
     "You've got 2 hours to cancel. After that, it's in the mail and you're a hero.",
+
+  billing: {
+    upgradePrompt:
+      "You've hit the Free limit. Three people is a lot... for a free tier. Upgrade and we'll remember everyone.",
+    upgradeCta: "Unlock the full Broflo",
+    proTagline: "For people who actually have people.",
+    eliteTagline: "For the person who has everything. Except time.",
+    freeTagline: "Dip your toes in. We won't judge. (Much.)",
+    checkoutSuccess:
+      "Welcome to the inner circle. Your gift game just leveled up.",
+    checkoutCanceled:
+      "Changed your mind? No hard feelings. The free tier misses you already.",
+    portalButton: "Manage Billing",
+    currentPlan: "Current Plan",
+    paymentFailed:
+      "Your payment didn't go through. We've paused your Pro perks until it's sorted.",
+    subscriptionCanceled:
+      "You've been downgraded to Free. We'll be here when you want to come back.",
+    noPlan: "You're on the free tier. Upgrade to unlock everything.",
+  },
 } as const;

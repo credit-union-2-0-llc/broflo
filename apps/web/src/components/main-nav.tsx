@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { LayoutDashboard, Users, Calendar, User, Trophy, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Calendar, User, Trophy, LogOut, Sparkles, CreditCard } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -96,6 +96,23 @@ export function MainNav() {
                 <User className="mr-2 h-4 w-4" />
                 Profile
               </DropdownMenuItem>
+              {user?.subscriptionTier === "free" ? (
+                <DropdownMenuItem
+                  className="cursor-pointer text-broflo-electric"
+                  onClick={() => window.location.href = "/upgrade"}
+                >
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Upgrade
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => window.location.href = "/billing"}
+                >
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Billing
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="cursor-pointer text-destructive focus:text-destructive"

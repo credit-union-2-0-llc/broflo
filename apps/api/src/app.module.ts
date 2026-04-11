@@ -10,6 +10,7 @@ import { EventsModule } from "./events/events.module";
 import { RemindersModule } from "./reminders/reminders.module";
 import { SuggestionsModule } from "./suggestions/suggestions.module";
 import { GiftsModule } from "./gifts/gifts.module";
+import { BillingModule } from "./billing/billing.module";
 import { RedisModule } from "./redis/redis.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 
@@ -30,6 +31,7 @@ import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
     RedisModule,
     SuggestionsModule,
     GiftsModule,
+    BillingModule,
   ],
   controllers: [HealthController],
   providers: [

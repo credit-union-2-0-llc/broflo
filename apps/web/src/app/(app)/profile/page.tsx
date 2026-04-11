@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import {
@@ -46,9 +47,26 @@ export default async function ProfilePage() {
             <p className="text-sm font-medium text-muted-foreground">
               Subscription
             </p>
-            <p className="text-foreground capitalize">
-              {user?.subscriptionTier || "free"}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-foreground capitalize">
+                {user?.subscriptionTier || "free"}
+              </p>
+              {(user?.subscriptionTier || "free") === "free" ? (
+                <Link
+                  href="/upgrade"
+                  className="inline-flex items-center justify-center rounded-lg h-7 px-2.5 text-[0.8rem] font-medium border border-broflo-electric text-broflo-electric hover:bg-muted transition-colors"
+                >
+                  Upgrade
+                </Link>
+              ) : (
+                <Link
+                  href="/billing"
+                  className="inline-flex items-center justify-center rounded-lg h-7 px-2.5 text-[0.8rem] font-medium border border-border hover:bg-muted transition-colors"
+                >
+                  Manage
+                </Link>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

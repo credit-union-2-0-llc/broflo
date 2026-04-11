@@ -379,4 +379,26 @@ export const api = {
 
   getRecentGifts: (token: string) =>
     apiFetch<RecentGiftsResponse>("/gifts/recent", { token }),
+
+  // Billing (S-6)
+  createCheckoutSession: (token: string, priceId: string) =>
+    apiFetch<{ url: string }>("/billing/checkout-session", {
+      method: "POST",
+      body: JSON.stringify({ priceId }),
+      token,
+    }),
+
+  createPortalSession: (token: string) =>
+    apiFetch<{ url: string }>("/billing/portal-session", {
+      method: "POST",
+      token,
+    }),
+
+  getSubscription: (token: string) =>
+    apiFetch<{
+      subscriptionTier: string;
+      stripeSubscriptionId: string | null;
+      stripeCustomerId: string | null;
+      hasPaymentMethod: boolean;
+    }>("/billing/subscription", { token }),
 };

@@ -6,7 +6,7 @@ import { GlobalExceptionFilter } from "./filters/global-exception.filter";
 import { RequestLoggerMiddleware } from "./middleware/request-logger.middleware";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   app.use(helmet());
 
