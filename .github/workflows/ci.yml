@@ -108,10 +108,12 @@ jobs:
         run: |
           cd apps/web
           mkdir -p deploy/.next
-          # Root node_modules (has hoisted deps like @swc/helpers)
+          # Root node_modules first (has hoisted deps like @swc/helpers)
           cp -r .next/standalone/node_modules deploy/node_modules
+          # Merge workspace node_modules (has next) without overwriting root
+          cp -rn .next/standalone/apps/web/node_modules/* deploy/node_modules/ 2>/dev/null || true
           cp .next/standalone/package.json deploy/package.json 2>/dev/null || true
-          # Server + compiled pages from workspace (NOT its node_modules)
+          # Server + compiled pages from workspace
           cp .next/standalone/apps/web/server.js deploy/
           cp -r .next/standalone/apps/web/.next/* deploy/.next/ 2>/dev/null || true
           # Static assets
@@ -157,15 +159,16 @@ jobs:
 
       - name: Prepare deploy package
         run: |
-          # Use pnpm deploy --prod for production-only deps
-          pnpm --filter @broflo/api deploy --prod apps/api/deploy
-          # Copy build output and Prisma artifacts into deploy dir
-          cp -r apps/api/dist apps/api/deploy/dist
-          cp -r apps/api/prisma apps/api/deploy/prisma 2>/dev/null || true
-          cp -r apps/api/src/generated apps/api/deploy/src/generated 2>/dev/null || true
+          mkdir -p /tmp/api-deploy
+          cp -r apps/api/dist /tmp/api-deploy/dist
+          cp -r apps/api/prisma /tmp/api-deploy/prisma
+          cp apps/api/package.json /tmp/api-deploy/package.json
+          cd /tmp/api-deploy
+          npm install --omit=dev
+          npx prisma generate
 
       - name: Zip deploy package
-        run: cd apps/api/deploy && zip -r ../../../deploy-api.zip . -x '*.map' -x '*/README.md' -x '*/CHANGELOG.md' -x '*/.github/*' -x '*/test/*' -x '*/__tests__/*'
+        run: cd /tmp/api-deploy && zip -r ${{ github.workspace }}/deploy-api.zip . -x '*.map'
 
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3
