@@ -505,22 +505,13 @@ Note: `VOICE.orderSuccess` currently reads "Done. They have no idea how easy tha
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **What is the platform fee percentage?**
-   - What we know: D-12 says "Broflo takes a platform fee" but no percentage specified
-   - What's unclear: 5%? 10%? Per-order flat fee?
-   - Recommendation: Treat as `[ASSUMED]` 5% for MockAdapter. Kirk confirms before real money flows. Store as env var `STRIPE_PLATFORM_FEE_BPS` (basis points).
+1. **What is the platform fee percentage?** — RESOLVED: 5% confirmed by Kirk (2026-04-11). Store as `STRIPE_PLATFORM_FEE_BPS=500` env var.
 
-2. **Does the free tier ever get to place orders?**
-   - What we know: S-6 payment vault exists for all tiers; ordering is a "pro/elite" concept per slice spec
-   - What's unclear: CONTEXT.md doesn't explicitly say free = blocked
-   - Recommendation: Block at `@RequiresTier('pro', 'elite')`. Upsell copy already exists in voice.ts.
+2. **Does the free tier ever get to place orders?** — RESOLVED: No. Pro/Elite only, confirmed by Kirk (2026-04-11). Block at `@RequiresTier('pro', 'elite')`.
 
-3. **Is `GiftRecord.source` enum update backward-compatible on production DB?**
-   - What we know: PostgreSQL `ALTER TYPE ... ADD VALUE` cannot run inside a transaction
-   - What's unclear: Whether Azure PostgreSQL 16 (the hosted version) requires special handling
-   - Recommendation: Write migration as raw SQL outside transaction block. Test on staging before prod.
+3. **Is `GiftRecord.source` enum update backward-compatible on production DB?** — RESOLVED: Plan 04 Task 1 handles via raw SQL `ALTER TYPE gift_source ADD VALUE 'ordered'` outside transaction. Standard PostgreSQL pattern, works on Azure PostgreSQL 16.
 
 ---
 
