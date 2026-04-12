@@ -36,9 +36,10 @@ export function NotificationBell() {
 
   useEffect(() => {
     if (!accessToken) return;
+    const token = accessToken;
     async function fetchUnread() {
       try {
-        const res = await api.getUnreadCount(accessToken);
+        const res = await api.getUnreadCount(token);
         setUnread(res.count);
       } catch {
         // silent

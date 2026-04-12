@@ -33,9 +33,9 @@ export function ServiceCreditBanner({ amountCents, onDismiss }: ServiceCreditBan
             variant="ghost"
             size="sm"
             className="mt-2 text-green-700 hover:text-green-800 hover:bg-green-100 px-0"
-            asChild
+            render={<a href="/billing" />}
           >
-            <a href="/billing">{VOICE.agent.creditBannerCta}</a>
+            {VOICE.agent.creditBannerCta}
           </Button>
         </div>
         <Button

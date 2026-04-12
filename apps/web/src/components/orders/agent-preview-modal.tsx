@@ -294,12 +294,10 @@ export function AgentPreviewModal({
                         variant="outline"
                         size="sm"
                         className="mt-2"
-                        asChild
+                        render={<a href={job.foundProductUrl} target="_blank" rel="noopener noreferrer" />}
                       >
-                        <a href={job.foundProductUrl} target="_blank" rel="noopener noreferrer">
-                          View on {displayRetailer}
-                          <ExternalLink className="ml-1 h-3 w-3" />
-                        </a>
+                        View on {displayRetailer}
+                        <ExternalLink className="ml-1 h-3 w-3" />
                       </Button>
                     )}
                   </Card>
@@ -481,8 +479,8 @@ export function AgentPreviewModal({
                   Close
                 </Button>
                 {job.orderId && (
-                  <Button variant="default" asChild>
-                    <a href={`/orders/${job.orderId}`}>View Order</a>
+                  <Button variant="default" render={<a href={`/orders/${job.orderId}`} />}>
+                    View Order
                   </Button>
                 )}
               </DialogFooter>
