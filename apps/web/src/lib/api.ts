@@ -226,6 +226,56 @@ export interface OrderStatusHistoryEntry {
   changedAt: string;
 }
 
+// S-10 Agent types
+export interface AgentJob {
+  id: string;
+  userId: string;
+  orderId: string | null;
+  suggestionId: string | null;
+  status: 'queued' | 'running' | 'previewing' | 'placing' | 'completed' | 'failed' | 'aborted';
+  retailerDomain: string;
+  retailerUrl: string;
+  searchTerms: string;
+  maxBudgetCents: number;
+  foundProductTitle: string | null;
+  foundProductPrice: number | null;
+  foundProductUrl: string | null;
+  foundProductImage: string | null;
+  matchConfidence: number | null;
+  confirmationNumber: string | null;
+  failureReason: 'captcha' | 'out_of_stock' | 'blocked' | 'timeout' | 'price_mismatch' | 'payment_declined' | 'address_rejected' | 'unknown' | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  steps?: AgentStep[];
+}
+
+export interface AgentStep {
+  id: string;
+  jobId: string;
+  stepNumber: number;
+  action: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+  screenshotUrl: string | null;
+  pageUrl: string | null;
+  aiModelUsed: string | null;
+  aiConfidence: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface AgentPlaceResponse {
+  job: AgentJob;
+  order?: Order;
+}
+
+export interface ServiceCreditInfo {
+  id: string;
+  amountCents: number;
+  reason: string;
+  createdAt: string;
+}
+
 // S-9 Autopilot types
 export interface AutopilotRule {
   id: string;
@@ -677,6 +727,39 @@ export const api = {
 
   markAllNotificationsRead: (token: string) =>
     apiFetch<{ success: boolean }>("/notifications/mark-all-read", {
+      method: "POST",
+      token,
+    }),
+
+  // Agent Orders (S-10)
+  agentPreview: (token: string, data: {
+    suggestionId: string;
+    personId: string;
+    eventId: string;
+    retailerUrl?: string;
+    searchTerms?: string;
+  }) =>
+    apiFetch<AgentJob>("/orders/agent/preview", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  agentPlace: (token: string, data: { jobId: string }) =>
+    apiFetch<AgentPlaceResponse>("/orders/agent/place", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  agentGetJob: (token: string, jobId: string) =>
+    apiFetch<AgentJob>(`/orders/agent/${jobId}`, { token }),
+
+  agentGetSteps: (token: string, jobId: string) =>
+    apiFetch<AgentStep[]>(`/orders/agent/${jobId}/steps`, { token }),
+
+  agentCancel: (token: string, jobId: string) =>
+    apiFetch<AgentJob>(`/orders/agent/${jobId}/cancel`, {
       method: "POST",
       token,
     }),

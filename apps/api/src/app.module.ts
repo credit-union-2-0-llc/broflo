@@ -16,6 +16,8 @@ import { AutopilotModule } from "./autopilot/autopilot.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { RedisModule } from "./redis/redis.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
+import { AgentOrdersModule } from "./orders/agent/agent-orders.module";
+import { AdminModule } from "./admin/admin.module";
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
     OrdersModule,
     AutopilotModule,
     NotificationsModule,
+    AgentOrdersModule,
+    AdminModule,
   ],
   controllers: [HealthController],
   providers: [

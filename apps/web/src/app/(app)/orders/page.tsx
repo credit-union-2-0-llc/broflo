@@ -19,6 +19,8 @@ import { api } from "@/lib/api";
 import type { Order } from "@/lib/api";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { CancelCountdown } from "@/components/orders/cancel-countdown";
+import { Badge } from "@/components/ui/badge";
+import { Bot } from "lucide-react";
 
 type StatusFilter = "all" | "active" | "delivered" | "cancelled";
 
@@ -161,6 +163,16 @@ export default function OrdersPage() {
                             })
                           : "Pending"}
                       </p>
+                      {order.retailerKey === "browser-agent" && (
+                        <Badge
+                          variant="outline"
+                          className="text-broflo-electric border-broflo-electric-light text-[10px] gap-1 w-fit mt-0.5"
+                          aria-label="This order was placed by the Broflo browser agent"
+                        >
+                          <Bot className="h-3 w-3" />
+                          Placed by Broflo Agent
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <span className="text-sm font-medium">{formatPrice(order.priceCents)}</span>

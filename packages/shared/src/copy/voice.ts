@@ -173,6 +173,59 @@ export const VOICE = {
       "Autopilot is a Pro feature. Upgrade and let us do the work.",
   },
 
+  agent: {
+    searching: [
+      "Searching for the perfect match...",
+      "Considering options that aren't socks. Stand by.",
+      "Browsing like a human. Thinking like a machine.",
+      "Cross-referencing their taste with what's in stock.",
+      "Give us a second. Good finds take a moment.",
+    ] as readonly string[],
+    executing: [
+      "Broflo is handling it. Relax.",
+      "We're placing the order. Hands off.",
+      "Working on it. This is what you pay us for.",
+      "Almost there. Patience is a virtue you don't need.",
+      "Adding to cart. Entering address. The boring stuff.",
+    ] as readonly string[],
+    found: "This looks right.",
+    foundLowConfidence: "Best we could find. Take a look.",
+    orderPlaced: "Placed by Broflo. You didn't lift a finger.",
+    captcha: (retailer: string) =>
+      `${retailer} wants to make sure we're human. (We're not.) Here's a link to finish this yourself.`,
+    outOfStock: "Sold out. Happens to the best of us.",
+    siteBlocked: (retailer: string) =>
+      `${retailer} isn't cooperating today. Some days are like that.`,
+    timeout: "This is taking longer than it should. We have standards.",
+    priceMismatch: "Heads up -- the price is different from what we estimated.",
+    priceLower: "Good news -- it's cheaper than we thought.",
+    explainerTitle: "How Broflo Orders Work",
+    explainerBody:
+      "Some retailers don't have an API, so Broflo uses a browser agent to place the order for you.",
+    explainerSteps: [
+      "We search the retailer's site for your gift",
+      "You review and confirm before we buy",
+      "We place the order using your shipping info",
+      "Same 2-hour cancel window as any Broflo order",
+    ] as readonly string[],
+    explainerPaymentNote:
+      "Your payment info is never stored by the retailer -- Broflo handles payment separately.",
+    explainerCta: "Got It, Find My Gift",
+    explainerDismiss: "Don't show this again",
+    orderManually: (retailer: string) => `Order on ${retailer}`,
+    tryDifferent: "Find Something Else",
+    tryAgain: "Try Again",
+    continueAtPrice: (price: string) => `Continue at ${price}`,
+    agentBadge: "Placed by Broflo Agent",
+    agentWorking: "Broflo is placing this order...",
+    verifiedDelivery: "Verified by Broflo",
+    sessionLogToggle: "View Agent Session Log",
+    viewScreenshots: "View All Screenshots",
+    creditIssued: (amount: string) =>
+      `That didn't work. We've credited ${amount} to your next month as an apology.`,
+    creditBannerCta: "View Credit",
+  },
+
   billing: {
     upgradePrompt:
       "You've hit the Free limit. Three people is a lot... for a free tier. Upgrade and we'll remember everyone.",

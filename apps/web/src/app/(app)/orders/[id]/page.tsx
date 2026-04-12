@@ -13,6 +13,10 @@ import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { StatusTimeline } from "@/components/orders/StatusTimeline";
 import { TrackingCard } from "@/components/orders/TrackingCard";
 import { CancelCountdown } from "@/components/orders/cancel-countdown";
+import { AgentSessionLog } from "@/components/orders/agent-session-log";
+import { Badge } from "@/components/ui/badge";
+import { Bot, CheckCircle2 } from "lucide-react";
+import type { AgentStep } from "@/lib/api";
 
 export default function OrderDetailPage() {
   const { data: session, status: sessionStatus } = useSession();
@@ -20,6 +24,7 @@ export default function OrderDetailPage() {
   const params = useParams<{ id: string }>();
   const [order, setOrder] = useState<OrderDetailResponse | null>(null);
   const [timeline, setTimeline] = useState<OrderStatusHistoryEntry[]>([]);
+  const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -36,6 +41,15 @@ export default function OrderDetailPage() {
         ]);
         setOrder(orderData);
         setTimeline(timelineData);
+        // Load agent steps if this is a browser-agent order
+        if (orderData.retailerKey === "browser-agent" && orderData.id) {
+          try {
+            const steps = await api.agentGetSteps(session.accessToken, orderData.id);
+            setAgentSteps(steps);
+          } catch {
+            // Agent steps may not be available — non-blocking
+          }
+        }
       } catch {
         router.push("/orders");
       } finally {
@@ -87,6 +101,22 @@ export default function OrderDetailPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {order.retailerKey === "browser-agent" && (
+              <Badge
+                variant="outline"
+                className="text-broflo-electric border-broflo-electric-light text-xs gap-1"
+                aria-label="This order was placed by the Broflo browser agent"
+              >
+                <Bot className="h-3 w-3" />
+                Placed by Broflo Agent
+              </Badge>
+            )}
+            {order.retailerKey === "browser-agent" && order.status === "delivered" && (
+              <Badge className="bg-green-100 text-green-700 border-green-200 border text-xs gap-1">
+                <CheckCircle2 className="h-3 w-3" />
+                Verified by Broflo
+              </Badge>
+            )}
             <OrderStatusBadge status={order.status} />
             {session?.accessToken &&
               ["pending", "ordered"].includes(order.status) &&
@@ -118,6 +148,23 @@ export default function OrderDetailPage() {
             trackingUrl={order.trackingUrl}
             carrierName={order.carrierName}
           />
+
+          {/* Agent Session Log */}
+          {order.retailerKey === "browser-agent" && agentSteps.length > 0 && (
+            <AgentSessionLog
+              steps={agentSteps}
+              sessionId={order.id}
+              retailerDomain={order.retailerKey}
+              durationSeconds={
+                agentSteps.length > 0 && agentSteps[agentSteps.length - 1].completedAt && agentSteps[0].startedAt
+                  ? Math.round(
+                      (new Date(agentSteps[agentSteps.length - 1].completedAt!).getTime() -
+                        new Date(agentSteps[0].startedAt!).getTime()) / 1000
+                    )
+                  : undefined
+              }
+            />
+          )}
 
           {/* Product Info */}
           <Card>
