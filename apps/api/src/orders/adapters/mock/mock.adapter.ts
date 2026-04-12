@@ -125,20 +125,30 @@ export class MockAdapter implements RetailerAdapter {
       return { status: 'pending' };
     }
 
-    const elapsed = Date.now() - order.placedAt.getTime();
-    const thirtyMin = 30 * 60 * 1000;
-    const twoHours = 2 * 60 * 60 * 1000;
-
     if (order.status === 'cancelled') {
       return { status: 'cancelled' };
     }
 
-    if (elapsed > twoHours) {
-      order.status = 'shipped';
-      return { status: 'shipped' };
+    const elapsed = Date.now() - order.placedAt.getTime();
+    const oneHour = 60 * 60 * 1000;
+    const fourHours = 4 * 60 * 60 * 1000;
+    const twoDays = 2 * 24 * 60 * 60 * 1000;
+
+    const trackingNumber = `MOCK-TRK-${retailerOrderId.slice(-6)}`;
+    const trackingUrl = `https://track.mock.example/${trackingNumber}`;
+    const carrierName = 'MockShip';
+
+    if (elapsed > twoDays) {
+      order.status = 'delivered';
+      return { status: 'delivered', trackingNumber, trackingUrl, carrierName };
     }
 
-    if (elapsed > thirtyMin) {
+    if (elapsed > fourHours) {
+      order.status = 'shipped';
+      return { status: 'shipped', trackingNumber, trackingUrl, carrierName };
+    }
+
+    if (elapsed > oneHour) {
       order.status = 'processing';
       return { status: 'processing' };
     }

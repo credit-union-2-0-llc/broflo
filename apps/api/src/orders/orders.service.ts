@@ -7,10 +7,11 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import type { User } from '@prisma/client';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, StatusChangeSource } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RetailerAdapter, RetailerOrderError } from './adapters/retailer.adapter';
 import { OrderAuditService } from './audit/order-audit.service';
+import { OrderStatusHistoryService } from './order-status-history.service';
 import { StripeConnectService } from './stripe-connect.service';
 import { PreviewOrderDto } from './dto/preview-order.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
@@ -24,6 +25,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     @Inject('RETAILER_ADAPTER') private readonly adapter: RetailerAdapter,
     private readonly orderAudit: OrderAuditService,
+    private readonly statusHistory: OrderStatusHistoryService,
     private readonly stripeConnect: StripeConnectService,
   ) {}
 
@@ -116,6 +118,8 @@ export class OrdersService {
       },
     });
 
+    await this.statusHistory.record(order.id, null, 'pending');
+
     // Stripe Connect: charge user with destination transfer to retailer
     let stripePaymentIntentId: string | null = null;
     const connectedAccountId = this.stripeConnect.getConnectedAccountId(this.adapter.retailerKey);
@@ -146,6 +150,9 @@ export class OrdersService {
         await this.prisma.order.update({
           where: { id: order.id },
           data: { status: 'failed' },
+        });
+        await this.statusHistory.record(order.id, 'pending', 'failed', 'system', {
+          reason: 'stripe_charge_failed',
         });
         await this.orderAudit.record({
           orderId: order.id,
@@ -184,6 +191,10 @@ export class OrdersService {
           confirmationNumber: result.confirmationNumber,
           estimatedDeliveryDate: new Date(result.estimatedDeliveryDate),
         },
+      });
+
+      await this.statusHistory.record(order.id, 'pending', 'ordered', 'system', {
+        retailerOrderId: result.retailerOrderId,
       });
 
       if (dto.giftRecordId) {
@@ -241,6 +252,9 @@ export class OrdersService {
       await this.prisma.order.update({
         where: { id: order.id },
         data: { status: 'failed' },
+      });
+      await this.statusHistory.record(order.id, 'pending', 'failed', 'system', {
+        reason: 'retailer_failed',
       });
       await this.orderAudit.record({
         orderId: order.id,
@@ -333,6 +347,14 @@ export class OrdersService {
       },
     });
 
+    await this.statusHistory.record(
+      order.id,
+      order.status as OrderStatus,
+      'cancelled',
+      'system',
+      { reason: reason ?? null },
+    );
+
     if (order.giftRecordId) {
       try {
         await this.prisma.giftRecord.update({
@@ -399,5 +421,72 @@ export class OrdersService {
       : 0;
 
     return { ...order, cancelWindowSecondsLeft };
+  }
+
+  async getTimeline(userId: string, orderId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    return this.statusHistory.getTimeline(orderId);
+  }
+
+  async transitionStatus(
+    orderId: string,
+    toStatus: OrderStatus,
+    source: StatusChangeSource = 'system',
+    extra?: {
+      trackingNumber?: string;
+      trackingUrl?: string;
+      carrierName?: string;
+      metadata?: Record<string, unknown>;
+    },
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const VALID_TRANSITIONS: Record<string, string[]> = {
+      pending: ['ordered', 'cancelled', 'failed'],
+      ordered: ['processing', 'cancelled', 'failed'],
+      processing: ['shipped', 'cancelled', 'failed'],
+      shipped: ['delivered', 'failed'],
+      delivered: [],
+      cancelled: [],
+      failed: [],
+    };
+
+    if (!VALID_TRANSITIONS[order.status]?.includes(toStatus)) {
+      this.log.warn(
+        `Invalid transition ${order.status} → ${toStatus} for order ${orderId}`,
+      );
+      return order;
+    }
+
+    const updateData: Record<string, unknown> = { status: toStatus };
+    if (extra?.trackingNumber) updateData.trackingNumber = extra.trackingNumber;
+    if (extra?.trackingUrl) updateData.trackingUrl = extra.trackingUrl;
+    if (extra?.carrierName) updateData.carrierName = extra.carrierName;
+    if (toStatus === 'delivered') updateData.deliveredAt = new Date();
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: updateData,
+    });
+
+    await this.statusHistory.record(
+      orderId,
+      order.status as OrderStatus,
+      toStatus,
+      source,
+      extra?.metadata,
+    );
+
+    return updated;
   }
 }

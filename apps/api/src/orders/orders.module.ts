@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 import { OrderAuditService } from './audit/order-audit.service';
+import { OrderStatusHistoryService } from './order-status-history.service';
 import { StripeConnectService } from './stripe-connect.service';
 import { MockAdapter } from './adapters/mock/mock.adapter';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,6 +13,7 @@ import { SubscriptionGuard } from '../billing/guards/subscription.guard';
   providers: [
     OrdersService,
     OrderAuditService,
+    OrderStatusHistoryService,
     StripeConnectService,
     PrismaService,
     SubscriptionGuard,
@@ -20,6 +22,6 @@ import { SubscriptionGuard } from '../billing/guards/subscription.guard';
       useClass: MockAdapter,
     },
   ],
-  exports: [OrdersService],
+  exports: [OrdersService, OrderStatusHistoryService],
 })
 export class OrdersModule {}

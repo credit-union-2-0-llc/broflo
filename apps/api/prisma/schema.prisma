@@ -274,10 +274,19 @@ enum OrderStatus {
   ordered
   processing
   shipped
+  delivered
   cancelled
   failed
 
   @@map("order_status")
+}
+
+enum StatusChangeSource {
+  system
+  webhook
+  manual
+
+  @@map("status_change_source")
 }
 
 model Order {
@@ -305,20 +314,40 @@ model Order {
   shippingState         String      @map("shipping_state")
   shippingZip           String      @map("shipping_zip")
   estimatedDeliveryDate DateTime?   @map("estimated_delivery_date")
+  trackingNumber        String?     @map("tracking_number")
+  trackingUrl           String?     @map("tracking_url")
+  carrierName           String?     @map("carrier_name")
+  deliveredAt           DateTime?   @map("delivered_at")
   placedAt              DateTime?   @map("placed_at")
   cancelledAt           DateTime?   @map("cancelled_at")
   cancelReason          String?     @map("cancel_reason")
   createdAt             DateTime    @default(now()) @map("created_at")
   updatedAt             DateTime    @updatedAt @map("updated_at")
 
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  person     Person      @relation(fields: [personId], references: [id], onDelete: Cascade)
-  event      Event?      @relation(fields: [eventId], references: [id], onDelete: SetNull)
-  giftRecord GiftRecord? @relation(fields: [giftRecordId], references: [id], onDelete: SetNull)
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  person        Person               @relation(fields: [personId], references: [id], onDelete: Cascade)
+  event         Event?               @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  giftRecord    GiftRecord?          @relation(fields: [giftRecordId], references: [id], onDelete: SetNull)
+  statusHistory OrderStatusHistory[]
 
   @@index([userId, status, placedAt], map: "idx_orders_user_status")
   @@index([personId, placedAt], map: "idx_orders_person_placed")
   @@map("orders")
+}
+
+model OrderStatusHistory {
+  id         String             @id @default(uuid())
+  orderId    String             @map("order_id")
+  fromStatus OrderStatus?       @map("from_status")
+  toStatus   OrderStatus        @map("to_status")
+  source     StatusChangeSource @default(system)
+  metadata   Json?
+  changedAt  DateTime           @default(now()) @map("changed_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, changedAt], map: "idx_order_status_history")
+  @@map("order_status_history")
 }
 
 // --- S-4: AI Audit ---

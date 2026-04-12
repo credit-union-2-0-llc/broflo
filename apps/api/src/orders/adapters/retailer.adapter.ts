@@ -34,6 +34,7 @@ export type OrderStatusValue =
   | 'ordered'
   | 'processing'
   | 'shipped'
+  | 'delivered'
   | 'cancelled'
   | 'failed';
 
@@ -41,6 +42,7 @@ export interface OrderStatusResult {
   status: OrderStatusValue;
   trackingNumber?: string;
   trackingUrl?: string;
+  carrierName?: string;
 }
 
 export class RetailerOrderError extends Error {
