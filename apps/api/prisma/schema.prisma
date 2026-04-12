@@ -40,6 +40,7 @@ model User {
   notifications    Notification[]
   agentJobs        AgentJob[]
   serviceCredits   ServiceCredit[]
+  personPhotos     PersonPhoto[]
 
   @@map("users")
 }
@@ -95,9 +96,70 @@ model Person {
   autopilotRules   AutopilotRule[]
   tags             PersonTag[]
   wishlistItems    WishlistItem[]
+  photos           PersonPhoto[]
 
   @@index([userId, deletedAt])
   @@map("persons")
+}
+
+// --- S-12: Photo Dossier Enrichment ---
+
+enum PhotoCategory {
+  bookshelf
+  closet
+  artwork
+  desk
+  kitchen
+  bar_cart     @map("bar_cart")
+  shoes
+  jewelry
+  nightstand
+  garage
+  garden
+  gaming_music @map("gaming_music")
+  pet_area     @map("pet_area")
+  fridge
+  car
+  social_ig_fb @map("social_ig_fb")
+  social_spotify @map("social_spotify")
+  social_amazon  @map("social_amazon")
+  other
+
+  @@map("photo_category")
+}
+
+enum PhotoAnalysisStatus {
+  pending
+  processing
+  complete
+  failed
+
+  @@map("photo_analysis_status")
+}
+
+model PersonPhoto {
+  id              String              @id @default(uuid())
+  personId        String              @map("person_id")
+  userId          String              @map("user_id")
+  blobPath        String              @map("blob_path") @db.VarChar(2000)
+  thumbBlobPath   String?             @map("thumb_blob_path") @db.VarChar(2000)
+  category        PhotoCategory       @default(other)
+  mimeType        String              @map("mime_type") @db.VarChar(100)
+  fileSizeBytes   Int                 @map("file_size_bytes")
+  analysisStatus  PhotoAnalysisStatus @default(pending) @map("analysis_status")
+  analysisJson    Json?               @map("analysis_json")
+  analysisModel   String?             @map("analysis_model") @db.VarChar(100)
+  analyzedAt      DateTime?           @map("analyzed_at")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([personId, category], map: "idx_person_photos_person_category")
+  @@index([personId, analysisStatus], map: "idx_person_photos_person_status")
+  @@index([userId, createdAt], map: "idx_person_photos_user_created")
+  @@map("person_photos")
 }
 
 model NeverAgainItem {
