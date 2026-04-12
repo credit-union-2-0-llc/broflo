@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { LayoutDashboard, Users, Calendar, User, Trophy, LogOut, Sparkles, CreditCard } from "lucide-react";
+import { LayoutDashboard, Users, Calendar, Package, User, Trophy, LogOut, Sparkles, CreditCard } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -19,6 +19,7 @@ const tabs = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/people", label: "People", icon: Users },
   { href: "/events", label: "Events", icon: Calendar },
+  { href: "/orders", label: "Orders", icon: Package },
 ] as const;
 
 function initials(name: string | null | undefined) {

@@ -6,6 +6,7 @@ import { ComingUpWidget } from "@/components/coming-up-widget";
 import { DashboardReminders } from "./dashboard-reminders";
 import { RecentGiftsWidget } from "@/components/gifts/recent-gifts-widget";
 import { BrofloScoreWidget } from "@/components/gifts/broflo-score-widget";
+import { OrdersInFlightWidget } from "@/components/dashboard/OrdersInFlightWidget";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -43,8 +44,9 @@ export default async function DashboardPage() {
           <ComingUpWidget events={events} />
         </div>
 
-        <div className="mt-6">
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
           <RecentGiftsWidget token={session.accessToken} />
+          <OrdersInFlightWidget token={session.accessToken} />
         </div>
       </div>
     </div>

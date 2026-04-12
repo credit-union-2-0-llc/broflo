@@ -8,6 +8,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secon
   ordered: { label: "Ordered", variant: "default", icon: CheckCircle },
   processing: { label: "Processing", variant: "secondary", icon: Package },
   shipped: { label: "Shipped", variant: "default", icon: Truck },
+  delivered: { label: "Delivered", variant: "outline", icon: CheckCircle },
   cancelled: { label: "Cancelled", variant: "destructive", icon: XCircle },
   failed: { label: "Failed", variant: "destructive", icon: AlertCircle },
 };

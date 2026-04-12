@@ -186,13 +186,17 @@ export interface Order {
   priceCents: number;
   platformFeeCents: number;
   stripePaymentIntentId: string | null;
-  status: 'pending' | 'ordered' | 'processing' | 'shipped' | 'cancelled' | 'failed';
+  status: 'pending' | 'ordered' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'failed';
   shippingName: string;
   shippingAddress1: string;
   shippingAddress2: string | null;
   shippingCity: string;
   shippingState: string;
   shippingZip: string;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  carrierName: string | null;
+  deliveredAt: string | null;
   estimatedDeliveryDate: string | null;
   placedAt: string | null;
   cancelledAt: string | null;
@@ -210,6 +214,16 @@ export interface OrderDetailResponse extends Order {
 export interface OrderListResponse {
   data: Array<Order & { person: { name: string } }>;
   meta: { page: number; limit: number; total: number };
+}
+
+export interface OrderStatusHistoryEntry {
+  id: string;
+  orderId: string;
+  fromStatus: string | null;
+  toStatus: string;
+  source: 'system' | 'webhook' | 'manual';
+  metadata: Record<string, unknown> | null;
+  changedAt: string;
 }
 
 export interface GiftRecordListResponse {
@@ -520,15 +534,20 @@ export const api = {
       token,
     }),
 
-  getOrders: (token: string, params?: { page?: number; limit?: number; status?: string }) => {
+  getOrders: (token: string, params?: { page?: number; limit?: number; status?: string; sortBy?: string; sortOrder?: string }) => {
     const q = new URLSearchParams();
     if (params?.page) q.set("page", String(params.page));
     if (params?.limit) q.set("limit", String(params.limit));
     if (params?.status) q.set("status", params.status);
+    if (params?.sortBy) q.set("sortBy", params.sortBy);
+    if (params?.sortOrder) q.set("sortOrder", params.sortOrder);
     const qs = q.toString();
     return apiFetch<OrderListResponse>(`/orders${qs ? `?${qs}` : ""}`, { token });
   },
 
   getOrder: (token: string, orderId: string) =>
     apiFetch<OrderDetailResponse>(`/orders/${orderId}`, { token }),
+
+  getOrderTimeline: (token: string, orderId: string) =>
+    apiFetch<OrderStatusHistoryEntry[]>(`/orders/${orderId}/timeline`, { token }),
 };

@@ -145,6 +145,17 @@ export const VOICE = {
 
   orderFailed: "Something went wrong placing your order. Try again.",
 
+  tracking: {
+    emptyState: "No orders yet. Find someone a gift and we'll handle the rest.",
+    inFlight: "Your gifts are on the move.",
+    delivered: "Delivered. Another win for you.",
+    trackingAvailable: "Here's your tracking. We'd say 'just relax' but you're already doing that.",
+    noTracking: "No tracking yet — we're on it.",
+    cancelled: "Cancelled. No charge. Try another?",
+    failed: "Something went wrong on the retailer's end. We've got your back — no charge.",
+    allClear: "All clear — no orders in transit.",
+  },
+
   billing: {
     upgradePrompt:
       "You've hit the Free limit. Three people is a lot... for a free tier. Upgrade and we'll remember everyone.",
