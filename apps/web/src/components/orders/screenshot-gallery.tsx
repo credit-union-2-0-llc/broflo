@@ -27,10 +27,13 @@ export function ScreenshotGallery({
   onOpenChange,
 }: ScreenshotGalleryProps) {
   const [index, setIndex] = useState(initialIndex);
-
-  useEffect(() => {
-    if (open) setIndex(initialIndex);
-  }, [open, initialIndex]);
+  const [prevOpen, setPrevOpen] = useState(false);
+  if (open && !prevOpen) {
+    setIndex(initialIndex);
+  }
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+  }
 
   const goNext = useCallback(() => {
     setIndex((i) => (i + 1) % screenshots.length);

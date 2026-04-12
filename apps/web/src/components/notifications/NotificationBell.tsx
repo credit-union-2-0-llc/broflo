@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Bell, CheckCheck } from "lucide-react";
@@ -32,36 +32,31 @@ export function NotificationBell() {
   const [unread, setUnread] = useState(0);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [open, setOpen] = useState(false);
-
-  const fetchUnread = useCallback(async () => {
-    if (!session?.accessToken) return;
-    try {
-      const res = await api.getUnreadCount(session.accessToken);
-      setUnread(res.count);
-    } catch {
-      // silent
-    }
-  }, [session?.accessToken]);
-
-  const fetchNotifications = useCallback(async () => {
-    if (!session?.accessToken) return;
-    try {
-      const res = await api.listNotifications(session.accessToken, { limit: 10 });
-      setNotifications(res.data);
-    } catch {
-      // silent
-    }
-  }, [session?.accessToken]);
+  const accessToken = session?.accessToken;
 
   useEffect(() => {
+    if (!accessToken) return;
+    async function fetchUnread() {
+      try {
+        const res = await api.getUnreadCount(accessToken);
+        setUnread(res.count);
+      } catch {
+        // silent
+      }
+    }
     fetchUnread();
     const interval = setInterval(fetchUnread, 30000);
     return () => clearInterval(interval);
-  }, [fetchUnread]);
+  }, [accessToken]);
 
-  useEffect(() => {
-    if (open) fetchNotifications();
-  }, [open, fetchNotifications]);
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    if (nextOpen && session?.accessToken) {
+      api.listNotifications(session.accessToken, { limit: 10 })
+        .then((res) => setNotifications(res.data))
+        .catch(() => {});
+    }
+  }
 
   async function handleClick(notif: NotificationItem) {
     if (!session?.accessToken) return;
@@ -94,7 +89,7 @@ export function NotificationBell() {
   }
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu open={open} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger
         render={
           <button
