@@ -5,10 +5,13 @@ import {
   HttpException,
   HttpStatus,
 } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
 import { RedisService } from "../redis/redis.service";
 import type { PhotoCategory, User } from "@prisma/client";
+import type { PhotoAnalysisJobData } from "./photo-analysis.processor";
 
 // file-type is ESM-only; use dynamic import
 async function detectFileType(
@@ -42,12 +45,15 @@ const TIER_LIMITS: Record<string, number> = {
 const UPLOAD_RATE_LIMIT_PER_MIN = 3;
 const UPLOAD_RATE_LIMIT_PER_HOUR = 20;
 
+const REANALYZE_DEBOUNCE_S = 600; // 10 minutes (Elite re-analysis)
+
 @Injectable()
 export class PhotosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly redis: RedisService,
+    @InjectQueue("photo-analysis") private readonly analysisQueue: Queue<PhotoAnalysisJobData>,
   ) {}
 
   private async ensureOwnership(userId: string, personId: string) {
@@ -185,7 +191,78 @@ export class PhotosService {
     // Increment rate limit counters
     await this.incrementRateLimit(user.id);
 
+    // Queue analysis for Pro/Elite (Free = store only)
+    if (user.subscriptionTier !== "free") {
+      const person = await this.prisma.person.findUnique({
+        where: { id: personId },
+        select: { name: true },
+      });
+      await this.analysisQueue.add({
+        photoId: updated.id,
+        personId,
+        userId: user.id,
+        category: updated.category,
+        tier: user.subscriptionTier,
+        personName: person?.name,
+      });
+    }
+
     return updated;
+  }
+
+  async reanalyzePhoto(userId: string, personId: string, photoId: string) {
+    const person = await this.ensureOwnership(userId, personId);
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+    });
+
+    // Elite only
+    if (user.subscriptionTier !== "elite") {
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.PAYMENT_REQUIRED,
+          message: "Re-analysis is an Elite feature.",
+          upgradeUrl: "/upgrade",
+          requiredTier: "elite",
+          currentTier: user.subscriptionTier,
+        },
+        HttpStatus.PAYMENT_REQUIRED,
+      );
+    }
+
+    const photo = await this.prisma.personPhoto.findFirst({
+      where: { id: photoId, personId },
+    });
+    if (!photo) throw new NotFoundException("Photo not found");
+
+    // Debounce (10 min)
+    const debounceKey = `debounce:reanalyze:${photoId}`;
+    const cached = await this.redis.getCachedSuggestions(debounceKey);
+    if (cached) {
+      throw new HttpException(
+        "This photo was analyzed recently. Please wait before re-analyzing.",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    // Reset status and queue
+    await this.prisma.personPhoto.update({
+      where: { id: photoId },
+      data: { analysisStatus: "pending", analysisJson: undefined, analyzedAt: null },
+    });
+
+    await this.analysisQueue.add({
+      photoId,
+      personId,
+      userId,
+      category: photo.category,
+      tier: "elite",
+      personName: person.name,
+    });
+
+    await this.redis.setCachedSuggestions(debounceKey, "1", REANALYZE_DEBOUNCE_S);
+
+    return { status: "queued" };
   }
 
   async getPhotos(userId: string, personId: string) {

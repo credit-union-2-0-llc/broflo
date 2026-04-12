@@ -48,6 +48,15 @@ export class PhotosController {
     return this.photos.getPhotoUrl(user.id, personId, photoId);
   }
 
+  @Post(":photoId/reanalyze")
+  async reanalyzePhoto(
+    @CurrentUser() user: User,
+    @Param("personId") personId: string,
+    @Param("photoId") photoId: string,
+  ) {
+    return this.photos.reanalyzePhoto(user.id, personId, photoId);
+  }
+
   @Delete(":photoId")
   @HttpCode(HttpStatus.NO_CONTENT)
   async deletePhoto(
