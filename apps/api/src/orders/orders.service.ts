@@ -11,6 +11,7 @@ import { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RetailerAdapter, RetailerOrderError } from './adapters/retailer.adapter';
 import { OrderAuditService } from './audit/order-audit.service';
+import { StripeConnectService } from './stripe-connect.service';
 import { PreviewOrderDto } from './dto/preview-order.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
 import { ListOrdersDto } from './dto/list-orders.dto';
@@ -23,6 +24,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     @Inject('RETAILER_ADAPTER') private readonly adapter: RetailerAdapter,
     private readonly orderAudit: OrderAuditService,
+    private readonly stripeConnect: StripeConnectService,
   ) {}
 
   async preview(user: User, dto: PreviewOrderDto) {
@@ -88,8 +90,6 @@ export class OrdersService {
 
     const product = await this.adapter.getProduct(dto.retailerProductId);
 
-    const platformFeeCents = Math.round(product.priceCents * 0.05);
-
     const order = await this.prisma.order.create({
       data: {
         userId: user.id,
@@ -103,7 +103,7 @@ export class OrdersService {
         productDescription: product.description,
         productImageUrl: product.imageUrl,
         priceCents: product.priceCents,
-        platformFeeCents,
+        platformFeeCents: this.stripeConnect.calculateFeeCents(product.priceCents),
         stripePaymentIntentId: null,
         status: 'pending',
         shippingName: dto.shippingName,
@@ -116,6 +116,52 @@ export class OrdersService {
       },
     });
 
+    // Stripe Connect: charge user with destination transfer to retailer
+    let stripePaymentIntentId: string | null = null;
+    const connectedAccountId = this.stripeConnect.getConnectedAccountId(this.adapter.retailerKey);
+
+    if (connectedAccountId && user.stripeCustomerId && user.stripePaymentMethodId) {
+      try {
+        const charge = await this.stripeConnect.createCharge({
+          amountCents: product.priceCents,
+          customerId: user.stripeCustomerId,
+          paymentMethodId: user.stripePaymentMethodId,
+          connectedAccountId,
+          orderId: order.id,
+          userId: user.id,
+        });
+        stripePaymentIntentId = charge.paymentIntentId;
+
+        // Update order with payment intent ID
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: {
+            stripePaymentIntentId,
+            platformFeeCents: this.stripeConnect.calculateFeeCents(product.priceCents),
+          },
+        });
+      } catch (err) {
+        // Stripe charge failed — mark order as failed, do NOT call retailer
+        this.log.error(`Stripe charge failed for order ${order.id}: ${err}`);
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: { status: 'failed' },
+        });
+        await this.orderAudit.record({
+          orderId: order.id,
+          userId: user.id,
+          action: 'place_failed',
+          details: { reason: 'stripe_charge_failed', error: String(err) },
+        });
+        throw new InternalServerErrorException('Payment failed. Your card was not charged.');
+      }
+    } else {
+      // No connected account (or no payment method) — mock flow without real charge
+      this.log.warn(
+        `Skipping Stripe charge for order ${order.id}: no connected account or payment method`,
+      );
+    }
+
     try {
       const result = await this.adapter.placeOrder(
         product,
@@ -127,7 +173,7 @@ export class OrdersService {
           state: dto.shippingState,
           zip: dto.shippingZip,
         },
-        order.id,
+        stripePaymentIntentId || order.id,
       );
 
       const updatedOrder = await this.prisma.order.update({
@@ -162,23 +208,55 @@ export class OrdersService {
       });
 
       return updatedOrder;
-    } catch (err) {
-      if (err instanceof RetailerOrderError) {
-        await this.prisma.order.update({
-          where: { id: order.id },
-          data: { status: 'failed' },
-        });
-        await this.orderAudit.record({
-          orderId: order.id,
-          userId: user.id,
-          action: 'place_failed',
-          details: { errorCode: err.code, errorMessage: err.message },
-        });
-        throw new InternalServerErrorException(
-          'Order placement failed. Please try again.',
-        );
+    } catch (adapterErr) {
+      if (adapterErr instanceof RetailerOrderError || adapterErr instanceof InternalServerErrorException) {
+        // If it's already an ISE from the Stripe path re-throw directly
+        if (adapterErr instanceof InternalServerErrorException) {
+          throw adapterErr;
+        }
       }
-      throw err;
+
+      // Retailer failed — refund if we charged
+      if (stripePaymentIntentId) {
+        try {
+          await this.stripeConnect.refund(stripePaymentIntentId, order.id);
+          await this.orderAudit.record({
+            orderId: order.id,
+            userId: user.id,
+            action: 'refund',
+            details: { reason: 'retailer_failed_after_charge' },
+          });
+        } catch (refundErr) {
+          this.log.error(`CRITICAL: Refund failed for order ${order.id}: ${refundErr}`);
+          await this.orderAudit.record({
+            orderId: order.id,
+            userId: user.id,
+            action: 'refund_failed',
+            details: { paymentIntentId: stripePaymentIntentId, error: String(refundErr) },
+          });
+        }
+      }
+
+      // Mark order as failed
+      await this.prisma.order.update({
+        where: { id: order.id },
+        data: { status: 'failed' },
+      });
+      await this.orderAudit.record({
+        orderId: order.id,
+        userId: user.id,
+        action: 'place_failed',
+        details: {
+          reason: 'retailer_failed',
+          error: String(adapterErr),
+          ...(adapterErr instanceof RetailerOrderError
+            ? { errorCode: adapterErr.code }
+            : {}),
+        },
+      });
+      throw new InternalServerErrorException(
+        'Order placement failed. Your card has been refunded.',
+      );
     }
   }
 
@@ -203,6 +281,31 @@ export class OrdersService {
       throw new BadRequestException(
         'Order cannot be cancelled in its current state.',
       );
+    }
+
+    // Refund via Stripe if payment was made
+    if (order.stripePaymentIntentId) {
+      try {
+        await this.stripeConnect.refund(order.stripePaymentIntentId, order.id);
+        await this.orderAudit.record({
+          orderId: order.id,
+          userId,
+          action: 'refund',
+          details: { paymentIntentId: order.stripePaymentIntentId },
+        });
+      } catch (refundErr) {
+        this.log.error(`Refund failed for order ${order.id}: ${refundErr}`);
+        await this.orderAudit.record({
+          orderId: order.id,
+          userId,
+          action: 'refund_failed',
+          details: {
+            paymentIntentId: order.stripePaymentIntentId,
+            error: String(refundErr),
+          },
+        });
+        throw new BadRequestException('Refund failed. Please contact support.');
+      }
     }
 
     try {
