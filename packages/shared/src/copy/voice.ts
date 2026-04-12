@@ -31,9 +31,6 @@ export const VOICE = {
     neverAgainAdded: "Noted. We'll never suggest that again.",
   },
 
-  orderSuccess:
-    "Done. They have no idea how easy that was. Keep it that way.",
-
   events: {
     created: "Noted. We'll make sure you're ready.",
     deleted: "Event removed. We'll stop reminding you.",
@@ -131,13 +128,22 @@ export const VOICE = {
   cancelWindow:
     "You've got 2 hours to cancel. After that, it's in the mail and you're a hero.",
 
+  orderSuccess:
+    "Done. They have no idea how easy that was. Keep it that way.",
+
   orderCancel: "Order cancelled. No charge. Try a different gift?",
-  orderFailed: "The order didn't go through. You can try again or order directly.",
+
   orderCancelConfirm: "Cancel this order? The gift won't be delivered.",
+
   orderCancelKeep: "Keep It",
+
   orderCancelConfirmAction: "Yes, Cancel",
+
   orderPlacing: "Placing your order...",
+
   orderPreviewCta: "Confirm & Order",
+
+  orderFailed: "Something went wrong placing your order. Try again.",
 
   billing: {
     upgradePrompt:

@@ -130,7 +130,7 @@ export interface GiftRecord {
   rating: number | null;
   feedbackNote: string | null;
   imageUrl: string | null;
-  source: "suggestion" | "manual";
+  source: "suggestion" | "manual" | "ordered";
   suggestionSnapshot: {
     title: string;
     estimatedPriceMinCents: number;
@@ -141,6 +141,75 @@ export interface GiftRecord {
   feedbackScored: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+// S-7 Order types
+export interface RetailerProduct {
+  id: string;
+  title: string;
+  description: string;
+  priceCents: number;
+  imageUrl: string | null;
+  estimatedDeliveryDays: number;
+  retailerHint: string;
+}
+
+export interface OrderPreviewResponse {
+  product: RetailerProduct;
+  suggestion: { id: string; title: string; description: string };
+  person: {
+    id: string;
+    name: string;
+    shippingAddress1: string | null;
+    shippingAddress2: string | null;
+    shippingCity: string | null;
+    shippingState: string | null;
+    shippingZip: string | null;
+  };
+  cancelWindowHours: number;
+}
+
+export interface Order {
+  id: string;
+  userId: string;
+  personId: string;
+  eventId: string | null;
+  giftRecordId: string | null;
+  suggestionId: string | null;
+  retailerKey: string;
+  retailerProductId: string;
+  retailerOrderId: string | null;
+  confirmationNumber: string | null;
+  productTitle: string;
+  productDescription: string | null;
+  productImageUrl: string | null;
+  priceCents: number;
+  platformFeeCents: number;
+  stripePaymentIntentId: string | null;
+  status: 'pending' | 'ordered' | 'processing' | 'shipped' | 'cancelled' | 'failed';
+  shippingName: string;
+  shippingAddress1: string;
+  shippingAddress2: string | null;
+  shippingCity: string;
+  shippingState: string;
+  shippingZip: string;
+  estimatedDeliveryDate: string | null;
+  placedAt: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderDetailResponse extends Order {
+  cancelWindowSecondsLeft: number;
+  person: { name: string };
+  giftRecord: { id: string; title: string; source: string } | null;
+}
+
+export interface OrderListResponse {
+  data: Array<Order & { person: { name: string } }>;
+  meta: { page: number; limit: number; total: number };
 }
 
 export interface GiftRecordListResponse {
@@ -416,4 +485,50 @@ export const api = {
       stripeCustomerId: string | null;
       hasPaymentMethod: boolean;
     }>("/billing/subscription", { token }),
+
+  // Orders (S-7)
+  previewOrder: (token: string, data: { suggestionId: string; personId: string; eventId: string; budgetMaxCents?: number }) =>
+    apiFetch<OrderPreviewResponse>("/orders/preview", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  placeOrder: (token: string, data: {
+    suggestionId: string;
+    personId: string;
+    eventId: string;
+    retailerProductId: string;
+    giftRecordId?: string;
+    shippingName: string;
+    shippingAddress1: string;
+    shippingAddress2?: string;
+    shippingCity: string;
+    shippingState: string;
+    shippingZip: string;
+  }) =>
+    apiFetch<Order>("/orders/place", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  cancelOrder: (token: string, orderId: string, reason?: string) =>
+    apiFetch<Order>(`/orders/${orderId}/cancel`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+      token,
+    }),
+
+  getOrders: (token: string, params?: { page?: number; limit?: number; status?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.limit) q.set("limit", String(params.limit));
+    if (params?.status) q.set("status", params.status);
+    const qs = q.toString();
+    return apiFetch<OrderListResponse>(`/orders${qs ? `?${qs}` : ""}`, { token });
+  },
+
+  getOrder: (token: string, orderId: string) =>
+    apiFetch<OrderDetailResponse>(`/orders/${orderId}`, { token }),
 };
