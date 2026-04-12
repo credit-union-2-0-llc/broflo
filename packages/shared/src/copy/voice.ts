@@ -156,6 +156,23 @@ export const VOICE = {
     allClear: "All clear — no orders in transit.",
   },
 
+  autopilot: {
+    emptyState:
+      "No autopilot rules yet. Set one up and we'll handle gifts while you sleep.",
+    enabled: "Autopilot is live. Sit back.",
+    disabled: "Autopilot paused. We'll wait until you're ready.",
+    consentLabel: (cap: string) =>
+      `I authorize Broflo to automatically place orders up to ${cap}/month on my behalf.`,
+    budgetWarning:
+      "You're getting close to your monthly cap. We'll pause autopilot before going over.",
+    orderPlaced: (name: string) =>
+      `Autopilot placed an order for ${name}. You're welcome.`,
+    needsApproval: (name: string) =>
+      `We found a gift for ${name} but weren't confident enough. Your call.`,
+    tierGate:
+      "Autopilot is a Pro feature. Upgrade and let us do the work.",
+  },
+
   billing: {
     upgradePrompt:
       "You've hit the Free limit. Three people is a lot... for a free tier. Upgrade and we'll remember everyone.",

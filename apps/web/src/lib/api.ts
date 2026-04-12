@@ -226,6 +226,61 @@ export interface OrderStatusHistoryEntry {
   changedAt: string;
 }
 
+// S-9 Autopilot types
+export interface AutopilotRule {
+  id: string;
+  userId: string;
+  personId: string;
+  isActive: boolean;
+  occasionTypes: string[];
+  budgetMinCents: number;
+  budgetMaxCents: number;
+  monthlyCapCents: number;
+  leadDays: number;
+  consentedAt: string;
+  consentedFromIp: string;
+  createdAt: string;
+  updatedAt: string;
+  person: { name: string };
+  runs?: AutopilotRun[];
+}
+
+export interface AutopilotRun {
+  id: string;
+  ruleId: string;
+  eventId: string;
+  orderId: string | null;
+  suggestionId: string | null;
+  status: string;
+  reason: string | null;
+  confidenceScore: number | null;
+  amountCents: number | null;
+  createdAt: string;
+  rule?: { person: { name: string } };
+  event?: { name: string; occasionType: string };
+}
+
+export interface AutopilotRunsResponse {
+  data: AutopilotRun[];
+  meta: { page: number; limit: number; total: number };
+}
+
+export interface NotificationItem {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  body: string;
+  linkUrl: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface NotificationListResponse {
+  data: NotificationItem[];
+  meta: { page: number; limit: number; total: number };
+}
+
 export interface GiftRecordListResponse {
   data: GiftRecord[];
   meta: {
@@ -550,4 +605,79 @@ export const api = {
 
   getOrderTimeline: (token: string, orderId: string) =>
     apiFetch<OrderStatusHistoryEntry[]>(`/orders/${orderId}/timeline`, { token }),
+
+  // Autopilot (S-9)
+  listRules: (token: string) =>
+    apiFetch<AutopilotRule[]>("/autopilot/rules", { token }),
+
+  createRule: (token: string, data: {
+    personId: string;
+    occasionTypes: string[];
+    budgetMinCents: number;
+    budgetMaxCents: number;
+    monthlyCapCents: number;
+    leadDays?: number;
+    consentGiven: boolean;
+  }) =>
+    apiFetch<AutopilotRule>("/autopilot/rules", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  updateRule: (token: string, ruleId: string, data: {
+    occasionTypes?: string[];
+    budgetMinCents?: number;
+    budgetMaxCents?: number;
+    monthlyCapCents?: number;
+    leadDays?: number;
+    isActive?: boolean;
+  }) =>
+    apiFetch<AutopilotRule>(`/autopilot/rules/${ruleId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  deleteRule: (token: string, ruleId: string) =>
+    apiFetch<{ deleted: boolean }>(`/autopilot/rules/${ruleId}`, {
+      method: "DELETE",
+      token,
+    }),
+
+  listRuns: (token: string, params?: { ruleId?: string; page?: number; limit?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.ruleId) q.set("ruleId", params.ruleId);
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.limit) q.set("limit", String(params.limit));
+    const qs = q.toString();
+    return apiFetch<AutopilotRunsResponse>(`/autopilot/runs${qs ? `?${qs}` : ""}`, { token });
+  },
+
+  getAutopilotSpend: (token: string) =>
+    apiFetch<{ monthlySpentCents: number }>("/autopilot/spend", { token }),
+
+  // Notifications (S-9)
+  listNotifications: (token: string, params?: { page?: number; limit?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.limit) q.set("limit", String(params.limit));
+    const qs = q.toString();
+    return apiFetch<NotificationListResponse>(`/notifications${qs ? `?${qs}` : ""}`, { token });
+  },
+
+  getUnreadCount: (token: string) =>
+    apiFetch<{ count: number }>("/notifications/unread-count", { token }),
+
+  markNotificationRead: (token: string, notificationId: string) =>
+    apiFetch<NotificationItem>(`/notifications/${notificationId}/read`, {
+      method: "PATCH",
+      token,
+    }),
+
+  markAllNotificationsRead: (token: string) =>
+    apiFetch<{ success: boolean }>("/notifications/mark-all-read", {
+      method: "POST",
+      token,
+    }),
 };

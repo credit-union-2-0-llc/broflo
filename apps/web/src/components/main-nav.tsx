@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { LayoutDashboard, Users, Calendar, Package, User, Trophy, LogOut, Sparkles, CreditCard } from "lucide-react";
+import { LayoutDashboard, Users, Calendar, Package, Zap, User, Trophy, LogOut, Sparkles, CreditCard } from "lucide-react";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -20,6 +21,7 @@ const tabs = [
   { href: "/people", label: "People", icon: Users },
   { href: "/events", label: "Events", icon: Calendar },
   { href: "/orders", label: "Orders", icon: Package },
+  { href: "/autopilot", label: "Autopilot", icon: Zap },
 ] as const;
 
 function initials(name: string | null | undefined) {
@@ -76,6 +78,7 @@ export function MainNav() {
             <Trophy className="h-3.5 w-3.5 text-broflo-gold" />
             {user?.brofloScore ?? 0}
           </Badge>
+          <NotificationBell />
           <DropdownMenu>
             <DropdownMenuTrigger className="focus:outline-none">
               <Avatar className="h-8 w-8 cursor-pointer">
