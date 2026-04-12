@@ -1,6 +1,12 @@
 import { Controller, Get } from "@nestjs/common";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { PrismaService } from "../prisma/prisma.service";
 import { Public } from "../auth/decorators/public.decorator";
+
+const pkg = JSON.parse(
+  readFileSync(join(__dirname, "..", "..", "package.json"), "utf-8"),
+);
 
 @Controller("health")
 export class HealthController {
@@ -18,7 +24,7 @@ export class HealthController {
 
     return {
       status: "ok",
-      version: process.env.npm_package_version || "0.1.0",
+      version: pkg.version,
       uptime: process.uptime(),
       dependencies: {
         database: dbStatus,

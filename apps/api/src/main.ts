@@ -1,9 +1,15 @@
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
+import { readFileSync } from "fs";
+import { join } from "path";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { GlobalExceptionFilter } from "./filters/global-exception.filter";
 import { RequestLoggerMiddleware } from "./middleware/request-logger.middleware";
+
+const pkg = JSON.parse(
+  readFileSync(join(__dirname, "..", "package.json"), "utf-8"),
+);
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
@@ -28,7 +34,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3001;
   await app.listen(port);
-  console.log(`[broflo-api] v0.6.0 listening on port ${port}`);
+  console.log(`[broflo-api] v${pkg.version} listening on port ${port}`);
 }
 
 bootstrap();
