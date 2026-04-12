@@ -1,4 +1,4 @@
-import type { Person, NeverAgainItem, CreatePersonData } from "@broflo/shared";
+import type { Person, NeverAgainItem, PersonTag, WishlistItem, CreatePersonData } from "@broflo/shared";
 
 export interface BrofloEvent {
   id: string;
@@ -770,4 +770,54 @@ export const api = {
       body: JSON.stringify({ channel: "manual_fallback" }),
       token,
     }),
+
+  // Enrichment (S-11)
+  parseWishlist: (token: string, personId: string, urls: string[]) =>
+    apiFetch<{ parsed: unknown[]; persisted: WishlistItem[] }>(
+      `/persons/${personId}/parse-wishlist`,
+      { method: "POST", body: JSON.stringify({ urls }), token },
+    ),
+
+  getWishlistItems: (token: string, personId: string) =>
+    apiFetch<WishlistItem[]>(`/persons/${personId}/wishlist-items`, { token }),
+
+  deleteWishlistItem: (token: string, personId: string, itemId: string) =>
+    apiFetch<void>(`/persons/${personId}/wishlist-items/${itemId}`, {
+      method: "DELETE",
+      token,
+    }),
+
+  generateTags: (token: string, personId: string) =>
+    apiFetch<PersonTag[]>(`/persons/${personId}/generate-tags`, {
+      method: "POST",
+      token,
+    }),
+
+  getTags: (token: string, personId: string) =>
+    apiFetch<PersonTag[]>(`/persons/${personId}/tags`, { token }),
+
+  addManualTag: (token: string, personId: string, tag: string) =>
+    apiFetch<PersonTag>(`/persons/${personId}/tags`, {
+      method: "POST",
+      body: JSON.stringify({ tag }),
+      token,
+    }),
+
+  deleteTag: (token: string, personId: string, tagId: string) =>
+    apiFetch<void>(`/persons/${personId}/tags/${tagId}`, {
+      method: "DELETE",
+      token,
+    }),
+
+  generateInsight: (token: string, personId: string) =>
+    apiFetch<{ profile_text: string; suggested_categories: string[]; data_richness: string }>(
+      `/persons/${personId}/generate-insight`,
+      { method: "POST", token },
+    ),
+
+  getInsight: (token: string, personId: string) =>
+    apiFetch<{ profile_text: string | null; completeness_score: number }>(
+      `/persons/${personId}/insight`,
+      { token },
+    ),
 };

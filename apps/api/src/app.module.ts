@@ -18,6 +18,7 @@ import { RedisModule } from "./redis/redis.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 import { AgentOrdersModule } from "./orders/agent/agent-orders.module";
 import { AdminModule } from "./admin/admin.module";
+import { EnrichmentModule } from "./enrichment/enrichment.module";
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { AdminModule } from "./admin/admin.module";
     NotificationsModule,
     AgentOrdersModule,
     AdminModule,
+    EnrichmentModule,
   ],
   controllers: [HealthController],
   providers: [

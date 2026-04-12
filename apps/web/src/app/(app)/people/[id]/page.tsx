@@ -18,6 +18,8 @@ import { CompletenessRing } from "@/components/completeness-ring";
 import { DeletePersonButton } from "@/components/delete-person-button";
 import { PersonEventsClient } from "./person-events-client";
 import { GiftHistorySection } from "@/components/gifts/gift-history-section";
+import { WishlistParser } from "@/components/wishlist-parser";
+import { InsightCard } from "@/components/insight-card";
 
 function initials(name: string) {
   return name
@@ -115,6 +117,13 @@ export default async function PersonDetailPage({
             <CompletenessRing score={person.completenessScore} size={48} />
           </CardHeader>
           <CardContent className="space-y-4">
+            <InsightCard
+              personId={person.id}
+              initialInsight={person.dossierInsight}
+              completenessScore={person.completenessScore}
+              tier={(session.user as Record<string, unknown>)?.subscriptionTier as string ?? "free"}
+            />
+
             <div className="grid grid-cols-2 gap-4 text-sm">
               {person.birthday && (
                 <div>
@@ -211,15 +220,14 @@ export default async function PersonDetailPage({
                 ),
             )}
 
-            {person.wishlistUrls && (
+            {(person.wishlistUrls || (person.wishlistItems && person.wishlistItems.length > 0)) && (
               <>
                 <Separator className="my-3" />
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">
-                    Wishlist URLs
-                  </h3>
-                  <p className="text-sm whitespace-pre-line">{person.wishlistUrls}</p>
-                </div>
+                <WishlistParser
+                  personId={person.id}
+                  wishlistUrls={person.wishlistUrls}
+                  initialItems={person.wishlistItems || []}
+                />
               </>
             )}
 

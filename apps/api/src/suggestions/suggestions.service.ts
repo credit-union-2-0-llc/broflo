@@ -58,7 +58,7 @@ export class SuggestionsService {
     // Validate ownership
     const person = await this.prisma.person.findFirst({
       where: { id: dto.personId, userId, deletedAt: null },
-      include: { neverAgainItems: true },
+      include: { neverAgainItems: true, tags: true, wishlistItems: true },
     });
     if (!person) throw new NotFoundException("Person not found");
 
@@ -188,6 +188,12 @@ export class SuggestionsService {
             clothing_size_bottom: person.clothingSizeBottom,
             shoe_size: person.shoeSize,
             notes: person.notes,
+            // S-11: enrichment fields
+            pronouns: person.pronouns,
+            allergens: person.allergens || [],
+            dietary_restrictions: person.dietaryRestrictions || [],
+            tags: (person as any).tags?.map((t: any) => t.tag) || [],
+            wishlist_items: (person as any).wishlistItems?.map((w: any) => w.productName).filter(Boolean) || [],
           },
           event_type: event.occasionType,
           event_date: nextOcc.toISOString().slice(0, 10),
