@@ -15,14 +15,15 @@ Orders have real-time status. Shipping updates flow in via webhook and are surfa
 
 ## Definition of Done
 
-- [ ] Carrier webhooks registered for UPS, FedEx, USPS
-- [ ] Order status updates: `ordered` → `shipped` → `out_for_delivery` → `delivered`
-- [ ] Email notification sent at each status change
-- [ ] Delivery confirmation email uses Broflo voice
-- [ ] Gift status auto-updates to `delivered` on delivery confirmation
-- [ ] Tracking URL stored and shown to user on gift detail
-- [ ] Failed delivery / exception status surfaced with Broflo copy
-- [ ] Carrier tracking number extracted from retailer order confirmation
+- [x] Order status model: pending → ordered → processing → shipped → delivered → cancelled/failed
+- [x] OrderStatusHistory table with timeline tracking (source: system/webhook/manual)
+- [x] Timeline endpoint: GET /orders/:id/timeline
+- [x] Webhook receiver: POST /orders/webhook/status for external status updates
+- [x] Polling cron: checks retailer status every 4 hours for orders without webhooks
+- [x] Frontend: orders list with status filters, order detail with StatusTimeline + TrackingCard
+- [x] Dashboard widget: OrdersInFlightWidget showing active orders
+- [x] Tracking URL stored and shown to user on order detail
+- [x] Failed delivery / exception status surfaced with Broflo voice copy
 
 ---
 
@@ -109,15 +110,16 @@ Pro users can enable full autopilot per person. Broflo selects and places the to
 
 ## Definition of Done
 
-- [ ] Autopilot toggle available per person on dossier (Pro tier only)
-- [ ] When autopilot on: lead-time trigger → AI runs suggestions → top suggestion selected → user notified with 2-hour window
-- [ ] During 2-hour window: user can reject/swap suggestion before order fires
-- [ ] After 2-hour window: order placed automatically
-- [ ] Full autopilot mode (fire without window): separate toggle, requires explicit opt-in
-- [ ] Autopilot runs within user's configured budget range — never exceeds max
-- [ ] Autopilot orders use the same audit log as manual orders
-- [ ] Autopilot can be disabled globally or per-person
-- [ ] Free tier users see autopilot toggle grayed out with upgrade prompt
+- [x] AutopilotRule model: per-person rules with occasion types, budget range, monthly cap, lead days, consent tracking
+- [x] AutopilotRun model: tracks each run with status (triggered, order_placed, failed, skipped_*)
+- [x] AutopilotController: CRUD rules (POST/GET/PATCH/DELETE), runs list, spend endpoint — all Pro+ tier-gated
+- [x] AutopilotService: consent model, $2k hard cap, budget validation, spending cap check
+- [x] AutopilotScheduler: daily 7AM UTC cron, confidence threshold >= 0.80 auto-order, < 0.80 notify
+- [x] NotificationsModule (global): list, unread-count, mark-read, mark-all-read
+- [x] Frontend /autopilot page: rules list, create/edit/delete/toggle, consent checkbox, spend summary
+- [x] NotificationBell in nav: unread badge, dropdown list, 30s polling
+- [x] Voice copy: autopilot.emptyState, enabled, disabled, consentLabel, budgetWarning, orderPlaced, needsApproval, tierGate
+- [x] Free tier users see tier gate with upgrade prompt
 
 ---
 

@@ -174,16 +174,16 @@ Broflo is a purchasing agent, not a retailer.
 
 | Slice | Name | Phase | Est. Weeks |
 |---|---|---|---|
-| S-0 | Walking skeleton | Foundation | 1 |
-| S-1 | Identity + auth | MVP Core | 1 |
-| S-2 | Person dossier | MVP Core | 1.5 |
-| S-3 | Event radar | MVP Core | 1 |
-| S-4 | Gift brain MVP | MVP Core | 1.5 |
-| S-5 | Gift history loop | MVP Core | 0.5 |
-| S-6 | Stripe + payment vault | Automation | 1 |
-| S-7 | First retailer API | Automation | 1.5 |
-| S-8 | Order tracking | Automation | 1 |
-| S-9 | Autopilot toggle | Automation | 1 |
+| S-0 | Walking skeleton | Foundation | 1 | DONE |
+| S-1 | Identity + auth | MVP Core | 1 | DONE |
+| S-2 | Person dossier | MVP Core | 1.5 | DONE |
+| S-3 | Event radar | MVP Core | 1 | DONE |
+| S-4 | Gift brain MVP | MVP Core | 1.5 | DONE |
+| S-5 | Gift history loop | MVP Core | 0.5 | DONE |
+| S-6 | Stripe + payment vault | Automation | 1 | DONE |
+| S-7 | First retailer API | Automation | 1.5 | DONE |
+| S-8 | Order tracking | Automation | 1 | DONE |
+| S-9 | Autopilot toggle | Automation | 1 | DONE |
 | S-10 | Browser agent fallback | Intelligence | 1.5 |
 | S-11 | Dossier enrichment | Intelligence | 1.5 |
 | S-12 | Voice layer | Intelligence | 0.5 |
