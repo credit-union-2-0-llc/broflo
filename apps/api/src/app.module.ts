@@ -19,6 +19,8 @@ import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 import { AgentOrdersModule } from "./orders/agent/agent-orders.module";
 import { AdminModule } from "./admin/admin.module";
 import { EnrichmentModule } from "./enrichment/enrichment.module";
+import { StorageModule } from "./storage/storage.module";
+import { PhotosModule } from "./photos/photos.module";
 
 @Module({
   imports: [
@@ -44,6 +46,8 @@ import { EnrichmentModule } from "./enrichment/enrichment.module";
     AgentOrdersModule,
     AdminModule,
     EnrichmentModule,
+    StorageModule,
+    PhotosModule,
   ],
   controllers: [HealthController],
   providers: [

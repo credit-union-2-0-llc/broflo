@@ -147,9 +147,12 @@ export class PersonsService {
       include: { neverAgainItems: true, tags: true },
     });
 
-    // Recompute completeness score after update
+    // Recompute completeness score after update (include photo count from S-12)
+    const photoCount = await this.prisma.personPhoto.count({
+      where: { personId: person.id },
+    });
     const mergedForScore = { ...person, ...dto };
-    const newScore = this.computeCompleteness(mergedForScore);
+    const newScore = this.computeCompleteness(mergedForScore, photoCount);
     if (newScore !== person.completenessScore) {
       await this.prisma.person.update({
         where: { id: person.id },
@@ -204,9 +207,10 @@ export class PersonsService {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private computeCompleteness(data: any): number {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private computeCompleteness(data: any, photoCount = 0): number {
     let score = 0;
-    // Weights total 100 — approved by Kirk at G14
+    // Weights total 100+8 (photos additive, capped at 100) — G14 + G21
     if (data.hobbies) score += 15;
     if (data.favoriteBrands) score += 12;
     if (data.budgetMinCents || data.budgetMaxCents) score += 12;
@@ -220,6 +224,7 @@ export class PersonsService {
     if (data.wishlistUrls) score += 5;
     if (data.notes) score += 3;
     if (data.anniversary) score += 2;
+    if (photoCount > 0) score += 8;
     return Math.min(score, 100);
   }
 
