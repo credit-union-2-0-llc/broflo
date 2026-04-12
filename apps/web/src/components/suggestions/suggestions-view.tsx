@@ -5,10 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Gift, RefreshCw, Shuffle, Lock, Loader2, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { VOICE } from "@broflo/shared";
 import { api } from "@/lib/api";
-import type { GiftSuggestion, SuggestionMetaResponse } from "@/lib/api";
+import type { GiftSuggestion, SuggestionMetaResponse, Order } from "@/lib/api";
 import { SuggestionCard } from "./suggestion-card";
+import { OrderPreviewModal } from "@/components/orders/order-preview-modal";
+import { CancelCountdown } from "@/components/orders/cancel-countdown";
 
 interface SuggestionsViewProps {
   eventId: string;
@@ -35,6 +38,12 @@ export function SuggestionsView({
   const [showGuidance, setShowGuidance] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
+
+  // Order modal state
+  const [orderingSuggestionId, setOrderingSuggestionId] = useState<string | null>(null);
+  const [orderedSuggestions, setOrderedSuggestions] = useState<Map<string, { orderId: string; status: string; placedAt: string }>>(new Map());
+  // Map from suggestionId -> giftRecordId (set when suggestion is selected)
+  const [suggestionGiftRecordIds, setSuggestionGiftRecordIds] = useState<Map<string, string>>(new Map());
 
   // Rotate loading messages
   useEffect(() => {
@@ -91,13 +100,21 @@ export function SuggestionsView({
   const handleSelect = async (suggestionId: string) => {
     setSelecting(true);
     try {
-      await api.selectSuggestion(token, eventId, suggestionId);
+      const res = await api.selectSuggestion(token, eventId, suggestionId);
       setSuggestions((prev) =>
         prev.map((s) => ({
           ...s,
           isSelected: s.id === suggestionId,
         })),
       );
+      // Capture giftRecordId so OrderPreviewModal can pass it to the place endpoint
+      if (res.giftRecord && typeof res.giftRecord === "object" && "id" in res.giftRecord) {
+        setSuggestionGiftRecordIds((prev) => {
+          const next = new Map(prev);
+          next.set(suggestionId, String(res.giftRecord.id));
+          return next;
+        });
+      }
     } catch {
       setError(VOICE.errors.generic);
     } finally {
@@ -119,6 +136,32 @@ export function SuggestionsView({
     const top = [...suggestions].sort((a, b) => b.confidenceScore - a.confidenceScore)[0];
     await handleSelect(top.id);
   };
+
+  function handleOrderThis(suggestionId: string) {
+    setOrderingSuggestionId(suggestionId);
+  }
+
+  function handleOrderPlaced(order: Order) {
+    setOrderingSuggestionId(null);
+    toast.success(VOICE.orderSuccess);
+    setOrderedSuggestions((prev) => {
+      const next = new Map(prev);
+      next.set(order.suggestionId ?? "", {
+        orderId: order.id,
+        status: order.status,
+        placedAt: order.placedAt ?? new Date().toISOString(),
+      });
+      return next;
+    });
+  }
+
+  function handleCancelCompleted(suggestionId: string) {
+    setOrderedSuggestions((prev) => {
+      const next = new Map(prev);
+      next.delete(suggestionId);
+      return next;
+    });
+  }
 
   // Loading state
   if (loading) {
@@ -163,6 +206,7 @@ export function SuggestionsView({
   const hasSelected = suggestions.some((s) => s.isSelected);
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Gift Ideas</CardTitle>
@@ -250,16 +294,33 @@ export function SuggestionsView({
         {/* Suggestion cards */}
         {suggestions.length > 0 ? (
           <div className="space-y-3" role="list">
-            {suggestions.map((s, i) => (
-              <SuggestionCard
-                key={s.id}
-                suggestion={s}
-                isTopPick={i === 0 && tier === "elite"}
-                onSelect={handleSelect}
-                onDismiss={handleDismiss}
-                selecting={selecting}
-              />
-            ))}
+            {suggestions.map((s, i) => {
+              const orderInfo = orderedSuggestions.get(s.id);
+              return (
+                <div key={s.id}>
+                  <SuggestionCard
+                    suggestion={s}
+                    isTopPick={i === 0 && tier === "elite"}
+                    onSelect={handleSelect}
+                    onDismiss={handleDismiss}
+                    selecting={selecting}
+                    onOrderThis={tier !== "free" ? handleOrderThis : undefined}
+                    orderStatus={orderInfo?.status ?? null}
+                    orderPlacedAt={orderInfo?.placedAt ?? null}
+                  />
+                  {orderInfo?.status === "ordered" && orderInfo.placedAt && (
+                    <div className="mt-1 flex justify-end">
+                      <CancelCountdown
+                        orderId={orderInfo.orderId}
+                        placedAt={orderInfo.placedAt}
+                        token={token}
+                        onCancelled={() => handleCancelCompleted(s.id)}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground italic">
@@ -290,5 +351,19 @@ export function SuggestionsView({
         )}
       </CardContent>
     </Card>
+
+    {orderingSuggestionId && (
+      <OrderPreviewModal
+        open={!!orderingSuggestionId}
+        onOpenChange={(open) => { if (!open) setOrderingSuggestionId(null); }}
+        suggestionId={orderingSuggestionId}
+        personId={personId}
+        eventId={eventId}
+        giftRecordId={suggestionGiftRecordIds.get(orderingSuggestionId)}
+        token={token}
+        onOrderPlaced={handleOrderPlaced}
+      />
+    )}
+  </>
   );
 }
