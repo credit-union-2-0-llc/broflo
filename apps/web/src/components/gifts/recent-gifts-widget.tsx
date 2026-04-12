@@ -10,6 +10,8 @@ import { api } from "@/lib/api";
 import type { GiftRecord } from "@/lib/api";
 import { StarRating } from "./star-rating";
 import { FeedbackDialog } from "./feedback-dialog";
+import { OrderStatusBadge } from "@/components/orders/order-status-badge";
+import { useCancelCountdown } from "@/hooks/use-cancel-countdown";
 import { toast } from "sonner";
 
 type RecentGift = GiftRecord & { personName: string; eventName: string | null };
@@ -18,10 +20,17 @@ interface RecentGiftsWidgetProps {
   token: string;
 }
 
+function GiftOrderBadge({ placedAt }: { placedAt: string }) {
+  const { canCancel, formatted } = useCancelCountdown(placedAt);
+  if (!canCancel) return null;
+  return <OrderStatusBadge status="ordered" cancelCountdown={formatted} />;
+}
+
 export function RecentGiftsWidget({ token }: RecentGiftsWidgetProps) {
   const [gifts, setGifts] = useState<RecentGift[]>([]);
   const [loading, setLoading] = useState(true);
   const [feedbackGift, setFeedbackGift] = useState<RecentGift | null>(null);
+  const [recentOrders, setRecentOrders] = useState<Map<string, { status: string; placedAt: string }>>(new Map());
 
   useEffect(() => {
     api
@@ -29,6 +38,24 @@ export function RecentGiftsWidget({ token }: RecentGiftsWidgetProps) {
       .then((res) => setGifts(res.gifts as RecentGift[]))
       .catch(() => {})
       .finally(() => setLoading(false));
+  }, [token]);
+
+  useEffect(() => {
+    api
+      .getOrders(token, { limit: 10, status: "ordered" })
+      .then((res) => {
+        const orderMap = new Map<string, { status: string; placedAt: string }>();
+        for (const order of res.data) {
+          if (order.giftRecordId) {
+            orderMap.set(order.giftRecordId, {
+              status: order.status,
+              placedAt: order.placedAt ?? order.createdAt,
+            });
+          }
+        }
+        setRecentOrders(orderMap);
+      })
+      .catch(() => {});
   }, [token]);
 
   async function handleNailedIt(gift: RecentGift) {
@@ -84,6 +111,9 @@ export function RecentGiftsWidget({ token }: RecentGiftsWidgetProps) {
                     })}
                   </span>
                 </div>
+                {recentOrders.get(gift.id) && (
+                  <GiftOrderBadge placedAt={recentOrders.get(gift.id)!.placedAt} />
+                )}
                 {!gift.rating && (
                   <div className="flex items-center gap-1 shrink-0">
                     <Button
