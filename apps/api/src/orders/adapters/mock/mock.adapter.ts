@@ -41,7 +41,7 @@ export class MockAdapter implements RetailerAdapter {
     await new Promise((r) => setTimeout(r, 1000 + Math.random() * 2000));
 
     const lower = keywords.toLowerCase();
-    return MOCK_CATALOG.filter((p) => {
+    const keywordMatches = MOCK_CATALOG.filter((p) => {
       const matchesKeyword =
         p.title.toLowerCase().includes(lower) ||
         p.description.toLowerCase().includes(lower) ||
@@ -49,7 +49,18 @@ export class MockAdapter implements RetailerAdapter {
       const inBudget =
         p.priceCents >= budgetMinCents && p.priceCents <= budgetMaxCents;
       return matchesKeyword && inBudget;
-    }).sort((a, b) => a.priceCents - b.priceCents);
+    });
+
+    // Budget fallback: if no keyword matches, return all products in budget range
+    const results =
+      keywordMatches.length > 0
+        ? keywordMatches
+        : MOCK_CATALOG.filter(
+            (p) =>
+              p.priceCents >= budgetMinCents && p.priceCents <= budgetMaxCents,
+          );
+
+    return results.sort((a, b) => a.priceCents - b.priceCents);
   }
 
   async getProduct(productId: string): Promise<RetailerProduct> {

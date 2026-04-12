@@ -32,8 +32,13 @@ describe('MockAdapter', () => {
       });
     });
 
-    it('returns empty array for nonsense keyword', async () => {
+    it('falls back to budget-only matching for nonsense keyword', async () => {
       const results = await adapter.searchProducts('xyznonexistentproduct1234', 0, 999999);
+      expect(results.length).toBeGreaterThan(0);
+    });
+
+    it('returns empty when no products match budget range', async () => {
+      const results = await adapter.searchProducts('xyznonexistentproduct1234', 0, 100);
       expect(results).toHaveLength(0);
     });
 
