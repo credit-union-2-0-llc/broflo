@@ -16,7 +16,7 @@ import type {
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
 const AI_SERVICE_KEY = process.env.AI_SERVICE_KEY || "dev-ai-service-key";
-const AI_TIMEOUT_MS = 15_000;
+const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS || "30000", 10);
 
 const TIER_MAX_REQUESTS: Record<string, number> = {
   free: 1,
@@ -347,7 +347,9 @@ export class SuggestionsService {
         orderBy: { requestIndex: "desc" },
         select: { requestIndex: true },
       });
-      if (!latest) throw new NotFoundException("No suggestions found");
+      if (!latest) {
+        return { suggestions: [], meta: { requestIndex: 0, total: 0, dismissed: 0 } };
+      }
       where.requestIndex = latest.requestIndex;
     }
 
