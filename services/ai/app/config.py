@@ -39,6 +39,14 @@ INSIGHT_MODEL = "claude-sonnet-4-6"
 # Page content truncation for wishlist parsing
 MAX_PAGE_CHARS = 6000
 
+# S-12: Photo analysis model routing (Kirk's G19 decision)
+# Free = no analysis (store only), Pro = Haiku, Elite = Sonnet 4.6
+VISION_MODELS: dict[SubscriptionTier, str] = {
+    SubscriptionTier.pro: "claude-haiku-4-5-20251001",
+    SubscriptionTier.elite: "claude-sonnet-4-6",
+}
+
 # Timeouts
 ANTHROPIC_TIMEOUT_S = 30
+VISION_TIMEOUT_S = 45  # Vision calls are heavier
 MAX_RETRIES = 1

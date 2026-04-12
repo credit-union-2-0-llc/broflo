@@ -181,3 +181,62 @@ class GenerateInsightResponse(BaseModel):
     input_tokens: int
     output_tokens: int
     latency_ms: int
+
+
+# --- S-12: Photo Analysis schemas ---
+
+
+class PhotoCategory(str, Enum):
+    bookshelf = "bookshelf"
+    closet = "closet"
+    artwork = "artwork"
+    desk = "desk"
+    kitchen = "kitchen"
+    bar_cart = "bar_cart"
+    shoes = "shoes"
+    jewelry = "jewelry"
+    nightstand = "nightstand"
+    garage = "garage"
+    garden = "garden"
+    gaming_music = "gaming_music"
+    pet_area = "pet_area"
+    fridge = "fridge"
+    car = "car"
+    social_ig_fb = "social_ig_fb"
+    social_spotify = "social_spotify"
+    social_amazon = "social_amazon"
+    other = "other"
+
+
+class AnalyzePhotoRequest(BaseModel):
+    image_base64: str  # base64-encoded JPEG
+    category: PhotoCategory = PhotoCategory.other
+    tier: SubscriptionTier  # pro or elite (free not allowed)
+    person_name: str | None = None
+
+
+class PriceSignal(BaseModel):
+    tier: str  # budget | mid | premium | luxury
+    evidence: str = ""
+
+
+class ExtractedSignal(BaseModel):
+    brands: list[str] = Field(default_factory=list)
+    styles: list[str] = Field(default_factory=list)
+    interests: list[str] = Field(default_factory=list)
+    price_signals: PriceSignal | None = None
+    extracted_tags: list[str] = Field(default_factory=list)
+    do_not_gift: list[str] = Field(default_factory=list)
+    raw_observations: str = ""
+    category_specific: dict = Field(default_factory=dict)
+    image_quality: str = "good"  # good | fair | poor
+    confidence: float = Field(ge=0.0, le=1.0, default=0.5)
+
+
+class AnalyzePhotoResponse(BaseModel):
+    signals: ExtractedSignal
+    category: PhotoCategory
+    model: str
+    input_tokens: int
+    output_tokens: int
+    latency_ms: int

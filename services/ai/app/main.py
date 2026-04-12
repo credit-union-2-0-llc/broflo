@@ -13,10 +13,11 @@ from .schemas import (
     ParseWishlistRequest, ParseWishlistResponse,
     GenerateTagsRequest, GenerateTagsResponse,
     GenerateInsightRequest, GenerateInsightResponse,
+    AnalyzePhotoRequest, AnalyzePhotoResponse,
 )
 from .prompt import build_system_prompt, build_user_message
 from .postprocess import run_pipeline
-from .enrichment import parse_wishlist, generate_tags, generate_insight
+from .enrichment import parse_wishlist, generate_tags, generate_insight, analyze_photo
 from .config import (
     SERVICE_KEY,
     ANTHROPIC_API_KEY,
@@ -219,4 +220,31 @@ async def generate_insight_endpoint(
         raise HTTPException(429, "AI service rate limited")
     except anthropic.APIError as e:
         logger.error("Anthropic API error in generate-insight: %s", e)
+        raise HTTPException(502, "AI service error")
+
+
+# --- S-12: Photo Analysis ---
+
+
+@app.post("/analyze-photo", response_model=AnalyzePhotoResponse)
+async def analyze_photo_endpoint(
+    req: AnalyzePhotoRequest,
+    x_service_key: str = Header(alias="X-Service-Key"),
+) -> AnalyzePhotoResponse:
+    """Analyze a photo using Claude Vision to extract gift signals."""
+    if x_service_key != SERVICE_KEY:
+        raise HTTPException(403, "Invalid service key")
+    try:
+        return await analyze_photo(req)
+    except ValueError as e:
+        raise HTTPException(403, str(e))
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.error("Failed to parse photo analysis response: %s", e)
+        raise HTTPException(500, "AI returned invalid response")
+    except anthropic.APITimeoutError:
+        raise HTTPException(504, "AI service timeout — photo may be too large")
+    except anthropic.RateLimitError:
+        raise HTTPException(429, "AI service rate limited")
+    except anthropic.APIError as e:
+        logger.error("Anthropic API error in analyze-photo: %s", e)
         raise HTTPException(502, "AI service error")
