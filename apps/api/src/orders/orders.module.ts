@@ -25,6 +25,6 @@ import { OrderPollingScheduler } from './order-polling.scheduler';
       useClass: MockAdapter,
     },
   ],
-  exports: [OrdersService, OrderStatusHistoryService],
+  exports: [OrdersService, OrderStatusHistoryService, OrderAuditService],
 })
 export class OrdersModule {}
