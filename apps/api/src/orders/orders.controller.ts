@@ -55,4 +55,9 @@ export class OrdersController {
   async getById(@CurrentUser() user: User, @Param('id') id: string) {
     return this.orders.getById(user.id, id);
   }
+
+  @Get(':id/timeline')
+  async getTimeline(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.orders.getTimeline(user.id, id);
+  }
 }

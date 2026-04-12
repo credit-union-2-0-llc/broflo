@@ -7,9 +7,11 @@ import { StripeConnectService } from './stripe-connect.service';
 import { MockAdapter } from './adapters/mock/mock.adapter';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionGuard } from '../billing/guards/subscription.guard';
+import { RetailerWebhookController } from './webhooks/retailer-webhook.controller';
+import { OrderPollingScheduler } from './order-polling.scheduler';
 
 @Module({
-  controllers: [OrdersController],
+  controllers: [OrdersController, RetailerWebhookController],
   providers: [
     OrdersService,
     OrderAuditService,
@@ -17,6 +19,7 @@ import { SubscriptionGuard } from '../billing/guards/subscription.guard';
     StripeConnectService,
     PrismaService,
     SubscriptionGuard,
+    OrderPollingScheduler,
     {
       provide: 'RETAILER_ADAPTER',
       useClass: MockAdapter,

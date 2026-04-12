@@ -385,13 +385,16 @@ export class OrdersService {
       where.status = query.status as OrderStatus;
     }
 
+    const sortField = query.sortBy ?? 'createdAt';
+    const sortDir = query.sortOrder ?? 'desc';
+
     const [total, orders] = await Promise.all([
       this.prisma.order.count({ where }),
       this.prisma.order.findMany({
         where,
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { [sortField]: sortDir },
         include: { person: { select: { name: true } } },
       }),
     ]);
