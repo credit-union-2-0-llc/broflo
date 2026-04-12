@@ -30,10 +30,22 @@ export interface Person {
   foodPreferences: string | null;
   wishlistUrls: string | null;
   notes: string | null;
+  pronouns: string | null;
+  allergens: string[];
+  dietaryRestrictions: string[];
+  dossierInsight: string | null;
+  completenessScore: number;
+  shippingAddress1: string | null;
+  shippingAddress2: string | null;
+  shippingCity: string | null;
+  shippingState: string | null;
+  shippingZip: string | null;
   deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
   neverAgainItems: NeverAgainItem[];
+  tags?: PersonTag[];
+  wishlistItems?: WishlistItem[];
 }
 
 export interface NeverAgainItem {
@@ -42,6 +54,55 @@ export interface NeverAgainItem {
   description: string;
   createdAt: string;
 }
+
+export interface PersonTag {
+  id: string;
+  personId: string;
+  tag: string;
+  source: "ai" | "manual";
+  createdAt: string;
+}
+
+export interface WishlistItem {
+  id: string;
+  personId: string;
+  sourceUrl: string;
+  productName: string | null;
+  category: string | null;
+  brand: string | null;
+  priceRange: string | null;
+  scrapedAt: string;
+  createdAt: string;
+}
+
+export const ALLERGEN_OPTIONS = [
+  "nuts",
+  "dairy",
+  "gluten",
+  "shellfish",
+  "soy",
+  "eggs",
+  "other",
+] as const;
+
+export type AllergenType = (typeof ALLERGEN_OPTIONS)[number];
+
+export const DIETARY_OPTIONS = [
+  "vegan",
+  "vegetarian",
+  "pescatarian",
+  "kosher",
+  "halal",
+  "other",
+] as const;
+
+export type DietaryType = (typeof DIETARY_OPTIONS)[number];
+
+export const PRONOUN_OPTIONS = [
+  "he/him",
+  "she/her",
+  "they/them",
+] as const;
 
 export interface CreatePersonData {
   name: string;
@@ -59,4 +120,12 @@ export interface CreatePersonData {
   foodPreferences?: string;
   wishlistUrls?: string;
   notes?: string;
+  pronouns?: string;
+  allergens?: string[];
+  dietaryRestrictions?: string[];
+  shippingAddress1?: string;
+  shippingAddress2?: string;
+  shippingCity?: string;
+  shippingState?: string;
+  shippingZip?: string;
 }

@@ -80,6 +80,12 @@ model Person {
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
+  pronouns          String?   @db.VarChar(50)
+  allergens         String[]  @default([])
+  dietaryRestrictions String[] @default([]) @map("dietary_restrictions")
+  dossierInsight    String?   @map("dossier_insight") @db.VarChar(2000)
+  completenessScore Int       @default(0) @map("completeness_score")
+
   user             User      @relation(fields: [userId], references: [id])
   neverAgainItems  NeverAgainItem[]
   events           Event[]
@@ -87,6 +93,8 @@ model Person {
   giftRecords      GiftRecord[]
   orders           Order[]
   autopilotRules   AutopilotRule[]
+  tags             PersonTag[]
+  wishlistItems    WishlistItem[]
 
   @@index([userId, deletedAt])
   @@map("persons")
@@ -101,6 +109,37 @@ model NeverAgainItem {
   person    Person   @relation(fields: [personId], references: [id])
 
   @@map("never_again_items")
+}
+
+model PersonTag {
+  id        String   @id @default(uuid())
+  personId  String   @map("person_id")
+  tag       String   @db.VarChar(100)
+  source    String   @default("ai") @db.VarChar(50) // "ai" | "manual"
+  createdAt DateTime @default(now()) @map("created_at")
+
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([personId, tag], name: "uq_person_tag", map: "uq_person_tag")
+  @@index([personId], map: "idx_person_tags_person")
+  @@map("person_tags")
+}
+
+model WishlistItem {
+  id          String   @id @default(uuid())
+  personId    String   @map("person_id")
+  sourceUrl   String   @map("source_url") @db.VarChar(2000)
+  productName String?  @map("product_name") @db.VarChar(500)
+  category    String?  @db.VarChar(200)
+  brand       String?  @db.VarChar(200)
+  priceRange  String?  @map("price_range") @db.VarChar(100)
+  scrapedAt   DateTime @default(now()) @map("scraped_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  person      Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId], map: "idx_wishlist_items_person")
+  @@map("wishlist_items")
 }
 
 enum OccasionType {

@@ -28,7 +28,7 @@ export class PersonsService {
   async list(userId: string) {
     return this.prisma.person.findMany({
       where: { userId, deletedAt: null },
-      include: { neverAgainItems: true },
+      include: { neverAgainItems: true, tags: true },
       orderBy: { createdAt: "desc" },
     });
   }
@@ -36,7 +36,7 @@ export class PersonsService {
   async get(userId: string, id: string) {
     const person = await this.prisma.person.findFirst({
       where: { id, userId, deletedAt: null },
-      include: { neverAgainItems: true },
+      include: { neverAgainItems: true, tags: true, wishlistItems: true },
     });
     if (!person) throw new NotFoundException("Person not found");
     return person;
@@ -84,8 +84,17 @@ export class PersonsService {
         foodPreferences: dto.foodPreferences ?? null,
         wishlistUrls: dto.wishlistUrls ?? null,
         notes: dto.notes ?? null,
+        pronouns: dto.pronouns ?? null,
+        allergens: dto.allergens ?? [],
+        dietaryRestrictions: dto.dietaryRestrictions ?? [],
+        shippingAddress1: dto.shippingAddress1 ?? null,
+        shippingAddress2: dto.shippingAddress2 ?? null,
+        shippingCity: dto.shippingCity ?? null,
+        shippingState: dto.shippingState ?? null,
+        shippingZip: dto.shippingZip ?? null,
+        completenessScore: this.computeCompleteness(dto),
       },
-      include: { neverAgainItems: true },
+      include: { neverAgainItems: true, tags: true },
     });
 
     await this.eventsService.autoSyncEvents(
@@ -126,9 +135,28 @@ export class PersonsService {
         foodPreferences: dto.foodPreferences,
         wishlistUrls: dto.wishlistUrls,
         notes: dto.notes,
+        pronouns: dto.pronouns,
+        allergens: dto.allergens,
+        dietaryRestrictions: dto.dietaryRestrictions,
+        shippingAddress1: dto.shippingAddress1,
+        shippingAddress2: dto.shippingAddress2,
+        shippingCity: dto.shippingCity,
+        shippingState: dto.shippingState,
+        shippingZip: dto.shippingZip,
       },
-      include: { neverAgainItems: true },
+      include: { neverAgainItems: true, tags: true },
     });
+
+    // Recompute completeness score after update
+    const mergedForScore = { ...person, ...dto };
+    const newScore = this.computeCompleteness(mergedForScore);
+    if (newScore !== person.completenessScore) {
+      await this.prisma.person.update({
+        where: { id: person.id },
+        data: { completenessScore: newScore },
+      });
+      updated.completenessScore = newScore;
+    }
 
     if (dto.birthday !== undefined || dto.anniversary !== undefined) {
       await this.eventsService.autoSyncEvents(
@@ -173,6 +201,26 @@ export class PersonsService {
     if (!item) throw new NotFoundException("Never-again item not found");
 
     await this.prisma.neverAgainItem.delete({ where: { id: itemId } });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private computeCompleteness(data: any): number {
+    let score = 0;
+    // Weights total 100 — approved by Kirk at G14
+    if (data.hobbies) score += 15;
+    if (data.favoriteBrands) score += 12;
+    if (data.budgetMinCents || data.budgetMaxCents) score += 12;
+    if (data.foodPreferences) score += 10;
+    if (data.birthday) score += 10;
+    if (data.shippingAddress1 && data.shippingCity && data.shippingState && data.shippingZip) score += 10;
+    if (data.musicTaste) score += 7;
+    if (data.clothingSizeTop || data.clothingSizeBottom) score += 6;
+    if (Array.isArray(data.allergens) && data.allergens.length > 0) score += 5;
+    if (data.shoeSize) score += 3;
+    if (data.wishlistUrls) score += 5;
+    if (data.notes) score += 3;
+    if (data.anniversary) score += 2;
+    return Math.min(score, 100);
   }
 
   private async ensureOwnership(userId: string, personId: string) {
