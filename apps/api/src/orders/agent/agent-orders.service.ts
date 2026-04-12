@@ -1,17 +1,15 @@
 import {
   Injectable,
-  Logger,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
-import type { User } from '@prisma/client';
+import type { User, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BrowserAgentClient } from './browser-agent.client';
 import { StripeIssuingService } from './stripe-issuing.service';
 import { RetailerProfileService } from './retailer-profile.service';
 import { ServiceCreditService } from './service-credit.service';
-import { OrdersService } from '../orders.service';
 import { OrderAuditService } from '../audit/order-audit.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { AgentPreviewDto, AgentPlaceDto } from './dto/agent-order.dto';
@@ -21,15 +19,12 @@ const MAX_CONCURRENT_JOBS = 3;
 
 @Injectable()
 export class AgentOrdersService {
-  private readonly log = new Logger(AgentOrdersService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly agentClient: BrowserAgentClient,
     private readonly stripeIssuing: StripeIssuingService,
     private readonly retailerProfile: RetailerProfileService,
     private readonly serviceCredit: ServiceCreditService,
-    private readonly ordersService: OrdersService,
     private readonly orderAudit: OrderAuditService,
     private readonly notifications: NotificationsService,
   ) {}
@@ -375,7 +370,7 @@ export class AgentOrdersService {
         pageUrl: s.page_url,
         aiModelUsed: s.ai_model_used,
         aiConfidence: s.ai_confidence,
-        metadata: s.metadata ?? undefined,
+        metadata: s.metadata as unknown as Prisma.InputJsonValue | undefined,
       })),
     });
   }
