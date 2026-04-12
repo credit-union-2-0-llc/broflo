@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { CompletenessRing } from "@/components/completeness-ring";
 import { DeletePersonButton } from "@/components/delete-person-button";
 import { PersonEventsClient } from "./person-events-client";
 import { GiftHistorySection } from "@/components/gifts/gift-history-section";
@@ -100,12 +101,18 @@ export default async function PersonDetailPage({
                 {initials(person.name)}
               </AvatarFallback>
             </Avatar>
-            <div>
+            <div className="flex-1">
               <CardTitle className="text-2xl">{person.name}</CardTitle>
-              <Badge variant="secondary" className="mt-1 capitalize">
-                {person.relationship}
-              </Badge>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant="secondary" className="capitalize">
+                  {person.relationship}
+                </Badge>
+                {person.pronouns && (
+                  <span className="text-xs text-muted-foreground">({person.pronouns})</span>
+                )}
+              </div>
             </div>
+            <CompletenessRing score={person.completenessScore} size={48} />
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -143,6 +150,46 @@ export default async function PersonDetailPage({
                 </div>
               )}
             </div>
+
+            {person.tags && person.tags.length > 0 && (
+              <>
+                <Separator className="my-3" />
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">Interests</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {person.tags.slice(0, 8).map((t) => (
+                      <span key={t.id} className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                        {t.tag}
+                      </span>
+                    ))}
+                    {person.tags.length > 8 && (
+                      <span className="text-xs text-muted-foreground self-center">+{person.tags.length - 8} more</span>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {(person.allergens.length > 0 || person.dietaryRestrictions.length > 0) && (
+              <>
+                <Separator className="my-3" />
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">Dietary</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {person.allergens.map((a) => (
+                      <span key={a} className="inline-flex items-center rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive capitalize">
+                        &#9888; {a}
+                      </span>
+                    ))}
+                    {person.dietaryRestrictions.map((d) => (
+                      <span key={d} className="inline-flex items-center rounded-full bg-yellow-500/10 px-2.5 py-1 text-xs font-medium text-yellow-700 capitalize">
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
 
             {sections.map(
               (section) =>

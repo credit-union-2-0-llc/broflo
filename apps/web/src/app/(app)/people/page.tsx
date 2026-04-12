@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { CompletenessRing } from "@/components/completeness-ring";
 
 function initials(name: string) {
   return name
@@ -74,6 +75,7 @@ export default async function PeoplePage() {
                         {person.relationship}
                       </Badge>
                     </div>
+                    <CompletenessRing score={person.completenessScore} />
                   </CardHeader>
                   <CardContent className="text-sm text-muted-foreground space-y-1">
                     {person.birthday && (
@@ -87,6 +89,18 @@ export default async function PeoplePage() {
                     )}
                     {formatBudget(person.budgetMinCents, person.budgetMaxCents) && (
                       <p>Budget: {formatBudget(person.budgetMinCents, person.budgetMaxCents)}</p>
+                    )}
+                    {person.tags && person.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {person.tags.slice(0, 3).map((t) => (
+                          <span key={t.id} className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                            {t.tag}
+                          </span>
+                        ))}
+                        {person.tags.length > 3 && (
+                          <span className="text-xs text-muted-foreground">+{person.tags.length - 3} more</span>
+                        )}
+                      </div>
                     )}
                   </CardContent>
                 </Card>
