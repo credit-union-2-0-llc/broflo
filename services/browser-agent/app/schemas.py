@@ -27,9 +27,9 @@ class ExecuteRequest(BaseModel):
     shipping_address: ShippingAddress
     mode: ExecuteMode
     stripe_virtual_card_id: Optional[str] = None
-    virtual_card_number: Optional[str] = None
-    virtual_card_exp: Optional[str] = None
-    virtual_card_cvc: Optional[str] = None
+    virtual_card_number: Optional[str] = Field(default=None, exclude=True, repr=False)
+    virtual_card_exp: Optional[str] = Field(default=None, exclude=True, repr=False)
+    virtual_card_cvc: Optional[str] = Field(default=None, exclude=True, repr=False)
 
 
 class StepResult(BaseModel):

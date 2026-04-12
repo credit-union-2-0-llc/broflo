@@ -11,6 +11,8 @@ Flow:
 8. Return AgentResult
 
 CAPTCHA detected at any step → immediate abort, no retry.
+Non-transient failures (captcha, out_of_stock, price_mismatch) → no retry.
+Transient failures (timeout, unknown) → up to 2 retries with exponential backoff.
 """
 
 import asyncio
@@ -21,13 +23,45 @@ from typing import Optional
 from playwright.async_api import async_playwright, Page, Browser
 
 from ..captcha import CaptchaDetector, CaptchaDetectedError
-from ..config import MAX_EXECUTION_SECONDS, MAX_STEPS, PRICE_MISMATCH_THRESHOLD_PCT
+from ..config import (
+    MAX_EXECUTION_SECONDS,
+    MAX_STEPS,
+    PRICE_MISMATCH_THRESHOLD_PCT,
+    MAX_RETRIES,
+    RETRY_BACKOFF_SECONDS,
+    RETRY_MAX_WALL_CLOCK_SECONDS,
+    TRANSIENT_FAILURE_REASONS,
+)
 from ..providers.base import BrowserProvider
 from ..schemas import ExecuteRequest, ExecuteMode, AgentResult, StepResult
 from ..storage import ScreenshotStore
 from ..ai.product_matcher import ProductMatcher
 
 logger = logging.getLogger("broflo-browser-agent.agent")
+
+# Out-of-stock detection indicators
+OOS_TEXT_INDICATORS = [
+    "out of stock",
+    "sold out",
+    "unavailable",
+    "currently unavailable",
+    "notify me when available",
+    "notify me",
+    "not available",
+    "no longer available",
+    "temporarily out of stock",
+    "back in stock",
+    "waitlist",
+]
+
+OOS_BUTTON_SELECTORS = [
+    'button[disabled]:has-text("Add to Cart")',
+    'button[disabled]:has-text("Add to Bag")',
+    'button[disabled]:has-text("Add to basket")',
+    'button:has-text("Notify Me")',
+    'button:has-text("Sold Out")',
+    'button:has-text("Out of Stock")',
+]
 
 
 class BrowserOrderAgent:
@@ -42,13 +76,69 @@ class BrowserOrderAgent:
         self._step_counter = 0
 
     async def execute(self, req: ExecuteRequest) -> AgentResult:
-        """Execute the full agent flow. Returns AgentResult regardless of outcome."""
+        """Execute with retry logic for transient failures.
+
+        Non-transient failures (captcha, out_of_stock, price_mismatch) fail immediately.
+        Transient failures (timeout, unknown) retry up to MAX_RETRIES times with backoff.
+        Each retry gets a fresh browser session.
+        """
+        overall_start = time.monotonic()
+        last_result: Optional[AgentResult] = None
+
+        for attempt in range(1 + MAX_RETRIES):
+            # Wall-clock guard across all attempts
+            elapsed_total = time.monotonic() - overall_start
+            if attempt > 0 and elapsed_total >= RETRY_MAX_WALL_CLOCK_SECONDS:
+                logger.warning("Retry wall-clock exceeded for job %s after %ds", req.job_id, int(elapsed_total))
+                break
+
+            # Backoff between retries
+            if attempt > 0:
+                backoff = RETRY_BACKOFF_SECONDS[min(attempt - 1, len(RETRY_BACKOFF_SECONDS) - 1)]
+                logger.info("Retry %d/%d for job %s after %ds backoff", attempt, MAX_RETRIES, req.job_id, backoff)
+                self._steps.append(StepResult(
+                    step_number=self._step_counter + 1,
+                    action="error",
+                    status="failed",
+                    metadata={"action": "retry", "attempt_number": attempt + 1, "previous_failure_reason": last_result.failure_reason if last_result else "unknown"},
+                ))
+                self._step_counter += 1
+                await asyncio.sleep(backoff)
+
+            # Reset step tracking for new attempt (keep prior steps for audit)
+            result = await self._execute_single_attempt(req)
+            last_result = result
+
+            # Non-transient failures — no retry
+            if result.failure_reason and result.failure_reason not in TRANSIENT_FAILURE_REASONS:
+                return result
+
+            # Success or preview — done
+            if result.status in ("completed", "previewing"):
+                return result
+
+            # Transient failure — retry if attempts remain
+            if result.failure_reason in TRANSIENT_FAILURE_REASONS:
+                logger.warning("Transient failure for job %s (attempt %d): %s", req.job_id, attempt + 1, result.failure_reason)
+                continue
+
+            # Unknown status — return as-is
+            return result
+
+        # All retries exhausted
+        if last_result:
+            last_result.failure_reason = last_result.failure_reason or "unknown"
+            last_result.steps = self._steps
+        return last_result or AgentResult(job_id=req.job_id, status="failed", failure_reason="unknown", steps=self._steps)
+
+    async def _execute_single_attempt(self, req: ExecuteRequest) -> AgentResult:
+        """Execute one attempt of the agent flow. Returns AgentResult regardless of outcome."""
         session = None
         browser: Optional[Browser] = None
         start_time = time.monotonic()
 
         try:
-            # Create isolated browser session
+            # Create isolated browser session (fresh per attempt)
             session = await self._provider.create_session()
             logger.info("Agent started for job %s, session %s", req.job_id, session.session_id)
 
@@ -86,6 +176,37 @@ class BrowserOrderAgent:
                     job_id=req.job_id,
                     status="failed",
                     failure_reason="out_of_stock",
+                    steps=self._steps,
+                    browser_session_id=session.session_id,
+                )
+
+            # Check out-of-stock indicators on product page
+            oos = await self._detect_out_of_stock(page)
+            if oos:
+                await self._complete_step("failed", page, metadata={"reason": "out_of_stock", "indicator": oos})
+                return AgentResult(
+                    job_id=req.job_id,
+                    status="failed",
+                    failure_reason="out_of_stock",
+                    found_product_title=match_result.title,
+                    found_product_price=match_result.price_cents,
+                    steps=self._steps,
+                    browser_session_id=session.session_id,
+                )
+
+            # Budget cap check — hard stop if price exceeds budget
+            if match_result.price_cents and match_result.price_cents > req.max_budget_cents:
+                await self._complete_step("failed", page, metadata={
+                    "reason": "price_mismatch",
+                    "price_cents": match_result.price_cents,
+                    "budget_cents": req.max_budget_cents,
+                })
+                return AgentResult(
+                    job_id=req.job_id,
+                    status="failed",
+                    failure_reason="price_mismatch",
+                    found_product_title=match_result.title,
+                    found_product_price=match_result.price_cents,
                     steps=self._steps,
                     browser_session_id=session.session_id,
                 )
@@ -369,28 +490,6 @@ class BrowserOrderAgent:
                 except Exception:
                     continue
 
-    async def _enter_payment(self, page: Page, req: ExecuteRequest) -> None:
-        """Enter virtual card details into payment fields."""
-        if not req.virtual_card_number:
-            return
-        # Card number, expiry, CVC — standard patterns
-        payment_fields = [
-            (req.virtual_card_number, ['input[name*="card" i]', 'input[autocomplete="cc-number"]']),
-            (req.virtual_card_exp or "", ['input[name*="expir" i]', 'input[autocomplete="cc-exp"]']),
-            (req.virtual_card_cvc or "", ['input[name*="cvc" i]', 'input[name*="cvv" i]', 'input[autocomplete="cc-csc"]']),
-        ]
-        for value, selectors in payment_fields:
-            if not value:
-                continue
-            for selector in selectors:
-                try:
-                    el = await page.wait_for_selector(selector, timeout=3000)
-                    if el:
-                        await el.fill(value)
-                        break
-                except Exception:
-                    continue
-
     async def _confirm_order(self, page: Page) -> None:
         """Click the final order confirmation button."""
         confirm_selectors = [
@@ -412,21 +511,128 @@ class BrowserOrderAgent:
                 continue
 
     async def _extract_checkout_price(self, page: Page) -> Optional[int]:
-        """Extract the total price from the checkout page in cents."""
+        """Extract the total price from the checkout page in cents using AI vision."""
         try:
-            content = await page.content()
-            # AI-based extraction would go here in production
-            # For now, return None (skip price verification)
+            screenshot_bytes = await self._provider.take_screenshot(page)
+            if not screenshot_bytes:
+                return None
+
+            import anthropic
+            import base64
+            from ..config import NAVIGATION_MODEL, ANTHROPIC_API_KEY
+
+            client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+            b64 = base64.b64encode(screenshot_bytes).decode("utf-8")
+
+            response = await client.messages.create(
+                model=NAVIGATION_MODEL,
+                max_tokens=100,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}},
+                        {"type": "text", "text": (
+                            "Extract the order total from this checkout page screenshot. "
+                            "Return ONLY an integer representing the total in cents. "
+                            "For example, $47.99 → 4799. If you cannot find a total, return 0."
+                        )},
+                    ],
+                }],
+            )
+
+            text = response.content[0].text.strip()
+            price = int("".join(c for c in text if c.isdigit()) or "0")
+            return price if price > 0 else None
+        except Exception as e:
+            logger.warning("Price extraction failed: %s", e)
+            return None
+
+    async def _extract_confirmation(self, page: Page) -> Optional[str]:
+        """Extract order confirmation number from the confirmation page using AI vision."""
+        try:
+            screenshot_bytes = await self._provider.take_screenshot(page)
+            if not screenshot_bytes:
+                return None
+
+            import anthropic
+            import base64
+            from ..config import NAVIGATION_MODEL, ANTHROPIC_API_KEY
+
+            client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+            b64 = base64.b64encode(screenshot_bytes).decode("utf-8")
+
+            response = await client.messages.create(
+                model=NAVIGATION_MODEL,
+                max_tokens=100,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}},
+                        {"type": "text", "text": (
+                            "Extract the order confirmation number from this confirmation page screenshot. "
+                            "Return ONLY the confirmation/order number string. "
+                            "If you cannot find one, return NONE."
+                        )},
+                    ],
+                }],
+            )
+
+            text = response.content[0].text.strip()
+            return None if text.upper() == "NONE" else text
+        except Exception as e:
+            logger.warning("Confirmation extraction failed: %s", e)
+            return None
+
+    async def _detect_out_of_stock(self, page: Page) -> Optional[str]:
+        """Detect out-of-stock conditions on the current page.
+
+        Returns the matched indicator string if OOS detected, None otherwise.
+        """
+        try:
+            content = (await page.content()).lower()
+
+            # Check text indicators
+            for indicator in OOS_TEXT_INDICATORS:
+                if indicator in content:
+                    logger.info("OOS text detected: '%s'", indicator)
+                    return indicator
+
+            # Check disabled/OOS button selectors
+            for selector in OOS_BUTTON_SELECTORS:
+                try:
+                    el = await page.wait_for_selector(selector, timeout=1000)
+                    if el:
+                        logger.info("OOS button detected: '%s'", selector)
+                        return selector
+                except Exception:
+                    continue
+
             return None
         except Exception:
             return None
 
-    async def _extract_confirmation(self, page: Page) -> Optional[str]:
-        """Extract order confirmation number from the confirmation page."""
-        try:
-            content = await page.content()
-            # AI-based extraction would go here in production
-            # For now, return None
-            return None
-        except Exception:
-            return None
+    async def _enter_payment(self, page: Page, req: ExecuteRequest) -> None:
+        """Enter virtual card details into payment fields.
+
+        Payment values are NEVER logged. All log output uses [REDACTED].
+        """
+        if not req.virtual_card_number:
+            return
+        logger.info("Entering payment for job %s: card=[REDACTED] exp=[REDACTED] cvc=[REDACTED]", req.job_id)
+        # Card number, expiry, CVC — standard patterns
+        payment_fields = [
+            (req.virtual_card_number, ['input[name*="card" i]', 'input[autocomplete="cc-number"]']),
+            (req.virtual_card_exp or "", ['input[name*="expir" i]', 'input[autocomplete="cc-exp"]']),
+            (req.virtual_card_cvc or "", ['input[name*="cvc" i]', 'input[name*="cvv" i]', 'input[autocomplete="cc-csc"]']),
+        ]
+        for value, selectors in payment_fields:
+            if not value:
+                continue
+            for selector in selectors:
+                try:
+                    el = await page.wait_for_selector(selector, timeout=3000)
+                    if el:
+                        await el.fill(value)
+                        break
+                except Exception:
+                    continue

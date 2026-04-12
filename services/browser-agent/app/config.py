@@ -23,7 +23,13 @@ CALLBACK_HMAC_SECRET = os.getenv("CALLBACK_HMAC_SECRET", "dev-hmac-secret")
 # Agent execution limits
 MAX_EXECUTION_SECONDS = 180  # 3-minute hard timeout
 MAX_STEPS = 15
-PRICE_MISMATCH_THRESHOLD_PCT = 5  # abort if checkout price > preview price + 5%
+PRICE_MISMATCH_THRESHOLD_PCT = 10  # abort if checkout price > preview price + 10%
+
+# Retry policy for transient failures
+MAX_RETRIES = 2  # 3 total attempts
+RETRY_BACKOFF_SECONDS = [30, 120]  # exponential backoff
+RETRY_MAX_WALL_CLOCK_SECONDS = 300  # 5-minute P95 cap for all attempts
+TRANSIENT_FAILURE_REASONS = {"timeout", "unknown"}  # only these get retried
 
 # AI models
 PRODUCT_MATCH_MODEL = "claude-sonnet-4-6-20260217"  # vision + reasoning for matching
