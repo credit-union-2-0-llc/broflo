@@ -12,6 +12,8 @@ import { SuggestionsModule } from "./suggestions/suggestions.module";
 import { GiftsModule } from "./gifts/gifts.module";
 import { BillingModule } from "./billing/billing.module";
 import { OrdersModule } from "./orders/orders.module";
+import { AutopilotModule } from "./autopilot/autopilot.module";
+import { NotificationsModule } from "./notifications/notifications.module";
 import { RedisModule } from "./redis/redis.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 
@@ -34,6 +36,8 @@ import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
     GiftsModule,
     BillingModule,
     OrdersModule,
+    AutopilotModule,
+    NotificationsModule,
   ],
   controllers: [HealthController],
   providers: [
