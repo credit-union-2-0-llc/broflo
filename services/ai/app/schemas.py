@@ -28,6 +28,12 @@ class PersonDossier(BaseModel):
     clothing_size_bottom: str | None = None
     shoe_size: str | None = None
     notes: str | None = None
+    # S-11 additions
+    pronouns: str | None = None
+    allergens: list[str] = Field(default_factory=list)
+    dietary_restrictions: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    wishlist_items: list[str] = Field(default_factory=list)  # product titles
 
 
 class NeverAgainItem(BaseModel):
@@ -84,3 +90,94 @@ class SuggestResponse(BaseModel):
     prompt_cache_hit: bool = False
     retry_count: int = 0
     suggestions_filtered: int = 0
+
+
+# --- S-11: Enrichment schemas ---
+
+
+class ParseWishlistRequest(BaseModel):
+    urls: list[str] = Field(min_length=1, max_length=5)
+    tier: SubscriptionTier
+
+
+class ParsedProduct(BaseModel):
+    title: str
+    brand: str | None = None
+    category: str | None = None
+    price_cents: int | None = None
+    price_range_min_cents: int | None = None
+    price_range_max_cents: int | None = None
+    color: str | None = None
+    size: str | None = None
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class ParsedUrlResult(BaseModel):
+    url: str
+    source_type: str  # wishlist | registry | product_page | shop_page | unknown
+    products: list[ParsedProduct]
+    error: str | None = None
+
+
+class ParseWishlistResponse(BaseModel):
+    results: list[ParsedUrlResult]
+    model: str
+    total_input_tokens: int
+    total_output_tokens: int
+    latency_ms: int
+
+
+class GenerateTagsRequest(BaseModel):
+    person_name: str
+    relationship: str
+    hobbies: str | None = None
+    music_taste: str | None = None
+    favorite_brands: str | None = None
+    food_preferences: str | None = None
+    notes: str | None = None
+    tier: SubscriptionTier
+
+
+class GeneratedTag(BaseModel):
+    label: str
+    category: str  # hobby | aesthetic | food_drink | music_media | fashion | lifestyle | tech | sports | exclusion | other
+    source_field: str  # hobbies | music_taste | favorite_brands | food_preferences | notes | inferred
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class GenerateTagsResponse(BaseModel):
+    tags: list[GeneratedTag]
+    model: str
+    input_tokens: int
+    output_tokens: int
+    latency_ms: int
+
+
+class GenerateInsightRequest(BaseModel):
+    person_name: str
+    relationship: str
+    hobbies: str | None = None
+    music_taste: str | None = None
+    favorite_brands: str | None = None
+    food_preferences: str | None = None
+    clothing_size_top: str | None = None
+    clothing_size_bottom: str | None = None
+    shoe_size: str | None = None
+    notes: str | None = None
+    pronouns: str | None = None
+    allergens: list[str] = Field(default_factory=list)
+    dietary_restrictions: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    gift_history: list[GiftHistoryItem] = Field(default_factory=list)
+    never_again: list[NeverAgainItem] = Field(default_factory=list)
+    tier: SubscriptionTier  # must be elite
+
+
+class GenerateInsightResponse(BaseModel):
+    profile_text: str
+    suggested_categories: list[str]
+    data_richness: str  # sparse | moderate | rich
+    model: str
+    input_tokens: int
+    output_tokens: int
+    latency_ms: int

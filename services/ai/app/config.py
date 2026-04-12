@@ -24,6 +24,21 @@ TIER_COUNTS: dict[SubscriptionTier, int] = {
     SubscriptionTier.elite: 5,
 }
 
+# Enrichment model routing (S-11)
+# Wishlist parsing: Haiku for all tiers (structured extraction)
+WISHLIST_MODEL = "claude-haiku-4-5-20251001"
+# Tag generation: Haiku for Free/Pro, Sonnet 4 for Elite (nuance detection)
+TAG_MODELS: dict[SubscriptionTier, str] = {
+    SubscriptionTier.free: "claude-haiku-4-5-20251001",
+    SubscriptionTier.pro: "claude-haiku-4-5-20251001",
+    SubscriptionTier.elite: "claude-sonnet-4-20250514",
+}
+# Insight generation: Sonnet 4.6 only (Elite-only, synthesis task)
+INSIGHT_MODEL = "claude-sonnet-4-6-20260217"
+
+# Page content truncation for wishlist parsing
+MAX_PAGE_CHARS = 6000
+
 # Timeouts
 ANTHROPIC_TIMEOUT_S = 30
 MAX_RETRIES = 1

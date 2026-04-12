@@ -109,6 +109,10 @@ no explanation outside the JSON.
 5. NEVER suggest: {", ".join(BLOCKLIST_CATEGORIES)}.
 6. NEVER assume gender, religion, or cultural background unless explicitly stated.
 7. Prices are in cents (e.g., 5000 = $50.00).
+8. ALLERGEN RESTRICTIONS are HARD RULES: NEVER suggest gifts containing or related \
+to any listed allergen. These are safety-critical.
+9. Respect DIETARY RESTRICTIONS: avoid food/drink gifts that violate them.
+10. Use INTEREST TAGS and WISHLIST ITEMS as strong signals for gift categories.
 
 OUTPUT SCHEMA:
 {schema_str}"""
@@ -144,6 +148,20 @@ def build_user_message(req: SuggestRequest) -> str:
         dossier_lines.append(f"  shoe {p.shoe_size}")
     if sanitized_notes:
         dossier_lines.append(f"- Notes: {sanitized_notes}")
+
+    # S-11: New dossier fields
+    if p.pronouns:
+        dossier_lines.append(f"- Pronouns: {p.pronouns}")
+    if p.allergens:
+        sanitized_allergens = [sanitize_prompt_field(a) or a for a in p.allergens]
+        dossier_lines.append(f"- ALLERGENS (HARD RULES - never gift these): {', '.join(sanitized_allergens)}")
+    if p.dietary_restrictions:
+        sanitized_dietary = [sanitize_prompt_field(d) or d for d in p.dietary_restrictions]
+        dossier_lines.append(f"- Dietary restrictions: {', '.join(sanitized_dietary)}")
+    if p.tags:
+        dossier_lines.append(f"- Interest tags: {', '.join(p.tags[:15])}")
+    if p.wishlist_items:
+        dossier_lines.append(f"- Wishlist items: {', '.join(p.wishlist_items[:10])}")
 
     dossier_block = "\n".join(dossier_lines) if dossier_lines else "(minimal dossier)"
 

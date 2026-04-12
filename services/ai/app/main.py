@@ -1,4 +1,4 @@
-"""Broflo AI Service — Gift Brain suggestion endpoint."""
+"""Broflo AI Service — Gift Brain suggestion + enrichment endpoints."""
 
 import json
 import time
@@ -8,9 +8,15 @@ from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 import anthropic
 
-from .schemas import SuggestRequest, SuggestResponse, SuggestionItem
+from .schemas import (
+    SuggestRequest, SuggestResponse, SuggestionItem,
+    ParseWishlistRequest, ParseWishlistResponse,
+    GenerateTagsRequest, GenerateTagsResponse,
+    GenerateInsightRequest, GenerateInsightResponse,
+)
 from .prompt import build_system_prompt, build_user_message
 from .postprocess import run_pipeline
+from .enrichment import parse_wishlist, generate_tags, generate_insight
 from .config import (
     SERVICE_KEY,
     ANTHROPIC_API_KEY,
@@ -21,7 +27,7 @@ from .config import (
 
 logger = logging.getLogger("broflo-ai")
 
-app = FastAPI(title="Broflo AI Service", version="0.2.0")
+app = FastAPI(title="Broflo AI Service", version="0.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -80,7 +86,7 @@ def _parse_suggestions(raw: str) -> list[SuggestionItem]:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "service": "broflo-ai", "version": "0.2.0"}
+    return {"status": "ok", "service": "broflo-ai", "version": "0.3.0"}
 
 
 @app.post("/suggest", response_model=SuggestResponse)
@@ -146,3 +152,71 @@ async def suggest(
         retry_count=retry_count,
         suggestions_filtered=filtered_count,
     )
+
+
+# --- S-11: Enrichment endpoints ---
+
+
+@app.post("/parse-wishlist", response_model=ParseWishlistResponse)
+async def parse_wishlist_endpoint(
+    req: ParseWishlistRequest,
+    x_service_key: str = Header(alias="X-Service-Key"),
+) -> ParseWishlistResponse:
+    """Parse wishlist/product URLs and extract structured product data."""
+    if x_service_key != SERVICE_KEY:
+        raise HTTPException(403, "Invalid service key")
+    try:
+        return await parse_wishlist(req)
+    except anthropic.APITimeoutError:
+        raise HTTPException(504, "AI service timeout")
+    except anthropic.RateLimitError:
+        raise HTTPException(429, "AI service rate limited")
+    except anthropic.APIError as e:
+        logger.error("Anthropic API error in parse-wishlist: %s", e)
+        raise HTTPException(502, "AI service error")
+
+
+@app.post("/generate-tags", response_model=GenerateTagsResponse)
+async def generate_tags_endpoint(
+    req: GenerateTagsRequest,
+    x_service_key: str = Header(alias="X-Service-Key"),
+) -> GenerateTagsResponse:
+    """Generate interest tags from dossier text fields."""
+    if x_service_key != SERVICE_KEY:
+        raise HTTPException(403, "Invalid service key")
+    try:
+        return await generate_tags(req)
+    except (json.JSONDecodeError, ValueError, KeyError) as e:
+        logger.error("Failed to parse tag generation response: %s", e)
+        raise HTTPException(500, "AI returned invalid response")
+    except anthropic.APITimeoutError:
+        raise HTTPException(504, "AI service timeout")
+    except anthropic.RateLimitError:
+        raise HTTPException(429, "AI service rate limited")
+    except anthropic.APIError as e:
+        logger.error("Anthropic API error in generate-tags: %s", e)
+        raise HTTPException(502, "AI service error")
+
+
+@app.post("/generate-insight", response_model=GenerateInsightResponse)
+async def generate_insight_endpoint(
+    req: GenerateInsightRequest,
+    x_service_key: str = Header(alias="X-Service-Key"),
+) -> GenerateInsightResponse:
+    """Generate a Gift Profile insight paragraph (Elite tier only)."""
+    if x_service_key != SERVICE_KEY:
+        raise HTTPException(403, "Invalid service key")
+    try:
+        return await generate_insight(req)
+    except ValueError as e:
+        raise HTTPException(403, str(e))
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.error("Failed to parse insight generation response: %s", e)
+        raise HTTPException(500, "AI returned invalid response")
+    except anthropic.APITimeoutError:
+        raise HTTPException(504, "AI service timeout")
+    except anthropic.RateLimitError:
+        raise HTTPException(429, "AI service rate limited")
+    except anthropic.APIError as e:
+        logger.error("Anthropic API error in generate-insight: %s", e)
+        raise HTTPException(502, "AI service error")
