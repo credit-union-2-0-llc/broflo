@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrdersService } from '../orders/orders.service';
+import { AgentOrdersService } from '../orders/agent/agent-orders.service';
 import { AutopilotService } from './autopilot.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SuggestionsService } from '../suggestions/suggestions.service';
@@ -16,6 +17,7 @@ export class AutopilotScheduler {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ordersService: OrdersService,
+    private readonly agentOrders: AgentOrdersService,
     private readonly autopilotService: AutopilotService,
     private readonly notifications: NotificationsService,
     private readonly suggestionsService: SuggestionsService,
@@ -209,8 +211,9 @@ export class AutopilotScheduler {
         continue;
       }
 
-      // Preview order to get product
+      // Preview order to get product — try API first, fall back to browser agent
       let preview;
+      let useAgent = false;
       try {
         preview = await this.ordersService.preview(
           { id: rule.userId } as never,
@@ -221,20 +224,88 @@ export class AutopilotScheduler {
             budgetMaxCents: rule.budgetMaxCents,
           },
         );
-      } catch (err) {
-        await this.prisma.autopilotRun.create({
-          data: {
-            ruleId: rule.id,
-            eventId: event.id,
+      } catch {
+        // No API adapter for this retailer — try browser agent
+        useAgent = true;
+        this.log.log(`API preview failed for rule ${rule.id}, falling back to browser agent`);
+      }
+
+      if (useAgent) {
+        // Route to browser agent
+        try {
+          const user = await this.prisma.user.findUniqueOrThrow({ where: { id: rule.userId } });
+          const agentJob = await this.agentOrders.preview(user, {
             suggestionId: suggestion.id,
-            status: 'failed',
-            reason: `Preview failed: ${err}`,
-          },
-        });
+            personId: rule.personId,
+            eventId: event.id,
+            retailerUrl: suggestion.retailerHint || undefined,
+          });
+
+          if (agentJob.status === 'previewing') {
+            const result = await this.agentOrders.place(user, { jobId: agentJob.id });
+            if (result.job.status === 'completed' && result.order) {
+              await this.prisma.autopilotRun.create({
+                data: {
+                  ruleId: rule.id,
+                  eventId: event.id,
+                  orderId: result.order.id,
+                  suggestionId: suggestion.id,
+                  status: 'order_placed',
+                  confidenceScore: suggestion.confidenceScore,
+                  amountCents: result.order.priceCents,
+                  reason: 'Placed via browser agent (no API adapter)',
+                },
+              });
+              await this.notifications.create(rule.userId, {
+                type: 'autopilot_ordered',
+                title: 'Autopilot Gift Ordered',
+                body: `We ordered "${result.order.productTitle}" for ${rule.person.name} via Broflo Agent. You have 2 hours to cancel.`,
+                linkUrl: `/orders/${result.order.id}`,
+              });
+              this.log.log(`Autopilot agent order placed: rule=${rule.id}, order=${result.order.id}`);
+            } else {
+              await this.prisma.autopilotRun.create({
+                data: {
+                  ruleId: rule.id,
+                  eventId: event.id,
+                  suggestionId: suggestion.id,
+                  status: 'failed',
+                  reason: `Browser agent failed: ${result.job.failureReason || 'unknown'}`,
+                },
+              });
+            }
+          } else {
+            await this.prisma.autopilotRun.create({
+              data: {
+                ruleId: rule.id,
+                eventId: event.id,
+                suggestionId: suggestion.id,
+                status: 'failed',
+                reason: `Browser agent preview failed: ${agentJob.failureReason || agentJob.status}`,
+              },
+            });
+          }
+        } catch (err) {
+          await this.prisma.autopilotRun.create({
+            data: {
+              ruleId: rule.id,
+              eventId: event.id,
+              suggestionId: suggestion.id,
+              status: 'failed',
+              reason: `Browser agent error: ${err}`,
+            },
+          });
+          await this.notifications.create(rule.userId, {
+            type: 'autopilot_failed',
+            title: 'Autopilot Order Failed',
+            body: `We tried to order a gift for ${rule.person.name} but something went wrong. No charge.`,
+            linkUrl: '/autopilot',
+          });
+        }
         continue;
       }
 
-      // Place order
+      // Place order via API adapter
       try {
         const order = await this.ordersService.place(
           { id: rule.userId, stripeCustomerId: rule.user.stripeCustomerId, stripePaymentMethodId: rule.user.stripePaymentMethodId } as never,
@@ -242,7 +313,7 @@ export class AutopilotScheduler {
             suggestionId: suggestion.id,
             personId: rule.personId,
             eventId: event.id,
-            retailerProductId: preview.product.id,
+            retailerProductId: preview!.product.id,
             shippingName: rule.person.name,
             shippingAddress1: rule.person.shippingAddress1!,
             shippingCity: rule.person.shippingCity!,
@@ -259,14 +330,14 @@ export class AutopilotScheduler {
             suggestionId: suggestion.id,
             status: 'order_placed',
             confidenceScore: suggestion.confidenceScore,
-            amountCents: preview.product.priceCents,
+            amountCents: preview!.product.priceCents,
           },
         });
 
         await this.notifications.create(rule.userId, {
           type: 'autopilot_ordered',
           title: 'Autopilot Gift Ordered',
-          body: `We ordered "${preview.product.title}" for ${rule.person.name}. You have 2 hours to cancel.`,
+          body: `We ordered "${preview!.product.title}" for ${rule.person.name}. You have 2 hours to cancel.`,
           linkUrl: `/orders/${order.id}`,
         });
 
