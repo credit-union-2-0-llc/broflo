@@ -3,11 +3,13 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OrdersService } from '../orders.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderAuditService } from '../audit/order-audit.service';
+import { StripeConnectService } from '../stripe-connect.service';
 
 describe('OrdersService - cancel window', () => {
   let service: OrdersService;
   let prisma: { order: { findFirst: jest.Mock; update: jest.Mock } };
   let adapter: { cancelOrder: jest.Mock };
+  let stripeConnect: { refund: jest.Mock; createCharge: jest.Mock; calculateFeeCents: jest.Mock; getConnectedAccountId: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -21,6 +23,13 @@ describe('OrdersService - cancel window', () => {
       cancelOrder: jest.fn().mockResolvedValue({ success: true }),
     };
 
+    stripeConnect = {
+      refund: jest.fn().mockResolvedValue(undefined),
+      createCharge: jest.fn(),
+      calculateFeeCents: jest.fn().mockReturnValue(0),
+      getConnectedAccountId: jest.fn().mockReturnValue(null),
+    };
+
     const auditRecord = jest.fn().mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
@@ -29,6 +38,7 @@ describe('OrdersService - cancel window', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: 'RETAILER_ADAPTER', useValue: adapter },
         { provide: OrderAuditService, useValue: { record: auditRecord } },
+        { provide: StripeConnectService, useValue: stripeConnect },
       ],
     }).compile();
 
@@ -46,6 +56,7 @@ describe('OrdersService - cancel window', () => {
       placedAt: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
       retailerOrderId: 'MOCK-123',
       giftRecordId: null,
+      stripePaymentIntentId: null,
     });
 
     await expect(service.cancel(userId, orderId)).rejects.toThrow(BadRequestException);
@@ -62,6 +73,7 @@ describe('OrdersService - cancel window', () => {
       placedAt: new Date(), // just now
       retailerOrderId: 'MOCK-123',
       giftRecordId: null,
+      stripePaymentIntentId: null,
     };
     prisma.order.findFirst.mockResolvedValue(mockOrder);
     prisma.order.update.mockResolvedValue({ ...mockOrder, status: 'cancelled' });
@@ -77,6 +89,7 @@ describe('OrdersService - cancel window', () => {
       placedAt: new Date(), // recent, but wrong status
       retailerOrderId: 'MOCK-123',
       giftRecordId: null,
+      stripePaymentIntentId: null,
     });
 
     await expect(service.cancel(userId, orderId)).rejects.toThrow(BadRequestException);
