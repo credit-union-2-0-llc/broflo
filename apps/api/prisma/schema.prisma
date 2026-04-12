@@ -38,6 +38,8 @@ model User {
   orders           Order[]
   autopilotRules   AutopilotRule[]
   notifications    Notification[]
+  agentJobs        AgentJob[]
+  serviceCredits   ServiceCredit[]
 
   @@map("users")
 }
@@ -333,6 +335,7 @@ model Order {
   event         Event?               @relation(fields: [eventId], references: [id], onDelete: SetNull)
   giftRecord    GiftRecord?          @relation(fields: [giftRecordId], references: [id], onDelete: SetNull)
   statusHistory OrderStatusHistory[]
+  agentJob      AgentJob?
 
   @@index([userId, status, placedAt], map: "idx_orders_user_status")
   @@index([personId, placedAt], map: "idx_orders_person_placed")
@@ -457,4 +460,175 @@ model AiAuditLog {
   @@index([model, createdAt], map: "idx_audit_model_created")
   @@index([tier, createdAt], map: "idx_audit_tier_created")
   @@map("ai_audit_logs")
+}
+
+// --- S-10: Browser Agent ---
+
+enum AgentJobStatus {
+  queued
+  running
+  previewing
+  placing
+  completed
+  failed
+  aborted
+
+  @@map("agent_job_status")
+}
+
+enum AgentFailureReason {
+  captcha
+  out_of_stock    @map("out_of_stock")
+  blocked
+  timeout
+  price_mismatch  @map("price_mismatch")
+  payment_declined @map("payment_declined")
+  address_rejected @map("address_rejected")
+  unknown
+
+  @@map("agent_failure_reason")
+}
+
+enum AgentStepAction {
+  navigate
+  search
+  filter
+  select_product   @map("select_product")
+  add_to_cart      @map("add_to_cart")
+  enter_address    @map("enter_address")
+  enter_payment    @map("enter_payment")
+  confirm_order    @map("confirm_order")
+  capture_confirmation @map("capture_confirmation")
+  detect_captcha   @map("detect_captcha")
+  detect_oos       @map("detect_oos")
+  error
+
+  @@map("agent_step_action")
+}
+
+enum AgentStepStatus {
+  pending
+  running
+  completed
+  failed
+  skipped
+
+  @@map("agent_step_status")
+}
+
+model AgentJob {
+  id                  String             @id @default(uuid())
+  userId              String             @map("user_id")
+  orderId             String?            @unique @map("order_id")
+  suggestionId        String?            @map("suggestion_id")
+  autopilotRunId      String?            @unique @map("autopilot_run_id")
+  status              AgentJobStatus     @default(queued)
+  retailerDomain      String             @map("retailer_domain")
+  retailerUrl         String             @map("retailer_url")
+  searchTerms         String             @map("search_terms")
+  maxBudgetCents      Int                @map("max_budget_cents")
+  shippingName        String             @map("shipping_name")
+  shippingAddress1    String             @map("shipping_address1")
+  shippingAddress2    String?            @map("shipping_address2")
+  shippingCity        String             @map("shipping_city")
+  shippingState       String             @map("shipping_state")
+  shippingZip         String             @map("shipping_zip")
+  foundProductTitle   String?            @map("found_product_title")
+  foundProductPrice   Int?               @map("found_product_price")
+  foundProductUrl     String?            @map("found_product_url")
+  foundProductImage   String?            @map("found_product_image")
+  matchConfidence     Float?             @map("match_confidence")
+  confirmationNumber  String?            @map("confirmation_number")
+  browserSessionId    String?            @map("browser_session_id")
+  stripeVirtualCardId String?            @map("stripe_virtual_card_id")
+  failureReason       AgentFailureReason? @map("failure_reason")
+  retryCount          Int                @default(0) @map("retry_count")
+  maxRetries          Int                @default(2) @map("max_retries")
+  idempotencyKey      String             @unique @map("idempotency_key")
+  startedAt           DateTime?          @map("started_at")
+  completedAt         DateTime?          @map("completed_at")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order   Order?      @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  steps   AgentStep[]
+
+  @@index([userId, status], map: "idx_agent_jobs_user_status")
+  @@index([status, createdAt], map: "idx_agent_jobs_status_queue")
+  @@index([retailerDomain, status], map: "idx_agent_jobs_retailer")
+  @@map("agent_jobs")
+}
+
+model AgentStep {
+  id              String           @id @default(uuid())
+  jobId           String           @map("job_id")
+  stepNumber      Int              @map("step_number")
+  action          AgentStepAction
+  status          AgentStepStatus  @default(pending)
+  screenshotUrl   String?          @map("screenshot_url")
+  pageUrl         String?          @map("page_url")
+  aiModelUsed     String?          @map("ai_model_used")
+  aiConfidence    Float?           @map("ai_confidence")
+  metadata        Json?
+  startedAt       DateTime?        @map("started_at")
+  completedAt     DateTime?        @map("completed_at")
+
+  job AgentJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, stepNumber], name: "uq_agent_step_job_number", map: "uq_agent_step_job_number")
+  @@index([jobId, stepNumber], map: "idx_agent_steps_job")
+  @@map("agent_steps")
+}
+
+model RetailerProfile {
+  id               String    @id @default(uuid())
+  retailerDomain   String    @unique @map("retailer_domain")
+  displayName      String    @map("display_name")
+  supported        Boolean   @default(true)
+  searchUrlPattern String?   @map("search_url_pattern")
+  captchaRate      Float     @default(0) @map("captcha_rate")
+  successRate      Float     @default(1) @map("success_rate")
+  totalAttempts    Int       @default(0) @map("total_attempts")
+  totalSuccesses   Int       @default(0) @map("total_successes")
+  avgExecutionMs   Int       @default(0) @map("avg_execution_ms")
+  lastAttemptAt    DateTime? @map("last_attempt_at")
+  blockedSince     DateTime? @map("blocked_since")
+  notes            String?
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@map("retailer_profiles")
+}
+
+model ServiceCredit {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  agentJobId      String?  @map("agent_job_id")
+  amountCents     Int      @map("amount_cents")
+  reason          String
+  stripeCouponId  String?  @map("stripe_coupon_id")
+  billingCycleKey String   @map("billing_cycle_key")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, billingCycleKey], name: "uq_service_credit_user_cycle", map: "uq_service_credit_user_cycle")
+  @@index([userId, createdAt], map: "idx_service_credits_user")
+  @@map("service_credits")
+}
+
+model FailureReview {
+  id              String    @id @default(uuid())
+  agentJobId      String    @map("agent_job_id")
+  retailerDomain  String    @map("retailer_domain")
+  failureReason   String    @map("failure_reason")
+  isSystemic      Boolean?  @map("is_systemic")
+  reviewNotes     String?   @map("review_notes")
+  resolvedAt      DateTime? @map("resolved_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([resolvedAt, createdAt], map: "idx_failure_reviews_unresolved")
+  @@index([retailerDomain], map: "idx_failure_reviews_retailer")
+  @@map("failure_reviews")
 }
