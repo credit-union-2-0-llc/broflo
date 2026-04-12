@@ -3,9 +3,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { X, Check } from "lucide-react";
+import { X, Check, ShoppingBag } from "lucide-react";
 import { VOICE } from "@broflo/shared";
 import type { GiftSuggestion } from "@/lib/api";
+import { OrderStatusBadge } from "@/components/orders/order-status-badge";
+import { useCancelCountdown } from "@/hooks/use-cancel-countdown";
 
 function dollars(cents: number) {
   return `$${(cents / 100).toFixed(0)}`;
@@ -23,6 +25,50 @@ interface SuggestionCardProps {
   onSelect: (id: string) => void;
   onDismiss: (id: string) => void;
   selecting?: boolean;
+  onOrderThis?: (suggestionId: string) => void;
+  orderStatus?: string | null;
+  orderPlacedAt?: string | null;
+}
+
+function OrderActions({
+  suggestionId,
+  orderStatus,
+  orderPlacedAt,
+  onOrderThis,
+}: {
+  suggestionId: string;
+  orderStatus?: string | null;
+  orderPlacedAt?: string | null;
+  onOrderThis?: (suggestionId: string) => void;
+}) {
+  const { formatted } = useCancelCountdown(
+    orderStatus === "ordered" ? (orderPlacedAt ?? null) : null
+  );
+
+  if (orderStatus) {
+    return (
+      <OrderStatusBadge
+        status={orderStatus}
+        cancelCountdown={orderStatus === "ordered" && orderPlacedAt ? formatted : undefined}
+      />
+    );
+  }
+
+  if (onOrderThis) {
+    return (
+      <Button
+        variant="default"
+        size="sm"
+        className="bg-emerald-600 hover:bg-emerald-700"
+        onClick={() => onOrderThis(suggestionId)}
+      >
+        <ShoppingBag className="mr-1 h-3.5 w-3.5" />
+        Order This
+      </Button>
+    );
+  }
+
+  return null;
 }
 
 export function SuggestionCard({
@@ -31,6 +77,9 @@ export function SuggestionCard({
   onSelect,
   onDismiss,
   selecting,
+  onOrderThis,
+  orderStatus,
+  orderPlacedAt,
 }: SuggestionCardProps) {
   const s = suggestion;
   const priceRange = `${dollars(s.estimatedPriceMinCents)} – ${dollars(s.estimatedPriceMaxCents)}`;
@@ -87,21 +136,33 @@ export function SuggestionCard({
             <X className="mr-1 h-3.5 w-3.5" />
             Not this one
           </Button>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => onSelect(s.id)}
-            disabled={s.isSelected || selecting}
-          >
-            {s.isSelected ? (
-              <>
-                <Check className="mr-1 h-3.5 w-3.5" />
-                Selected
-              </>
-            ) : (
-              "Select This Gift"
+          <div className="flex items-center gap-2">
+            {s.isSelected && (
+              <OrderActions
+                suggestionId={s.id}
+                orderStatus={orderStatus}
+                orderPlacedAt={orderPlacedAt}
+                onOrderThis={!orderStatus ? onOrderThis : undefined}
+              />
             )}
-          </Button>
+            {!orderStatus && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => onSelect(s.id)}
+                disabled={s.isSelected || selecting}
+              >
+                {s.isSelected ? (
+                  <>
+                    <Check className="mr-1 h-3.5 w-3.5" />
+                    Selected
+                  </>
+                ) : (
+                  "Select This Gift"
+                )}
+              </Button>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>
