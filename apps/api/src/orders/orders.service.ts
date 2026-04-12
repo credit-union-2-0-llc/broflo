@@ -436,6 +436,29 @@ export class OrdersService {
     return this.statusHistory.getTimeline(orderId);
   }
 
+  async markManuallyPurchased(userId: string, orderId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId, status: 'failed' },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found or not in failed state');
+    }
+
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'ordered', placedAt: new Date() },
+    });
+
+    await this.orderAudit.record({
+      orderId,
+      userId,
+      action: 'place',
+      details: { channel: 'manual_fallback', source: 'user' },
+    });
+
+    return { success: true };
+  }
+
   async transitionStatus(
     orderId: string,
     toStatus: OrderStatus,

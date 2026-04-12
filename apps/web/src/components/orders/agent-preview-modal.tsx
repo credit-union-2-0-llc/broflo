@@ -143,7 +143,7 @@ export function AgentPreviewModal({
         } catch {
           // Silently continue polling
         }
-      }, 3000);
+      }, 5000);
     },
     [token],
   );
@@ -269,6 +269,19 @@ export function AgentPreviewModal({
                     ? VOICE.agent.found
                     : VOICE.agent.foundLowConfidence}
                 </p>
+
+                {/* Price exceeds budget warning (M4) */}
+                {job.foundProductPrice != null && job.maxBudgetCents != null &&
+                  job.foundProductPrice > job.maxBudgetCents && (
+                  <Card className="bg-amber-50 border-amber-200 p-3">
+                    <p className="text-sm text-amber-800">
+                      {VOICE.agent.priceOverBudget(
+                        dollars(job.foundProductPrice),
+                        dollars(job.maxBudgetCents),
+                      )}
+                    </p>
+                  </Card>
+                )}
 
                 {/* Low confidence warning */}
                 {job.matchConfidence != null && job.matchConfidence < 0.5 && (
@@ -483,8 +496,21 @@ export function AgentPreviewModal({
                 type={job?.failureReason ?? "unknown"}
                 retailer={displayRetailer}
                 productUrl={job?.foundProductUrl ?? undefined}
+                productTitle={job?.foundProductTitle ?? undefined}
                 priceExpected={job?.maxBudgetCents}
                 priceActual={job?.foundProductPrice ?? undefined}
+                shippingAddress={
+                  shippingName
+                    ? {
+                        name: shippingName,
+                        address1: shippingAddress1,
+                        address2: shippingAddress2 || undefined,
+                        city: shippingCity,
+                        state: shippingState,
+                        zip: shippingZip,
+                      }
+                    : undefined
+                }
                 errorMessage={error ?? undefined}
                 onRetry={() => {
                   setPhase("searching");
@@ -504,6 +530,19 @@ export function AgentPreviewModal({
                   }
                 }}
                 onFindAnother={() => onOpenChange(false)}
+                onMarkPurchased={
+                  job?.orderId
+                    ? async () => {
+                        try {
+                          await api.markOrderManual(token, job.orderId!);
+                          toast.success("Marked as purchased.");
+                          onOpenChange(false);
+                        } catch {
+                          toast.error("Could not update order.");
+                        }
+                      }
+                    : undefined
+                }
               />
             </>
           )}

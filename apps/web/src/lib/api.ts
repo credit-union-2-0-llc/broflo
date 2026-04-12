@@ -763,4 +763,11 @@ export const api = {
       method: "POST",
       token,
     }),
+
+  markOrderManual: (token: string, orderId: string) =>
+    apiFetch<{ success: boolean }>(`/orders/${orderId}/mark-manual`, {
+      method: "POST",
+      body: JSON.stringify({ channel: "manual_fallback" }),
+      token,
+    }),
 };

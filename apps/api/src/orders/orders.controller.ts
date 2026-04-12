@@ -60,4 +60,12 @@ export class OrdersController {
   async getTimeline(@CurrentUser() user: User, @Param('id') id: string) {
     return this.orders.getTimeline(user.id, id);
   }
+
+  @Post(':id/mark-manual')
+  async markManuallyPurchased(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+  ) {
+    return this.orders.markManuallyPurchased(user.id, id);
+  }
 }

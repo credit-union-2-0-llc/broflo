@@ -224,6 +224,20 @@ export const VOICE = {
     creditIssued: (amount: string) =>
       `That didn't work. We've credited ${amount} to your next month as an apology.`,
     creditBannerCta: "View Credit",
+    fallbackCta: "Complete Purchase Manually",
+    purchasedManually: "I Bought It Myself",
+    purchasedManuallyConfirm:
+      "Mark this order as purchased? This moves it to your order history.",
+    copyAddress: "Copy Address",
+    addressCopied: "Address copied to clipboard.",
+    progressSearch: "Searching the retailer's site...",
+    progressMatch: "Matching the best product...",
+    progressCart: "Adding to cart...",
+    progressShipping: "Entering shipping details...",
+    progressPayment: "Processing payment...",
+    progressConfirm: "Confirming order...",
+    priceOverBudget: (price: string, budget: string) =>
+      `This costs ${price}, which is over your ${budget} budget.`,
   },
 
   billing: {
