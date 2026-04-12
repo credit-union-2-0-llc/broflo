@@ -3,6 +3,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OrdersService } from '../orders.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderAuditService } from '../audit/order-audit.service';
+import { OrderStatusHistoryService } from '../order-status-history.service';
 import { StripeConnectService } from '../stripe-connect.service';
 
 describe('OrdersService - cancel window', () => {
@@ -38,6 +39,7 @@ describe('OrdersService - cancel window', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: 'RETAILER_ADAPTER', useValue: adapter },
         { provide: OrderAuditService, useValue: { record: auditRecord } },
+        { provide: OrderStatusHistoryService, useValue: { record: jest.fn().mockResolvedValue(undefined) } },
         { provide: StripeConnectService, useValue: stripeConnect },
       ],
     }).compile();
