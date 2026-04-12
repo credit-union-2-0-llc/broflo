@@ -17,6 +17,35 @@ const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS || "30000", 10);
 const TAG_DEBOUNCE_S = 300; // 5 minutes
 const INSIGHT_DEBOUNCE_S = 600; // 10 minutes
 
+// AI service response shapes
+export interface ParsedProduct {
+  title?: string;
+  category?: string;
+  brand?: string;
+  confidence: number;
+  price_cents?: number | null;
+  price_range_min_cents?: number | null;
+  price_range_max_cents?: number | null;
+}
+
+interface ParseWishlistResult {
+  results: Array<{
+    url: string;
+    error?: string;
+    products?: ParsedProduct[];
+  }>;
+}
+
+interface GenerateTagsResult {
+  tags: Array<{ label: string }>;
+}
+
+interface GenerateInsightResult {
+  profile_text?: string;
+  suggested_categories?: string[];
+  data_richness?: string;
+}
+
 @Injectable()
 export class EnrichmentService {
   private readonly logger = new Logger(EnrichmentService.name);
@@ -87,11 +116,10 @@ export class EnrichmentService {
       where: { id: userId },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = (await this.callAiService("/parse-wishlist", {
       urls,
       tier: user.subscriptionTier,
-    })) as any;
+    })) as ParseWishlistResult;
 
     // Persist parsed items
     const created = [];
@@ -169,7 +197,6 @@ export class EnrichmentService {
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = (await this.callAiService("/generate-tags", {
       person_name: person.name,
       relationship: person.relationship,
@@ -179,7 +206,7 @@ export class EnrichmentService {
       food_preferences: person.foodPreferences,
       notes: person.notes,
       tier: user.subscriptionTier,
-    })) as any;
+    })) as GenerateTagsResult;
 
     // Clear existing AI tags and replace
     await this.prisma.personTag.deleteMany({
@@ -291,7 +318,6 @@ export class EnrichmentService {
       where: { personId },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = (await this.callAiService("/generate-insight", {
       person_name: person.name,
       relationship: person.relationship,
@@ -316,7 +342,7 @@ export class EnrichmentService {
         description: n.description,
       })),
       tier: user.subscriptionTier,
-    })) as any;
+    })) as GenerateInsightResult;
 
     // Store insight on person
     const insightText = (result.profile_text || "").slice(0, 2000);
