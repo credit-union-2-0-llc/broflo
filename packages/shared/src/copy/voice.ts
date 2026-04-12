@@ -259,4 +259,34 @@ export const VOICE = {
       "You've been downgraded to Free. We'll be here when you want to come back.",
     noPlan: "You're on the free tier. Upgrade to unlock everything.",
   },
+
+  photos: {
+    emptyState:
+      "Snap a few pics of their space — we'll figure out what they're into.",
+    emptyStateSubtext:
+      "A bookshelf says more than a form field. Trust us.",
+    uploadButton: "Add Photos",
+    cameraButton: "Take Photo",
+    chooseButton: "Choose Photo",
+    categoryPickerTitle: "What kind of space is this?",
+    categorySkip: "Skip — we'll figure it out",
+    uploading: "Uploading...",
+    analyzing: "Broflo's reading the room...",
+    analysisComplete: "Signals extracted.",
+    analysisFailed: "Analysis hit a wall. Tap to retry.",
+    reanalyze: "Re-analyze",
+    reanalyzeQueued: "Re-analysis queued. Give us a sec.",
+    deleteConfirm: "Delete this photo? Tags we already extracted will stick around.",
+    tierGateFree:
+      "Free accounts get 1 photo per person. Upgrade to Pro for 5 photos and AI analysis.",
+    tierGatePro:
+      "You've hit 5 photos for this person. Upgrade to Elite for unlimited.",
+    tierGateAnalysis:
+      "Upgrade to Pro to unlock AI photo analysis.",
+    mergeToast: (count: number) =>
+      `We picked up ${count} new signal${count === 1 ? "" : "s"} from their space.`,
+    consent:
+      "You're uploading a photo of someone's private space. Make sure you have their okay. Broflo analyzes photos to find gift signals using AI. We never share them. You can delete any photo anytime.",
+    consentButton: "Got it, let's go",
+  },
 } as const;

@@ -820,4 +820,53 @@ export const api = {
       `/persons/${personId}/insight`,
       { token },
     ),
+
+  // --- S-12: Photos ---
+
+  uploadPhoto: async (token: string, personId: string, file: File, category?: string) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (category) formData.append("category", category);
+
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+    const res = await fetch(`${baseUrl}/persons/${personId}/photos`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: "Upload failed" }));
+      throw err;
+    }
+    return res.json();
+  },
+
+  getPhotos: (token: string, personId: string) =>
+    apiFetch<Array<{
+      id: string;
+      personId: string;
+      category: string;
+      analysisStatus: string;
+      analysisJson: Record<string, unknown> | null;
+      thumbUrl: string | null;
+      createdAt: string;
+    }>>(`/persons/${personId}/photos`, { token }),
+
+  getPhotoUrl: (token: string, personId: string, photoId: string) =>
+    apiFetch<{ url: string; thumbUrl: string | null }>(
+      `/persons/${personId}/photos/${photoId}/url`,
+      { token },
+    ),
+
+  deletePhoto: (token: string, personId: string, photoId: string) =>
+    apiFetch<void>(
+      `/persons/${personId}/photos/${photoId}`,
+      { method: "DELETE", token },
+    ),
+
+  reanalyzePhoto: (token: string, personId: string, photoId: string) =>
+    apiFetch<{ status: string }>(
+      `/persons/${personId}/photos/${photoId}/reanalyze`,
+      { method: "POST", token },
+    ),
 };

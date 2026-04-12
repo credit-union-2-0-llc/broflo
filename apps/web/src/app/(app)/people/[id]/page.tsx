@@ -20,6 +20,7 @@ import { PersonEventsClient } from "./person-events-client";
 import { GiftHistorySection } from "@/components/gifts/gift-history-section";
 import { WishlistParser } from "@/components/wishlist-parser";
 import { InsightCard } from "@/components/insight-card";
+import { PhotoSection } from "@/components/photos";
 
 function initials(name: string) {
   return name
@@ -230,6 +231,13 @@ export default async function PersonDetailPage({
                 />
               </>
             )}
+
+            <Separator className="my-3" />
+            <PhotoSection
+              personId={person.id}
+              personName={person.name}
+              tier={(session.user as Record<string, unknown>)?.subscriptionTier as string ?? "free"}
+            />
 
             {person.notes && (
               <>
