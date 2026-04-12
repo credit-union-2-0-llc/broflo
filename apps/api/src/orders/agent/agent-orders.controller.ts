@@ -11,7 +11,7 @@ import { AgentOrdersService } from './agent-orders.service';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { RequiresTier } from '../../billing/decorators/requires-tier.decorator';
 import { SubscriptionGuard } from '../../billing/guards/subscription.guard';
-import { AgentPreviewDto, AgentPlaceDto, AgentCancelDto } from './dto/agent-order.dto';
+import { AgentPreviewDto, AgentPlaceDto } from './dto/agent-order.dto';
 
 @Controller('orders/agent')
 export class AgentOrdersController {
