@@ -131,6 +131,14 @@ export const VOICE = {
   cancelWindow:
     "You've got 2 hours to cancel. After that, it's in the mail and you're a hero.",
 
+  orderCancel: "Order cancelled. No charge. Try a different gift?",
+  orderFailed: "The order didn't go through. You can try again or order directly.",
+  orderCancelConfirm: "Cancel this order? The gift won't be delivered.",
+  orderCancelKeep: "Keep It",
+  orderCancelConfirmAction: "Yes, Cancel",
+  orderPlacing: "Placing your order...",
+  orderPreviewCta: "Confirm & Order",
+
   billing: {
     upgradePrompt:
       "You've hit the Free limit. Three people is a lot... for a free tier. Upgrade and we'll remember everyone.",
