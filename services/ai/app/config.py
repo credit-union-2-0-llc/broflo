@@ -14,7 +14,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 TIER_MODELS: dict[SubscriptionTier, str] = {
     SubscriptionTier.free: "claude-haiku-4-5-20251001",
     SubscriptionTier.pro: "claude-sonnet-4-20250514",
-    SubscriptionTier.elite: "claude-sonnet-4-6-20260217",
+    SubscriptionTier.elite: "claude-sonnet-4-6",
 }
 
 # Suggestion counts by tier
@@ -34,7 +34,7 @@ TAG_MODELS: dict[SubscriptionTier, str] = {
     SubscriptionTier.elite: "claude-sonnet-4-20250514",
 }
 # Insight generation: Sonnet 4.6 only (Elite-only, synthesis task)
-INSIGHT_MODEL = "claude-sonnet-4-6-20260217"
+INSIGHT_MODEL = "claude-sonnet-4-6"
 
 # Page content truncation for wishlist parsing
 MAX_PAGE_CHARS = 6000
