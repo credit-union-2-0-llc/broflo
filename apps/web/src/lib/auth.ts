@@ -6,6 +6,7 @@ declare module "next-auth" {
   interface Session {
     accessToken: string;
     refreshToken: string;
+    error?: "RefreshTokenError";
     user: {
       id: string;
       email: string;
@@ -21,6 +22,8 @@ declare module "next-auth" {
   interface JWT {
     accessToken: string;
     refreshToken: string;
+    accessTokenExpires: number;
+    error?: "RefreshTokenError";
     user: {
       id: string;
       email: string;
@@ -29,6 +32,15 @@ declare module "next-auth" {
       subscriptionTier: string;
       brofloScore: number;
     };
+  }
+}
+
+function getTokenExpiry(token: string): number {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return (payload.exp ?? 0) * 1000;
+  } catch {
+    return 0;
   }
 }
 
@@ -92,6 +104,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const u = user as Record<string, unknown>;
         token.accessToken = u.accessToken as string;
         token.refreshToken = u.refreshToken as string;
+        token.accessTokenExpires = getTokenExpiry(u.accessToken as string);
         token.user = {
           id: u.id as string,
           email: u.email as string,
@@ -101,6 +114,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           brofloScore: u.brofloScore as number,
         };
       }
+
+      // Refresh access token if expired or expiring within 60s
+      if (Date.now() > (token.accessTokenExpires as number) - 60_000) {
+        try {
+          const refreshed = await api.refresh(token.refreshToken as string);
+          token.accessToken = refreshed.accessToken;
+          token.refreshToken = refreshed.refreshToken;
+          token.accessTokenExpires = getTokenExpiry(refreshed.accessToken);
+          delete token.error;
+        } catch {
+          token.error = "RefreshTokenError";
+          return token;
+        }
+      }
+
       if (trigger === "update" && token.accessToken) {
         try {
           const sub = await api.getSubscription(token.accessToken as string);
@@ -116,6 +144,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.accessToken = token.accessToken as string;
       session.refreshToken = token.refreshToken as string;
       session.user = token.user as typeof session.user;
+      if (token.error === "RefreshTokenError") {
+        session.error = "RefreshTokenError";
+      }
       return session;
     },
   },
