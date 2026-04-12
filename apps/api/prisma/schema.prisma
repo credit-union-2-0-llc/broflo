@@ -405,6 +405,7 @@ model AutopilotRun {
   reason          String?
   confidenceScore Float?            @map("confidence_score")
   amountCents     Int?              @map("amount_cents")
+  metadata        Json?
   createdAt       DateTime          @default(now()) @map("created_at")
 
   rule       AutopilotRule    @relation(fields: [ruleId], references: [id], onDelete: Cascade)

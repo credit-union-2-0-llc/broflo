@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Body, Query, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('admin')
@@ -44,6 +44,33 @@ export class AdminController {
         isSystemic: body.isSystemic,
         reviewNotes: body.reviewNotes,
         resolvedAt: body.resolved ? new Date() : undefined,
+      },
+    });
+  }
+
+  @Get('retailers')
+  async listRetailers() {
+    return this.prisma.retailerProfile.findMany({
+      orderBy: { retailerDomain: 'asc' },
+    });
+  }
+
+  @Patch('retailers/:domain')
+  async updateRetailer(
+    @Param('domain') domain: string,
+    @Body() body: { supported?: boolean; notes?: string },
+  ) {
+    const profile = await this.prisma.retailerProfile.findFirst({
+      where: { retailerDomain: domain },
+    });
+    if (!profile) throw new NotFoundException(`Retailer ${domain} not found`);
+
+    return this.prisma.retailerProfile.update({
+      where: { id: profile.id },
+      data: {
+        supported: body.supported,
+        blockedSince: body.supported === true ? null : undefined,
+        notes: body.notes,
       },
     });
   }

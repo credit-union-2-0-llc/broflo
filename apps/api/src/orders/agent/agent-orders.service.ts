@@ -236,6 +236,14 @@ export class AgentOrdersService {
           },
         });
 
+        // B4: Create OrderStatusHistory for agent orders (same as API orders)
+        await this.orderAudit.record({
+          orderId: order.id,
+          userId: user.id,
+          action: 'place',
+          details: { channel: 'browser_agent', jobId: job.id },
+        });
+
         await this.retailerProfile.recordAttempt(job.retailerDomain, true, false);
 
         await this.notifications.create(user.id, {

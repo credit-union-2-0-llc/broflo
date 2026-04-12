@@ -254,6 +254,7 @@ export class AutopilotScheduler {
                   confidenceScore: suggestion.confidenceScore,
                   amountCents: result.order.priceCents,
                   reason: 'Placed via browser agent (no API adapter)',
+                  metadata: { channel: 'browser_agent', jobId: agentJob.id },
                 },
               });
               await this.notifications.create(rule.userId, {
@@ -271,6 +272,7 @@ export class AutopilotScheduler {
                   suggestionId: suggestion.id,
                   status: 'failed',
                   reason: `Browser agent failed: ${result.job.failureReason || 'unknown'}`,
+                  metadata: { channel: 'browser_agent', jobId: agentJob.id },
                 },
               });
             }
@@ -282,6 +284,7 @@ export class AutopilotScheduler {
                 suggestionId: suggestion.id,
                 status: 'failed',
                 reason: `Browser agent preview failed: ${agentJob.failureReason || agentJob.status}`,
+                metadata: { channel: 'browser_agent', jobId: agentJob.id },
               },
             });
           }
