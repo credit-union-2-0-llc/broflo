@@ -1,0 +1,49 @@
+name: Deploy API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - "packages/**"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @broflo/api run prisma:generate
+
+      - run: pnpm --filter @broflo/api run build
+
+      - name: Create deploy package
+        run: |
+          mkdir -p ./deploy-api
+          cp apps/api/package.json ./deploy-api/
+          cp -r apps/api/dist ./deploy-api/dist
+          cp -r apps/api/prisma ./deploy-api/prisma
+          cd ./deploy-api
+          node -e "const p=require('./package.json'); delete p.devDependencies; require('fs').writeFileSync('package.json', JSON.stringify(p,null,2))"
+          npm install --omit=dev
+          # Copy Prisma generated client (includes linux engine from pnpm generate)
+          mkdir -p node_modules/.prisma
+          cp -r ../node_modules/.pnpm/@prisma+client*/node_modules/.prisma/client node_modules/.prisma/client
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: broflo-api
+          publish-profile: ${{ secrets.BROFLO_API_PUBLISH_PROFILE }}
+          package: ./deploy-api

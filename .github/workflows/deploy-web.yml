@@ -1,0 +1,42 @@
+name: Deploy Web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - "packages/**"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @broflo/web run build
+
+      - name: Create deploy package
+        run: |
+          cp -rL apps/web/.next/standalone ./deploy-web
+          cp -r apps/web/.next/static ./deploy-web/apps/web/.next/static
+          cp -r apps/web/public ./deploy-web/apps/web/public 2>/dev/null || true
+          # Hoist pnpm transitive deps so Node can resolve them
+          cp -rL ./deploy-web/node_modules/.pnpm/node_modules/* ./deploy-web/node_modules/ 2>/dev/null || true
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: broflo-web
+          publish-profile: ${{ secrets.BROFLO_WEB_PUBLISH_PROFILE }}
+          package: ./deploy-web
