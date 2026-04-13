@@ -81,7 +81,7 @@ export class PhotoTagMergeService {
         });
         existingSet.add(candidate); // prevent within-batch dupes
         mergedCount++;
-      } catch (error) {
+      } catch {
         // Unique constraint violation — tag was created between our check and insert
         // Safe to ignore
       }
