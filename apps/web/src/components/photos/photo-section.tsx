@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { VOICE } from "@broflo/shared/copy/voice";
 import { api } from "@/lib/api";
 import { PhotoUploadTrigger } from "./photo-upload-trigger";
@@ -26,8 +27,11 @@ interface Photo {
   createdAt: string;
 }
 
+const CONSENT_KEY = "broflo:photo-consent-acknowledged";
+
 export function PhotoSection({ personId, tier }: PhotoSectionProps) {
   const { data: session } = useSession();
+  const router = useRouter();
   const token = session?.accessToken as string;
 
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -36,7 +40,12 @@ export function PhotoSection({ personId, tier }: PhotoSectionProps) {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showConsent, setShowConsent] = useState(false);
-  const [consentAcknowledged, setConsentAcknowledged] = useState(false);
+  const [consentAcknowledged, setConsentAcknowledged] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(CONSENT_KEY) === "true";
+    }
+    return false;
+  });
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
 
   // Load photos
@@ -79,6 +88,7 @@ export function PhotoSection({ personId, tier }: PhotoSectionProps) {
 
   const handleConsentAccept = useCallback(() => {
     setConsentAcknowledged(true);
+    localStorage.setItem(CONSENT_KEY, "true");
     setShowConsent(false);
     setShowCategoryPicker(true);
   }, []);
@@ -95,7 +105,17 @@ export function PhotoSection({ personId, tier }: PhotoSectionProps) {
           await api.uploadPhoto(token, personId, file, category);
           successCount++;
         } catch (err: unknown) {
-          toast.error(err instanceof Error ? err.message : "Something went wrong.");
+          const errObj = err as Record<string, unknown>;
+          if (errObj?.statusCode === 402 || errObj?.requiredTier) {
+            toast.error(
+              (errObj.message as string) || "Upgrade to upload more photos.",
+              { action: { label: "Upgrade", onClick: () => router.push("/upgrade") } },
+            );
+          } else {
+            toast.error(
+              errObj?.message as string || (err instanceof Error ? err.message : "Something went wrong."),
+            );
+          }
         }
       }
 
@@ -103,8 +123,11 @@ export function PhotoSection({ personId, tier }: PhotoSectionProps) {
       setUploading(false);
       await loadPhotos();
 
-      if (successCount > 0 && tier !== "free") {
-        toast(VOICE.photos.analysisComplete);
+      if (successCount > 0) {
+        router.refresh(); // Refresh server data (completeness score)
+        if (tier !== "free") {
+          toast(VOICE.photos.analysisComplete);
+        }
       }
     },
     [token, personId, pendingFiles, tier, loadPhotos],
@@ -116,11 +139,13 @@ export function PhotoSection({ personId, tier }: PhotoSectionProps) {
       try {
         await api.deletePhoto(token, personId, photoId);
         setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+        setLightboxPhotoId(null);
+        router.refresh(); // Refresh server data (completeness score)
       } catch {
         toast.error("Delete failed");
       }
     },
-    [token, personId],
+    [token, personId, router],
   );
 
   const handleReanalyze = useCallback(

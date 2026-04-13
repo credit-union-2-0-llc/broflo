@@ -82,18 +82,19 @@ export function PhotoGallery({ photos, tier, onPhotoClick, onDelete }: PhotoGall
           <button
             onClick={(e) => {
               e.stopPropagation();
+              e.preventDefault();
               if (confirmDelete === photo.id) {
                 onDelete(photo.id);
                 setConfirmDelete(null);
               } else {
                 setConfirmDelete(photo.id);
-                setTimeout(() => setConfirmDelete(null), 3000);
+                setTimeout(() => setConfirmDelete(null), 5000);
               }
             }}
-            className="absolute bottom-1.5 right-1.5 rounded-full bg-background/80 p-1 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
+            className={`absolute bottom-1.5 right-1.5 rounded-full bg-background/80 p-1.5 backdrop-blur-sm transition-opacity ${confirmDelete === photo.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
             title={confirmDelete === photo.id ? "Click again to confirm" : "Delete photo"}
           >
-            <Trash2 className={`h-3.5 w-3.5 ${confirmDelete === photo.id ? "text-red-500" : "text-muted-foreground"}`} />
+            <Trash2 className={`h-4 w-4 ${confirmDelete === photo.id ? "text-red-500" : "text-muted-foreground"}`} />
           </button>
         </div>
       ))}
