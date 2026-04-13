@@ -235,7 +235,6 @@ export default async function PersonDetailPage({
             <Separator className="my-3" />
             <PhotoSection
               personId={person.id}
-              personName={person.name}
               tier={(session.user as Record<string, unknown>)?.subscriptionTier as string ?? "free"}
             />
 

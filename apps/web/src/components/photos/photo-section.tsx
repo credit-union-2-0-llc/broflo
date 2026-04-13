@@ -13,7 +13,6 @@ import { useToast } from "@/components/ui/use-toast";
 
 interface PhotoSectionProps {
   personId: string;
-  personName: string;
   tier: string;
 }
 
@@ -27,9 +26,9 @@ interface Photo {
   createdAt: string;
 }
 
-export function PhotoSection({ personId, personName, tier }: PhotoSectionProps) {
+export function PhotoSection({ personId, tier }: PhotoSectionProps) {
   const { data: session } = useSession();
-  const token = (session as any)?.accessToken as string;
+  const token = session?.accessToken as string;
   const { toast } = useToast();
 
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -96,10 +95,10 @@ export function PhotoSection({ personId, personName, tier }: PhotoSectionProps) 
         try {
           await api.uploadPhoto(token, personId, file, category);
           successCount++;
-        } catch (err: any) {
+        } catch (err: unknown) {
           toast({
             title: "Upload failed",
-            description: err.message || "Something went wrong.",
+            description: err instanceof Error ? err.message : "Something went wrong.",
             variant: "destructive",
           });
         }
@@ -136,10 +135,10 @@ export function PhotoSection({ personId, personName, tier }: PhotoSectionProps) 
         await api.reanalyzePhoto(token, personId, photoId);
         toast({ description: VOICE.photos.reanalyzeQueued });
         await loadPhotos();
-      } catch (err: any) {
+      } catch (err: unknown) {
         toast({
           title: "Re-analysis failed",
-          description: err.message || VOICE.photos.analysisFailed,
+          description: err instanceof Error ? err.message : VOICE.photos.analysisFailed,
           variant: "destructive",
         });
       }

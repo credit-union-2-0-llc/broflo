@@ -207,7 +207,6 @@ export class PersonsService {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private computeCompleteness(data: any, photoCount = 0): number {
     let score = 0;
     // Weights total 100+8 (photos additive, capped at 100) — G14 + G21

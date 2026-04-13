@@ -32,17 +32,15 @@ export function PhotoLightbox({
   onReanalyze,
 }: PhotoLightboxProps) {
   const [currentId, setCurrentId] = useState(photoId);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [imageData, setImageData] = useState<{ id: string; url: string } | null>(null);
 
   const currentIndex = photos.findIndex((p) => p.id === currentId);
   const current = photos[currentIndex];
+  const loading = !imageData || imageData.id !== currentId;
 
   useEffect(() => {
-    setLoading(true);
     api.getPhotoUrl(token, personId, currentId).then((data) => {
-      setImageUrl(data.url);
-      setLoading(false);
+      setImageData({ id: currentId, url: data.url });
     });
   }, [currentId, token, personId]);
 
@@ -98,9 +96,9 @@ export function PhotoLightbox({
           {loading ? (
             <div className="text-white/60">{VOICE.photos.analyzing}</div>
           ) : (
-            imageUrl && (
+            imageData?.url && (
               <img
-                src={imageUrl}
+                src={imageData?.url}
                 alt="Photo"
                 className="max-h-[80vh] max-w-full rounded-lg object-contain"
               />
