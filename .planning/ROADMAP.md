@@ -15,35 +15,17 @@
 | G4 | Security Fixes | Complete |
 | S-6 | Stripe Payment Vault | Complete |
 | S-7 | First Retailer API | Complete |
-
-### Phase 8: Order Tracking
-
-**Goal:** Post-placement order lifecycle — status timeline, tracking info, webhook receiver, polling cron, orders list/detail UI, dashboard widget.
-
-**Status:** Planning complete
-
-**Depends on:** S-7 (orders module), S-6 (payment vault)
-
-**Plans:** 3 plans
-
-Plans:
-- [ ] 08-01-PLAN.md — Schema + OrderStatusHistory + MockAdapter update (delivered enum, tracking fields, history model)
-- [ ] 08-02-PLAN.md — Backend: timeline endpoint, webhook receiver, polling cron, status transitions, enhanced list
-- [ ] 08-03-PLAN.md — Frontend: /orders list, /orders/:id detail with timeline, tracking card, dashboard widget, nav update
-
-**Canonical refs:**
-- Agent artifacts at `cu2-agent-studio/projects/broflo/artifacts/*-s8s9-2026-04-12.md`
-
-### Phase 9: Autopilot
-
-**Goal:** Auto-gifting for recurring events. Per-person opt-in, AI picks gift, auto-orders with cancel window notification. Pro+ only.
-
-**Status:** Planned (blocked by S-8)
-
-**Depends on:** S-8 (order tracking), S-4 (AI suggestions), S-5 (gift history)
+| S-8 | Order Tracking | Complete |
+| S-9 | Autopilot | Complete |
+| S-10 | Browser Agent Fallback | Complete |
+| S-11 | Enrichment (Wishlists, Tags, Insights) | Complete |
+| S-12 | Photo Dossier Enrichment | Complete |
 
 ### Future Phases
-| Phase | Name |
-|-------|------|
-| S-10/S-11/S-12 | Intelligence |
-| S-13/S-16 | Growth |
+| Phase | Name | Notes |
+|-------|------|-------|
+| S-13+ | Growth | Referrals, onboarding, analytics, marketing — not yet specced |
+
+### Known Issues (2026-04-13)
+- Deploy AI job fails — `broflo-cicd` SP scoped to `rg-broflo`, can't reach `cu2registry` in `rg-cu2-shared`
+- Intermittent 401s on notification polling — JWT refresh race condition during 15m token rotation window (self-corrects)

@@ -14,6 +14,7 @@ env:
   NODE_VERSION: "20"
   ACR_NAME: cu2registry
   ACR_LOGIN_SERVER: cu2registry.azurecr.io
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ─────────────────────────────────────────────
@@ -189,6 +190,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ci, changes]
     if: needs.changes.outputs.ai == 'true'
+    continue-on-error: true  # SP scoped to rg-broflo, can't reach cu2registry in rg-cu2-shared yet
     environment: production
     steps:
       - uses: actions/checkout@v4
