@@ -159,6 +159,11 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm --filter @broflo/api prisma:generate
 
+      - name: Run database migrations
+        run: pnpm --filter @broflo/api exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Build API
         run: pnpm build:api
 
