@@ -4,6 +4,7 @@ import { PhotosController } from "./photos.controller";
 import { PhotosService } from "./photos.service";
 import { PhotoAnalysisProcessor } from "./photo-analysis.processor";
 import { PhotoTagMergeService } from "./photo-tag-merge.service";
+import { PrismaService } from "../prisma/prisma.service";
 
 @Module({
   imports: [
@@ -12,7 +13,7 @@ import { PhotoTagMergeService } from "./photo-tag-merge.service";
     }),
   ],
   controllers: [PhotosController],
-  providers: [PhotosService, PhotoAnalysisProcessor, PhotoTagMergeService],
+  providers: [PhotosService, PhotoAnalysisProcessor, PhotoTagMergeService, PrismaService],
   exports: [PhotosService],
 })
 export class PhotosModule {}

@@ -13,15 +13,41 @@ import { RedisService } from "../redis/redis.service";
 import type { PhotoCategory, User } from "@prisma/client";
 import type { PhotoAnalysisJobData } from "./photo-analysis.processor";
 
-// file-type is ESM-only; use dynamic import
-async function detectFileType(
+// Magic-byte detection — no ESM dependency, works in CJS + Jest
+function detectFileType(
   buffer: Buffer,
-): Promise<{ mime: string; ext: string } | undefined> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const mod = await (Function('return import("file-type")')() as Promise<{
-    fileTypeFromBuffer: (buf: Buffer) => Promise<{ mime: string; ext: string } | undefined>;
-  }>);
-  return mod.fileTypeFromBuffer(buffer);
+): { mime: string; ext: string } | undefined {
+  if (buffer.length < 12) return undefined;
+
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return { mime: "image/jpeg", ext: "jpg" };
+  }
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e &&
+    buffer[3] === 0x47 && buffer[4] === 0x0d && buffer[5] === 0x0a &&
+    buffer[6] === 0x1a && buffer[7] === 0x0a
+  ) {
+    return { mime: "image/png", ext: "png" };
+  }
+  // WebP: RIFF....WEBP
+  if (
+    buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 &&
+    buffer[3] === 0x46 && buffer[8] === 0x57 && buffer[9] === 0x45 &&
+    buffer[10] === 0x42 && buffer[11] === 0x50
+  ) {
+    return { mime: "image/webp", ext: "webp" };
+  }
+  // HEIC/HEIF: ....ftyp followed by heic/heix/mif1
+  if (buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70) {
+    const brand = buffer.subarray(8, 12).toString("ascii");
+    if (["heic", "heix", "mif1", "hevc"].includes(brand)) {
+      return { mime: "image/heic", ext: "heic" };
+    }
+  }
+
+  return undefined;
 }
 
 const ALLOWED_MIME_TYPES = new Set([
@@ -125,7 +151,7 @@ export class PhotosService {
     }
 
     // Magic byte validation
-    const detected = await detectFileType(file.buffer);
+    const detected = detectFileType(file.buffer);
     if (!detected || !ALLOWED_MIME_TYPES.has(detected.mime)) {
       throw new HttpException(
         "Unsupported file type. Upload JPEG, PNG, WebP, or HEIC.",
@@ -156,7 +182,16 @@ export class PhotosService {
     }
 
     // Process image: re-encode to JPEG, strip EXIF, generate thumbnail
-    const { processed, thumb } = await this.storage.processImage(file.buffer);
+    let processed: Buffer;
+    let thumb: Buffer;
+    try {
+      ({ processed, thumb } = await this.storage.processImage(file.buffer));
+    } catch {
+      throw new HttpException(
+        "Unsupported file type. Upload JPEG, PNG, WebP, or HEIC.",
+        HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+      );
+    }
 
     // Create DB record (generates UUID for blob path)
     const photo = await this.prisma.personPhoto.create({

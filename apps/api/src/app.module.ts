@@ -29,7 +29,7 @@ import { PhotosModule } from "./photos/photos.module";
       {
         name: "short",
         ttl: 60000,
-        limit: 10,
+        limit: parseInt(process.env.THROTTLE_LIMIT || "10", 10),
       },
     ]),
     ScheduleModule.forRoot(),
