@@ -25,7 +25,7 @@ import {
   OAuthExchangeDto,
 } from "./dto/auth.dto";
 
-@Throttle({ short: { ttl: 60000, limit: 5 } })
+@Throttle({ short: { ttl: 60000, limit: parseInt(process.env.THROTTLE_AUTH_LIMIT || "5", 10) } })
 @Controller("auth")
 export class AuthController {
   constructor(private readonly auth: AuthService) {}

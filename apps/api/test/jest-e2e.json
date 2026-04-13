@@ -1,4 +1,5 @@
 {
+  "setupFiles": ["./setup-e2e.ts"],
   "moduleFileExtensions": ["js", "json", "ts"],
   "rootDir": ".",
   "testEnvironment": "node",

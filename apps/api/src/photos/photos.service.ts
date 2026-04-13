@@ -67,9 +67,9 @@ const TIER_LIMITS: Record<string, number> = {
   elite: Infinity,
 };
 
-// Rate limits
-const UPLOAD_RATE_LIMIT_PER_MIN = 3;
-const UPLOAD_RATE_LIMIT_PER_HOUR = 20;
+// Rate limits (env-configurable for testing; defaults = production values)
+const UPLOAD_RATE_LIMIT_PER_MIN = parseInt(process.env.PHOTO_UPLOAD_LIMIT_PER_MIN || "3", 10);
+const UPLOAD_RATE_LIMIT_PER_HOUR = parseInt(process.env.PHOTO_UPLOAD_LIMIT_PER_HOUR || "20", 10);
 
 const REANALYZE_DEBOUNCE_S = 600; // 10 minutes (Elite re-analysis)
 
