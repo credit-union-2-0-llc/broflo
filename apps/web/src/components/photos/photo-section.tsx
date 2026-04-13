@@ -9,7 +9,7 @@ import { PhotoCategoryPicker } from "./photo-category-picker";
 import { PhotoGallery } from "./photo-gallery";
 import { PhotoLightbox } from "./photo-lightbox";
 import { PhotoConsentModal } from "./photo-consent-modal";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 
 interface PhotoSectionProps {
   personId: string;
@@ -29,7 +29,6 @@ interface Photo {
 export function PhotoSection({ personId, tier }: PhotoSectionProps) {
   const { data: session } = useSession();
   const token = session?.accessToken as string;
-  const { toast } = useToast();
 
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,11 +95,7 @@ export function PhotoSection({ personId, tier }: PhotoSectionProps) {
           await api.uploadPhoto(token, personId, file, category);
           successCount++;
         } catch (err: unknown) {
-          toast({
-            title: "Upload failed",
-            description: err instanceof Error ? err.message : "Something went wrong.",
-            variant: "destructive",
-          });
+          toast.error(err instanceof Error ? err.message : "Something went wrong.");
         }
       }
 
@@ -109,10 +104,10 @@ export function PhotoSection({ personId, tier }: PhotoSectionProps) {
       await loadPhotos();
 
       if (successCount > 0 && tier !== "free") {
-        toast({ description: VOICE.photos.analysisComplete });
+        toast(VOICE.photos.analysisComplete);
       }
     },
-    [token, personId, pendingFiles, tier, loadPhotos, toast],
+    [token, personId, pendingFiles, tier, loadPhotos],
   );
 
   const handleDelete = useCallback(
@@ -122,10 +117,10 @@ export function PhotoSection({ personId, tier }: PhotoSectionProps) {
         await api.deletePhoto(token, personId, photoId);
         setPhotos((prev) => prev.filter((p) => p.id !== photoId));
       } catch {
-        toast({ title: "Delete failed", variant: "destructive" });
+        toast.error("Delete failed");
       }
     },
-    [token, personId, toast],
+    [token, personId],
   );
 
   const handleReanalyze = useCallback(
@@ -133,17 +128,13 @@ export function PhotoSection({ personId, tier }: PhotoSectionProps) {
       if (!token) return;
       try {
         await api.reanalyzePhoto(token, personId, photoId);
-        toast({ description: VOICE.photos.reanalyzeQueued });
+        toast(VOICE.photos.reanalyzeQueued);
         await loadPhotos();
       } catch (err: unknown) {
-        toast({
-          title: "Re-analysis failed",
-          description: err instanceof Error ? err.message : VOICE.photos.analysisFailed,
-          variant: "destructive",
-        });
+        toast.error(err instanceof Error ? err.message : VOICE.photos.analysisFailed);
       }
     },
-    [token, personId, loadPhotos, toast],
+    [token, personId, loadPhotos],
   );
 
   if (loading) return null;
