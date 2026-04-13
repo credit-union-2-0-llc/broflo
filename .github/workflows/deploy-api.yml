@@ -38,9 +38,8 @@ jobs:
           cd ./deploy-api
           node -e "const p=require('./package.json'); delete p.devDependencies; require('fs').writeFileSync('package.json', JSON.stringify(p,null,2))"
           npm install --omit=dev
-          # Copy Prisma generated client (includes linux engine from pnpm generate)
-          mkdir -p node_modules/.prisma
-          cp -r ../node_modules/.pnpm/@prisma+client*/node_modules/.prisma/client node_modules/.prisma/client
+          # Generate Prisma client in deploy context (ensures correct platform engines + enum exports)
+          npx prisma@6 generate
 
       - uses: azure/webapps-deploy@v3
         with:

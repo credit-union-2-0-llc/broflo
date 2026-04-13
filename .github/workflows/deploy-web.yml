@@ -26,6 +26,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm --filter @broflo/web run build
+        env:
+          NEXT_PUBLIC_API_URL: https://broflo-api.azurewebsites.net
 
       - name: Create deploy package
         run: |
