@@ -2,6 +2,10 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { api } from "./api";
 
+// Deduplicate concurrent token refreshes — only one refresh in flight at a time
+let refreshPromise: Promise<{ accessToken: string; refreshToken: string }> | null =
+  null;
+
 declare module "next-auth" {
   interface Session {
     accessToken: string;
@@ -118,7 +122,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       // Refresh access token if expired or expiring within 60s
       if (Date.now() > (token.accessTokenExpires as number) - 60_000) {
         try {
-          const refreshed = await api.refresh(token.refreshToken as string);
+          if (!refreshPromise) {
+            refreshPromise = api
+              .refresh(token.refreshToken as string)
+              .finally(() => {
+                refreshPromise = null;
+              });
+          }
+          const refreshed = await refreshPromise;
           token.accessToken = refreshed.accessToken;
           token.refreshToken = refreshed.refreshToken;
           token.accessTokenExpires = getTokenExpiry(refreshed.accessToken);
