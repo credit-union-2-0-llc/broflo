@@ -68,12 +68,12 @@ export function EventCard({ event }: { event: UpcomingEvent }) {
             {countdownLabel(event.daysUntil)}
           </Badge>
         </CardHeader>
-        <CardContent className="flex items-center justify-between pt-0">
+        <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-0">
           <span className="text-sm text-muted-foreground">
             {budget ? `Budget: ${budget}` : "No budget set"}
           </span>
           {event.daysUntil <= 30 && (
-            <Button variant="ghost" size="sm" className="text-xs gap-1" tabIndex={-1}>
+            <Button variant="ghost" size="sm" className="text-xs gap-1 w-fit" tabIndex={-1}>
               <Gift className="h-3.5 w-3.5" />
               Find Gifts
             </Button>

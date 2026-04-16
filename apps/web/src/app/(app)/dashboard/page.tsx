@@ -39,12 +39,12 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-4 sm:gap-6 sm:grid-cols-2">
           <BrofloScoreWidget score={session.user?.brofloScore ?? 0} />
           <ComingUpWidget events={events} />
         </div>
 
-        <div className="mt-6 grid gap-6 md:grid-cols-2">
+        <div className="mt-4 sm:mt-6 grid gap-4 sm:gap-6 sm:grid-cols-2">
           <RecentGiftsWidget token={session.accessToken} />
           <OrdersInFlightWidget token={session.accessToken} />
         </div>

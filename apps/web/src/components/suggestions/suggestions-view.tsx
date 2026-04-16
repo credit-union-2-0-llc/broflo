@@ -266,7 +266,7 @@ export function SuggestionsView({
 
         {/* Guidance input for re-roll */}
         {showGuidance && (
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Input
               placeholder="Any guidance? e.g. 'more experiential', 'under $50'"
               value={guidanceText}
@@ -274,10 +274,12 @@ export function SuggestionsView({
               maxLength={200}
               className="text-sm"
             />
-            <Button size="sm" onClick={generate}>Go</Button>
-            <Button size="sm" variant="ghost" onClick={() => { setShowGuidance(false); generate(); }}>
-              Skip
-            </Button>
+            <div className="flex gap-2 shrink-0">
+              <Button size="sm" onClick={generate}>Go</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setShowGuidance(false); generate(); }}>
+                Skip
+              </Button>
+            </div>
           </div>
         )}
 

@@ -174,8 +174,8 @@ export default function OrdersPage() {
                         </Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-sm font-medium">{formatPrice(order.priceCents)}</span>
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                      <span className="text-sm font-medium hidden sm:inline">{formatPrice(order.priceCents)}</span>
                       <OrderStatusBadge status={order.status} />
                     </div>
                     {session?.accessToken &&

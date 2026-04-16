@@ -73,7 +73,7 @@ export default async function EventDetailPage({
       : null;
 
   return (
-    <div className="min-h-screen bg-background px-4 py-8">
+    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
       <div className="mx-auto max-w-2xl space-y-6">
         <div className="flex items-center justify-between">
           <Link href="/events">
@@ -129,7 +129,7 @@ export default async function EventDetailPage({
               </Badge>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-muted-foreground">Recurrence</span>
                 <p className="font-medium capitalize">{event.recurrenceRule.replace("_", "-")}</p>

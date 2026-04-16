@@ -59,7 +59,7 @@ export default async function PeoplePage() {
         </div>
 
         {people.length > 0 && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
             {people.map((person) => (
               <Link key={person.id} href={`/people/${person.id}`}>
                 <Card className="transition-shadow hover:shadow-md cursor-pointer h-full">
