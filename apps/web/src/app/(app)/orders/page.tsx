@@ -96,8 +96,8 @@ export default function OrdersPage() {
         </div>
 
         {/* Filters */}
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex gap-1">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex flex-wrap gap-1">
             {(["all", "active", "delivered", "cancelled"] as StatusFilter[]).map((f) => (
               <Button
                 key={f}
@@ -110,7 +110,7 @@ export default function OrdersPage() {
             ))}
           </div>
           <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as "asc" | "desc")}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-full sm:w-[140px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

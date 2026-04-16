@@ -125,7 +125,7 @@ export default async function PersonDetailPage({
               tier={(session.user as Record<string, unknown>)?.subscriptionTier as string ?? "free"}
             />
 
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               {person.birthday && (
                 <div>
                   <span className="text-muted-foreground">Birthday</span>
@@ -209,7 +209,7 @@ export default async function PersonDetailPage({
                     <h3 className="text-sm font-semibold text-muted-foreground mb-2">
                       {section.label}
                     </h3>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                       {section.items.map((item) => (
                         <div key={item.label}>
                           <span className="text-muted-foreground">{item.label}</span>

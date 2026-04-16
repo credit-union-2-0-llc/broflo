@@ -90,7 +90,7 @@ export default function OrderDetailPage() {
         </Link>
 
         {/* Header */}
-        <div className="flex items-start justify-between mb-6">
+        <div className="mb-6 space-y-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{order.productTitle}</h1>
             <p className="text-sm text-muted-foreground mt-1">
@@ -100,7 +100,7 @@ export default function OrderDetailPage() {
               )}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {order.retailerKey === "browser-agent" && (
               <Badge
                 variant="outline"
@@ -171,15 +171,15 @@ export default function OrderDetailPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">Product</CardTitle>
             </CardHeader>
-            <CardContent className="flex gap-4">
+            <CardContent className="flex flex-col sm:flex-row gap-4">
               {order.productImageUrl ? (
                 <img
                   src={order.productImageUrl}
                   alt={order.productTitle}
-                  className="h-20 w-20 rounded object-cover bg-muted"
+                  className="h-20 w-20 rounded object-cover bg-muted shrink-0"
                 />
               ) : (
-                <div className="h-20 w-20 rounded bg-muted flex items-center justify-center text-muted-foreground text-xs">
+                <div className="h-20 w-20 rounded bg-muted flex items-center justify-center text-muted-foreground text-xs shrink-0">
                   Gift
                 </div>
               )}

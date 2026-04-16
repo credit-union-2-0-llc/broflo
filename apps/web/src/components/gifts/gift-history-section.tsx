@@ -133,7 +133,7 @@ export function GiftHistorySection({
               }}
             >
               <SelectTrigger
-                className="w-[100px] h-8 text-xs"
+                className="w-full sm:w-[100px] h-8 text-xs"
                 aria-label="Filter gift history by year"
               >
                 <SelectValue placeholder="Year" />
