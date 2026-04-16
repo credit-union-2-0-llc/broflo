@@ -19,7 +19,7 @@ test.describe("UC-02: Upload Dad's garage photo for AI enrichment", () => {
 
     await uploadPhoto(page, dad.name, "garage");
 
-    await expect(page.locator("img[alt*='photo'], img[alt*='Photo']").first()).toBeVisible({
+    await expect(page.locator(".aspect-square img").first()).toBeVisible({
       timeout: 15_000,
     });
   });

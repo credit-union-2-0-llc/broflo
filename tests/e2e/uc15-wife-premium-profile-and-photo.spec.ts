@@ -22,7 +22,7 @@ test.describe("UC-15: Wife Sarah — premium/discerning taste + bookshelf photo"
     await ensurePersonExists(page, wife);
     await uploadPhoto(page, wife.name, "bookshelf");
 
-    const photos = page.locator("img[alt*='photo'], img[alt*='Photo']");
+    const photos = page.locator(".aspect-square img");
     await expect(photos.first()).toBeVisible({ timeout: 15_000 });
   });
 

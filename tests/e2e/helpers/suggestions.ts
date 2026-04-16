@@ -23,11 +23,25 @@ export async function generateSuggestions(page: Page, personName: string) {
 
 export async function selectSuggestion(page: Page, index = 0) {
   const cards = page.locator('[role="listitem"][aria-label*="Gift suggestion"]');
-  const card = cards.nth(index);
-  await card.locator('button:has-text("Select"), button:has-text("Pick")').click();
+  const count = await cards.count();
+
+  // Find the (index+1)th card that still has "Select This Gift" (skip already-selected)
+  let cardIndex = -1;
+  let found = 0;
+  for (let i = 0; i < count; i++) {
+    const btn = cards.nth(i).locator('button:has-text("Select This Gift")');
+    if (await btn.count() > 0) {
+      if (found === index) { cardIndex = i; break; }
+      found++;
+    }
+  }
+  if (cardIndex < 0) throw new Error("No selectable suggestion found");
+
+  // nth() uses fixed DOM position — stable across state changes
+  await cards.nth(cardIndex).locator('button:has-text("Select This Gift")').click();
   await expect(
-    card.locator('text="Selected", button:has-text("Selected")'),
-  ).toBeVisible({ timeout: 5000 });
+    cards.nth(cardIndex).locator('button:has-text("Selected")'),
+  ).toBeVisible({ timeout: 10_000 });
 }
 
 export async function dismissSuggestion(page: Page, index = 0) {

@@ -21,7 +21,7 @@ test.describe("UC-12: Grandpa Earl — traditional/no-tech gifts", () => {
     await ensurePersonExists(page, grandpa);
     await uploadPhoto(page, grandpa.name, "bookshelf");
 
-    const photos = page.locator("img[alt*='photo'], img[alt*='Photo']");
+    const photos = page.locator(".aspect-square img");
     await expect(photos.first()).toBeVisible({ timeout: 15_000 });
   });
 

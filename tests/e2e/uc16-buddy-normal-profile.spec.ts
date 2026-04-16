@@ -21,7 +21,7 @@ test.describe("UC-16: Buddy Chris — normal/easy bro gifts + bar cart photo", (
     await ensurePersonExists(page, chris);
     await uploadPhoto(page, chris.name, "bar_cart");
 
-    const photos = page.locator("img[alt*='photo'], img[alt*='Photo']");
+    const photos = page.locator(".aspect-square img");
     await expect(photos.first()).toBeVisible({ timeout: 15_000 });
   });
 

@@ -13,7 +13,7 @@ test.describe("UC-06: Upload Mom's kitchen photo for enrichment", () => {
     await navigateToPerson(page, mom.name);
     await uploadPhoto(page, mom.name, "kitchen");
 
-    const photos = page.locator("img[alt*='photo'], img[alt*='Photo']");
+    const photos = page.locator(".aspect-square img");
     await expect(photos.first()).toBeVisible({ timeout: 15_000 });
   });
 

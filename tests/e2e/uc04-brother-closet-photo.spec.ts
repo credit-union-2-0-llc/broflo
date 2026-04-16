@@ -16,7 +16,7 @@ test.describe("UC-04: Upload Brother's closet photo — brand detection", () => 
     await navigateToPerson(page, brother.name);
     await uploadPhoto(page, brother.name, "desk");
 
-    const photoGallery = page.locator("img[alt*='photo'], img[alt*='Photo']");
+    const photoGallery = page.locator(".aspect-square img");
     await expect(photoGallery.first()).toBeVisible({ timeout: 15_000 });
   });
 

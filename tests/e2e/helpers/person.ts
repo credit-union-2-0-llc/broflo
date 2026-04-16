@@ -112,40 +112,43 @@ export async function navigateToPerson(page: Page, name: string) {
   await expect(page.getByText(name).first()).toBeVisible({ timeout: 5_000 });
 }
 
+const CATEGORY_LABELS: Record<string, string> = {
+  bookshelf: "Bookshelf", closet: "Closet", artwork: "Artwork", desk: "Desk",
+  kitchen: "Kitchen", bar_cart: "Bar Cart", shoes: "Shoes", jewelry: "Jewelry",
+  nightstand: "Nightstand", garage: "Garage", garden: "Garden",
+  gaming_music: "Gaming/Music", pet_area: "Pet Area", fridge: "Fridge", car: "Car",
+  social_ig_fb: "IG/Facebook", social_spotify: "Spotify", social_amazon: "Amazon",
+};
+
 export async function uploadPhoto(page: Page, personName: string, category?: string) {
   await navigateToPerson(page, personName);
+
+  // Set up filechooser listener BEFORE clicking — the button click opens the native picker
+  const fileChooserPromise = page.waitForEvent("filechooser");
 
   const uploadBtn = page.locator('button:has-text("Add Photos"), button:has-text("Choose Photo")');
   await uploadBtn.first().click();
 
-  // Handle consent modal on first upload
-  const consentBtn = page.locator('button:has-text("Got it")');
-  if (await consentBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await consentBtn.click();
-  }
-
-  // Upload a test image via file chooser
-  const fileChooserPromise = page.waitForEvent("filechooser");
-  const fileInput = page.locator('input[type="file"]').first();
-  if (await fileInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await fileInput.click();
-  } else {
-    await page.locator('button:has-text("Choose Photo")').first().click();
-  }
   const fileChooser = await fileChooserPromise;
   await fileChooser.setFiles(getTestPhotoPath());
 
-  // Handle category picker if it appears
+  // Consent modal appears AFTER file selection (first upload only)
+  const consentBtn = page.locator('button:has-text("Got it")');
+  if (await consentBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await consentBtn.click();
+    await consentBtn.waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+  }
+
+  // Category picker appears after consent (or directly if already consented)
   if (category) {
-    const categoryBtn = page.locator(`button:has-text("${capitalize(category.replace("_", " "))}")`);
-    if (await categoryBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await categoryBtn.click();
-    }
+    const label = CATEGORY_LABELS[category] || category;
+    const categoryBtn = page.locator(`button:has-text("${label}")`);
+    await categoryBtn.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+    await categoryBtn.click();
   } else {
     const skipBtn = page.locator('button:has-text("Skip")');
-    if (await skipBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await skipBtn.click();
-    }
+    await skipBtn.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+    await skipBtn.click();
   }
 
   // Wait for upload to complete
@@ -156,7 +159,4 @@ function getTestPhotoPath(): string {
   return "./tests/e2e/fixtures/photos/test-room.jpg";
 }
 
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
 
