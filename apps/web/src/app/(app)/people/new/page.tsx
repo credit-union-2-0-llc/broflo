@@ -31,9 +31,9 @@ export default function NewPersonPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-8">
+    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
       <div className="mx-auto max-w-2xl">
-        <h1 className="text-3xl font-bold tracking-tight mb-6">Add a Person</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-6">Add a Person</h1>
         {upgradeMessage && (
           <div className="mb-6">
             <UpgradePrompt message={upgradeMessage} />

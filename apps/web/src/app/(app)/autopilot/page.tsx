@@ -141,10 +141,10 @@ export default function AutopilotPage() {
   // Tier gate screen
   if (!hasAccess && !loading) {
     return (
-      <div className="min-h-screen bg-background px-4 py-8">
+      <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
         <div className="mx-auto max-w-2xl text-center py-20">
           <Zap className="h-12 w-12 text-broflo-electric mx-auto mb-4" />
-          <h1 className="text-3xl font-bold tracking-tight mb-2">Autopilot</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">Autopilot</h1>
           <p className="text-muted-foreground mb-6 italic">
             {VOICE.autopilot.tierGate}
           </p>
@@ -158,12 +158,12 @@ export default function AutopilotPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-8">
+    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
       <div className="mx-auto max-w-4xl">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
             <Zap className="h-6 w-6 text-broflo-electric" />
-            <h1 className="text-3xl font-bold tracking-tight">Autopilot</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Autopilot</h1>
           </div>
           <Dialog open={showCreate} onOpenChange={setShowCreate}>
             <DialogTrigger render={<Button />}>

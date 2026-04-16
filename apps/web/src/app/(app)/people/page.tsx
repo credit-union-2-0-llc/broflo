@@ -42,18 +42,18 @@ export default async function PeoplePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-8">
+    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
       <div className="mx-auto max-w-4xl">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Your People</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Your People</h1>
             <p className="mt-1 text-muted-foreground">
               {people.length === 0
                 ? VOICE.emptyStates.people
                 : `${people.length} ${people.length === 1 ? "person" : "people"} in your circle`}
             </p>
           </div>
-          <Link href="/people/new">
+          <Link href="/people/new" className="shrink-0">
             <Button>{people.length === 0 ? VOICE.people.addFirst : VOICE.people.addAnother}</Button>
           </Link>
         </div>

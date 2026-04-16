@@ -44,7 +44,7 @@ function BillingContent() {
   const isPaid = tier !== "free";
 
   return (
-    <div className="container max-w-lg mx-auto py-8 px-4">
+    <div className="container max-w-lg mx-auto py-6 px-4 sm:px-6 sm:py-8 md:px-8">
       <h1 className="text-2xl font-bold tracking-tight mb-6">Billing</h1>
 
       {success && (

@@ -34,10 +34,10 @@ export default async function EventsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background px-4 py-8">
+      <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
         <div className="mx-auto max-w-4xl">
-          <div className="mb-8 flex items-center justify-between">
-            <h1 className="text-3xl font-bold tracking-tight">Events</h1>
+          <div className="mb-6 sm:mb-8 flex items-center justify-between">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Events</h1>
           </div>
           <div className="text-center py-12">
             <p className="text-sm text-destructive">{VOICE.errors.eventsLoad}</p>
@@ -51,11 +51,11 @@ export default async function EventsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-8">
+    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
       <div className="mx-auto max-w-4xl">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Events</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Events</h1>
             {events.length > 0 && (
               <p className="mt-1 text-muted-foreground">
                 {events.length} {events.length === 1 ? "event" : "events"} across {totalPeople}{" "}

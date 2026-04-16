@@ -72,9 +72,9 @@ function UpgradeContent() {
   const currentTier = session?.user?.subscriptionTier || "free";
 
   return (
-    <div className="container max-w-5xl mx-auto py-8 px-4">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">
+    <div className="container max-w-5xl mx-auto py-6 px-4 sm:px-6 sm:py-8 md:px-8">
+      <div className="text-center mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
           {VOICE.billing.upgradeCta}
         </h1>
         <p className="text-muted-foreground mt-2">
