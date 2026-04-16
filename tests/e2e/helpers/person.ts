@@ -28,7 +28,7 @@ export async function createPerson(page: Page, persona: Persona) {
   // Budget tab
   if (persona.budgetMin || persona.budgetMax) {
     await page.getByRole("tab", { name: "Budget" }).click();
-    await page.waitForTimeout(300);
+    await page.locator("#budgetMin").waitFor({ state: "visible", timeout: 5000 });
     if (persona.budgetMin) await page.fill("#budgetMin", String(persona.budgetMin));
     if (persona.budgetMax) await page.fill("#budgetMax", String(persona.budgetMax));
   }
@@ -36,7 +36,7 @@ export async function createPerson(page: Page, persona: Persona) {
   // Preferences tab
   if (persona.hobbies || persona.musicTaste || persona.favoriteBrands || persona.foodPreferences || persona.clothingSizeTop) {
     await page.getByRole("tab", { name: "Preferences" }).click();
-    await page.waitForTimeout(300);
+    await page.locator("#clothingSizeTop, #hobbies").first().waitFor({ state: "visible", timeout: 5000 });
     if (persona.clothingSizeTop) await page.fill("#clothingSizeTop", persona.clothingSizeTop);
     if (persona.clothingSizeBottom) await page.fill("#clothingSizeBottom", persona.clothingSizeBottom);
     if (persona.shoeSize) await page.fill("#shoeSize", persona.shoeSize);
@@ -63,7 +63,7 @@ export async function createPerson(page: Page, persona: Persona) {
   // Notes tab
   if (persona.notes || persona.wishlistUrls) {
     await page.getByRole("tab", { name: "Notes" }).click();
-    await page.waitForTimeout(300);
+    await page.locator("#wishlistUrls, #notes").first().waitFor({ state: "visible", timeout: 5000 });
     if (persona.wishlistUrls) await page.fill("#wishlistUrls", persona.wishlistUrls);
     if (persona.notes) await page.fill("#notes", persona.notes);
   }
@@ -71,7 +71,7 @@ export async function createPerson(page: Page, persona: Persona) {
   // Shipping tab
   if (persona.shippingAddress1) {
     await page.getByRole("tab", { name: "Shipping" }).click();
-    await page.waitForTimeout(300);
+    await page.locator("#shippingAddress1").waitFor({ state: "visible", timeout: 5000 });
     await page.fill("#shippingAddress1", persona.shippingAddress1);
     if (persona.shippingCity) await page.fill("#shippingCity", persona.shippingCity);
     if (persona.shippingState) await page.fill("#shippingState", persona.shippingState);

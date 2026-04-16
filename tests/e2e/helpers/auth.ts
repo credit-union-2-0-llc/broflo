@@ -1,14 +1,26 @@
 import { type Page, expect } from "@playwright/test";
 import path from "path";
+import { config } from "dotenv";
+
+config({ path: path.join(__dirname, "..", "..", "..", ".env.test") });
 
 export const AUTH_DIR = path.join(__dirname, "..", ".auth");
 
+function acct(id: string) {
+  const upper = id.toUpperCase();
+  return {
+    name: "Kirk Test",
+    email: process.env[`E2E_${upper}_EMAIL`] ?? "",
+    password: process.env[`E2E_${upper}_PASSWORD`] ?? "",
+  };
+}
+
 export const ACCOUNTS = {
-  alpha: { name: "Kirk Test", email: "broflo-e2e-alpha@cu-2.com", password: "TestPass123!@#" },
-  beta: { name: "Kirk Test", email: "broflo-e2e-beta@cu-2.com", password: "TestPass123!@#" },
-  gamma: { name: "Kirk Test", email: "broflo-e2e-gamma@cu-2.com", password: "TestPass123!@#" },
-  delta: { name: "Kirk Test", email: "broflo-e2e-delta@cu-2.com", password: "TestPass123!@#" },
-} as const;
+  alpha: acct("alpha"),
+  beta: acct("beta"),
+  gamma: acct("gamma"),
+  delta: acct("delta"),
+};
 
 export type AccountId = keyof typeof ACCOUNTS;
 
