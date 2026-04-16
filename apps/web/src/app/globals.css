@@ -152,3 +152,24 @@
     @apply font-sans;
   }
 }
+
+/* Mobile touch target enhancement — ensure minimum 44px tap area */
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  a[href],
+  input[type="checkbox"],
+  input[type="radio"],
+  select,
+  [data-slot="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Exempt icon-only buttons that use padding for tap area */
+  [data-slot="button"].size-6,
+  [data-slot="button"].size-7 {
+    min-height: unset;
+    min-width: unset;
+  }
+}
