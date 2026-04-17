@@ -48,7 +48,7 @@ logger = logging.getLogger("broflo-ai")
 def _get_client() -> anthropic.Anthropic:
     if not ANTHROPIC_API_KEY:
         raise RuntimeError("Anthropic API key not configured")
-    return anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    return anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, max_retries=0)
 
 
 def _strip_json_fences(text: str) -> str:

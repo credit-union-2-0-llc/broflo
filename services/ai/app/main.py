@@ -42,7 +42,7 @@ app.add_middleware(
 def _get_client() -> anthropic.Anthropic:
     if not ANTHROPIC_API_KEY:
         raise HTTPException(503, "Anthropic API key not configured")
-    return anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    return anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, max_retries=0)
 
 
 def _call_anthropic(
