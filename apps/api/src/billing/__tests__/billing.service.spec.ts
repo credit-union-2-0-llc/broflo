@@ -127,6 +127,153 @@ describe("BillingService", () => {
     });
   });
 
+  describe("handleCheckoutCompleted", () => {
+    let stripeMock: { subscriptions: { retrieve: jest.Mock } };
+
+    beforeEach(() => {
+      stripeMock = { subscriptions: { retrieve: jest.fn() } };
+      (service as any).stripe = stripeMock;
+    });
+
+    it("upgrades user to pro after checkout", async () => {
+      stripeMock.subscriptions.retrieve
+        .mockResolvedValueOnce({ metadata: { brofloUserId: "user-1" } })
+        .mockResolvedValueOnce({
+          items: { data: [{ price: { id: "price_pro_monthly" } }] },
+          default_payment_method: { id: "pm_123" },
+        });
+
+      await (service as any).handleCheckoutCompleted({
+        subscription: "sub_123",
+        customer: "cus_456",
+      });
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: {
+          subscriptionTier: "pro",
+          stripeSubscriptionId: "sub_123",
+          stripeCustomerId: "cus_456",
+          stripePaymentMethodId: "pm_123",
+        },
+      });
+    });
+
+    it("upgrades to elite when elite price used", async () => {
+      stripeMock.subscriptions.retrieve
+        .mockResolvedValueOnce({ metadata: { brofloUserId: "user-1" } })
+        .mockResolvedValueOnce({
+          items: { data: [{ price: { id: "price_elite_annual" } }] },
+          default_payment_method: { id: "pm_456" },
+        });
+
+      await (service as any).handleCheckoutCompleted({
+        subscription: "sub_200",
+        customer: "cus_789",
+      });
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: expect.objectContaining({ subscriptionTier: "elite" }),
+      });
+    });
+
+    it("sets paymentMethodId to null when payment method is not expanded object", async () => {
+      stripeMock.subscriptions.retrieve
+        .mockResolvedValueOnce({ metadata: { brofloUserId: "user-1" } })
+        .mockResolvedValueOnce({
+          items: { data: [{ price: { id: "price_pro_monthly" } }] },
+          default_payment_method: null,
+        });
+
+      await (service as any).handleCheckoutCompleted({
+        subscription: "sub_123",
+        customer: "cus_456",
+      });
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: expect.objectContaining({ stripePaymentMethodId: null }),
+      });
+    });
+
+    it("silently returns when no brofloUserId in subscription metadata", async () => {
+      stripeMock.subscriptions.retrieve.mockResolvedValue({ metadata: {} });
+
+      await (service as any).handleCheckoutCompleted({
+        subscription: "sub_123",
+      });
+
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("silently returns when no subscription and no session metadata userId", async () => {
+      await (service as any).handleCheckoutCompleted({
+        subscription: null,
+        metadata: {},
+      });
+
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("handleSubscriptionUpdated", () => {
+    let stripeMock: { subscriptions: { retrieve: jest.Mock } };
+
+    beforeEach(() => {
+      stripeMock = { subscriptions: { retrieve: jest.fn() } };
+      (service as any).stripe = stripeMock;
+    });
+
+    it("updates tier and payment method on plan change", async () => {
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        default_payment_method: { id: "pm_789" },
+      });
+
+      await (service as any).handleSubscriptionUpdated({
+        id: "sub_123",
+        metadata: { brofloUserId: "user-1" },
+        items: { data: [{ price: { id: "price_elite_annual" } }] },
+      });
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: {
+          subscriptionTier: "elite",
+          stripeSubscriptionId: "sub_123",
+          stripePaymentMethodId: "pm_789",
+        },
+      });
+    });
+
+    it("handles string payment method ID (not expanded)", async () => {
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        default_payment_method: "pm_string_id",
+      });
+
+      await (service as any).handleSubscriptionUpdated({
+        id: "sub_123",
+        metadata: { brofloUserId: "user-1" },
+        items: { data: [{ price: { id: "price_pro_monthly" } }] },
+      });
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: expect.objectContaining({ stripePaymentMethodId: null }),
+      });
+    });
+
+    it("silently returns when no brofloUserId in metadata", async () => {
+      await (service as any).handleSubscriptionUpdated({
+        id: "sub_123",
+        metadata: {},
+        items: { data: [] },
+      });
+
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe("handleWebhook", () => {
     it("throws when webhook secret not configured", async () => {
       delete process.env.STRIPE_WEBHOOK_SECRET;

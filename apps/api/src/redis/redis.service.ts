@@ -71,10 +71,17 @@ export class RedisService implements OnModuleDestroy {
       }
       return;
     }
-    const keys = await this.getClient().keys(pattern);
-    if (keys.length > 0) {
-      await this.getClient().del(...keys);
-    }
+    const client = this.getClient();
+    let cursor = "0";
+    do {
+      const [nextCursor, keys] = await client.scan(
+        cursor, "MATCH", pattern, "COUNT", 100,
+      );
+      cursor = nextCursor;
+      if (keys.length > 0) {
+        await client.del(...keys);
+      }
+    } while (cursor !== "0");
   }
 
   // --- Rate limiting (20 requests/user/hour) ---
