@@ -27,7 +27,7 @@ export function BottomTabBar() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-s1"
+      className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-s1"
       style={{
         borderTop: "1px solid var(--border2)",
         paddingBottom: "env(safe-area-inset-bottom)",

@@ -34,7 +34,7 @@ export function ScoreboardStrip() {
     >
       {/* Desktop: full strip */}
       <div
-        className="hidden md:grid"
+        className="hidden lg:grid"
         style={{ gridTemplateColumns: "auto 1fr 1fr 1fr 1fr auto" }}
       >
         {/* Logo cell */}
@@ -146,7 +146,7 @@ export function ScoreboardStrip() {
 
       {/* Mobile: collapsed strip — Score + Code Red only */}
       <div
-        className="md:hidden grid items-center"
+        className="lg:hidden grid items-center"
         style={{ gridTemplateColumns: "auto 1fr 1fr auto" }}
       >
         <div

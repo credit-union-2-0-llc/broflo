@@ -54,7 +54,7 @@ export function ThreatRoster({ events }: ThreatRosterProps) {
       ) : (
         <>
           {/* Desktop: table layout */}
-          <div className="hidden md:block">
+          <div className="hidden lg:block">
             {/* Header row */}
             <div
               className="grid items-center py-2"
@@ -95,7 +95,7 @@ export function ThreatRoster({ events }: ThreatRosterProps) {
           </div>
 
           {/* Mobile: card stack */}
-          <div className="md:hidden flex flex-col gap-2">
+          <div className="lg:hidden flex flex-col gap-2">
             {events.map((event, i) => (
               <ThreatRow
                 key={event.id}

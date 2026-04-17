@@ -57,7 +57,7 @@ export function PlayerCard({
       }}
     >
       {/* Desktop: 3-column grid */}
-      <div className="hidden md:grid" style={{ gridTemplateColumns: "auto 1fr auto" }}>
+      <div className="hidden lg:grid" style={{ gridTemplateColumns: "auto 1fr auto" }}>
         {/* Number column */}
         <div
           className="flex items-center justify-center min-w-[48px] p-3"
@@ -180,7 +180,7 @@ export function PlayerCard({
       </div>
 
       {/* Mobile: stacked layout */}
-      <div className="md:hidden p-3">
+      <div className="lg:hidden p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div

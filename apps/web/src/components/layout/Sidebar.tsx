@@ -49,7 +49,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className="hidden md:flex flex-col bg-s1 overflow-y-auto"
+      className="hidden lg:flex flex-col bg-s1 overflow-y-auto"
       style={{ borderRight: "1px solid var(--border2)" }}
     >
       <nav className="flex-1 py-4">
