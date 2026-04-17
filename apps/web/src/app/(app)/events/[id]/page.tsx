@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import type { UpcomingEvent } from "@/lib/api";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -60,7 +60,10 @@ export default async function EventDetailPage({
   try {
     const res = await api.getUpcomingEvents(session.accessToken, { limit: 100 });
     events = res.data;
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      redirect("/login");
+    }
     notFound();
   }
 

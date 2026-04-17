@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import type { UpcomingEvent } from "@/lib/api";
 import { VOICE } from "@broflo/shared";
 import Link from "next/link";
@@ -58,7 +58,10 @@ export default async function PersonDetailPage({
     person = personRes;
     events = eventsRes.data;
     people = peopleRes;
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      redirect("/login");
+    }
     notFound();
   }
 
