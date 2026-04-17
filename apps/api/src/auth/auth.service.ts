@@ -68,9 +68,14 @@ export class AuthService {
     return this.issueTokens(user);
   }
 
+  private hashToken(token: string): string {
+    return crypto.createHash("sha256").update(token).digest("hex");
+  }
+
   async refresh(refreshToken: string) {
+    const hash = this.hashToken(refreshToken);
     const user = await this.prisma.user.findFirst({
-      where: { refreshToken },
+      where: { refreshTokenHash: hash },
     });
     if (!user || !user.isActive) {
       throw new UnauthorizedException("Invalid refresh token");
@@ -89,7 +94,7 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: { refreshToken: null },
+      data: { refreshTokenHash: null },
     });
   }
 
@@ -102,7 +107,7 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { refreshToken },
+      data: { refreshTokenHash: this.hashToken(refreshToken) },
     });
 
     return {

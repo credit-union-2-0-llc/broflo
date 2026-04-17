@@ -12,7 +12,7 @@ model User {
   id               String    @id @default(uuid())
   email            String    @unique
   name             String?
-  refreshToken     String?   @map("refresh_token")
+  refreshTokenHash String?   @map("refresh_token_hash")
   avatarUrl        String?   @map("avatar_url")
   subscriptionTier      String    @default("free") @map("subscription_tier")
   stripeCustomerId      String?   @unique @map("stripe_customer_id")
