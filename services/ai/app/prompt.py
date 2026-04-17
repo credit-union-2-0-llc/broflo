@@ -163,6 +163,7 @@ def build_user_message(req: SuggestRequest) -> str:
     if p.wishlist_items:
         dossier_lines.append(f"- Wishlist items: {', '.join(p.wishlist_items[:10])}")
 
+    dossier_is_sparse = len(dossier_lines) < 3
     dossier_block = "\n".join(dossier_lines) if dossier_lines else "(minimal dossier)"
 
     # Never-again list
@@ -196,6 +197,19 @@ def build_user_message(req: SuggestRequest) -> str:
         if sanitized_guidance:
             guidance_block = f"\nADDITIONAL GUIDANCE: {sanitized_guidance}"
 
+    # When dossier is thin, push the AI to be distinctive rather than generic
+    sparse_block = ""
+    if dossier_is_sparse:
+        sparse_block = (
+            "\nSPARSE DOSSIER STRATEGY: The dossier has very little info. "
+            "DO NOT fall back to generic gifts (candles, gift cards, spa sets, "
+            "jewelry, hotel stays). Instead: "
+            "1) Use the relationship type and event context to infer lifestyle signals. "
+            "2) Suggest distinctive, memorable gifts — things with personality and a story. "
+            "3) Lean toward experiences, subscriptions, and curated/artisan goods. "
+            "4) Each suggestion should feel like a specific find, not a category."
+        )
+
     return f"""RECIPIENT: {p.name}
 RELATIONSHIP: {p.relationship}
 EVENT: {req.event_type} on {req.event_date} ({req.days_until} days away)
@@ -208,7 +222,7 @@ NEVER-AGAIN LIST:
 {na_block}
 
 GIFT HISTORY:
-{history_block}{dismissed_block}{guidance_block}
+{history_block}{dismissed_block}{guidance_block}{sparse_block}
 
 MODE: {req.surprise_factor.value}
 COUNT: {req.count}
