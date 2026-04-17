@@ -34,9 +34,7 @@ import { PhotosModule } from "./photos/photos.module";
     ]),
     ScheduleModule.forRoot(),
     BullModule.forRoot({
-      redis: process.env.REDIS_URL
-        ? { host: new URL(process.env.REDIS_URL).hostname, port: parseInt(new URL(process.env.REDIS_URL).port || "6379", 10) }
-        : { host: "localhost", port: 6379 },
+      redis: process.env.REDIS_URL || "redis://localhost:6379",
     }),
     AuthModule,
     PersonsModule,
