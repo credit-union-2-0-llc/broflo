@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import Stripe from 'stripe';
 import type { User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -10,8 +11,11 @@ const TIER_PRICES_CENTS: Record<string, number> = {
 @Injectable()
 export class ServiceCreditService {
   private readonly log = new Logger(ServiceCreditService.name);
+  private readonly stripe: InstanceType<typeof Stripe>;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {
+    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+  }
 
   /**
    * Issue a service credit when a browser agent order fails.
@@ -41,7 +45,23 @@ export class ServiceCreditService {
       return false;
     }
 
-    // Create the credit record
+    let stripeTxnId: string | null = null;
+    if (user.stripeCustomerId) {
+      try {
+        const txn = await this.stripe.customers.createBalanceTransaction(
+          user.stripeCustomerId,
+          {
+            amount: -amountCents,
+            currency: 'usd',
+            description: `Broflo service credit: ${reason}`,
+          },
+        );
+        stripeTxnId = txn.id;
+      } catch (err) {
+        this.log.error('Failed to apply Stripe balance credit for user %s: %s', user.id, err);
+      }
+    }
+
     await this.prisma.serviceCredit.create({
       data: {
         userId: user.id,
@@ -49,8 +69,7 @@ export class ServiceCreditService {
         amountCents,
         reason: `Agent order failed: ${reason}`,
         billingCycleKey,
-        // TODO: Create Stripe coupon/credit note when Stripe Billing is wired up
-        // stripeCouponId will be set after Stripe API call
+        stripeCouponId: stripeTxnId,
       },
     });
 
