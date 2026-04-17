@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { encrypt, decrypt, hasKey } from "./crypto";
 
 const PII_STRING_FIELDS = [
@@ -12,20 +12,10 @@ const PII_STRING_FIELDS = [
 
 const PII_ARRAY_FIELDS = ["allergens", "dietaryRestrictions"] as const;
 
-function encryptField(value: unknown): unknown {
-  if (typeof value === "string" && value.length > 0) return encrypt(value);
-  return value;
-}
-
-function decryptField(value: unknown): unknown {
-  if (typeof value === "string" && value.length > 0) return decrypt(value);
-  return value;
-}
-
-function encryptData(data: Record<string, unknown>): void {
+export function encryptData(data: Record<string, unknown>): void {
   for (const field of PII_STRING_FIELDS) {
-    if (field in data && data[field] != null) {
-      data[field] = encryptField(data[field]);
+    if (field in data && typeof data[field] === "string" && (data[field] as string).length > 0) {
+      data[field] = encrypt(data[field] as string);
     }
   }
   for (const field of PII_ARRAY_FIELDS) {
@@ -37,10 +27,10 @@ function encryptData(data: Record<string, unknown>): void {
   }
 }
 
-function decryptRecord(record: Record<string, unknown>): void {
+export function decryptRecord(record: Record<string, unknown>): void {
   for (const field of PII_STRING_FIELDS) {
-    if (record[field] != null) {
-      record[field] = decryptField(record[field]);
+    if (typeof record[field] === "string" && (record[field] as string).length > 0) {
+      record[field] = decrypt(record[field] as string);
     }
   }
   for (const field of PII_ARRAY_FIELDS) {
@@ -52,7 +42,7 @@ function decryptRecord(record: Record<string, unknown>): void {
   }
 }
 
-function decryptResult(result: unknown): void {
+export function decryptResult(result: unknown): void {
   if (!result) return;
   if (Array.isArray(result)) {
     result.forEach((r) => decryptResult(r));
@@ -63,51 +53,52 @@ function decryptResult(result: unknown): void {
   }
 }
 
-const WRITE_ACTIONS = ["create", "update", "upsert", "createMany"];
-const READ_ACTIONS = [
-  "findFirst",
-  "findUnique",
-  "findMany",
-  "findFirstOrThrow",
-  "findUniqueOrThrow",
-];
+/**
+ * Monkey-patch PrismaClient.person operations to encrypt/decrypt PII.
+ * Prisma 6 removed $use — this wraps the model-level methods directly.
+ */
+export function piiExtension(prisma: PrismaClient): void {
+  if (!hasKey()) return;
 
-export function piiMiddleware(): Prisma.Middleware {
-  return async (params, next) => {
-    if (params.model !== "Person" || !hasKey()) {
-      return next(params);
-    }
+  const person = prisma.person as unknown as Record<string, unknown>;
 
-    if (WRITE_ACTIONS.includes(params.action)) {
-      const args = params.args as Record<string, unknown>;
-      if (args.data && typeof args.data === "object") {
-        encryptData(args.data as Record<string, unknown>);
+  for (const method of ["create", "update", "upsert", "createMany"]) {
+    const original = person[method] as (...args: unknown[]) => unknown;
+    if (!original) continue;
+    person[method] = (...args: unknown[]) => {
+      const opts = args[0] as Record<string, unknown> | undefined;
+      if (opts?.data && typeof opts.data === "object") {
+        encryptData(opts.data as Record<string, unknown>);
       }
-      if (
-        params.action === "upsert" &&
-        args.create &&
-        typeof args.create === "object"
-      ) {
-        encryptData(args.create as Record<string, unknown>);
+      if (method === "upsert" && opts?.create && typeof opts.create === "object") {
+        encryptData(opts.create as Record<string, unknown>);
       }
-      if (
-        params.action === "upsert" &&
-        args.update &&
-        typeof args.update === "object"
-      ) {
-        encryptData(args.update as Record<string, unknown>);
+      if (method === "upsert" && opts?.update && typeof opts.update === "object") {
+        encryptData(opts.update as Record<string, unknown>);
       }
-    }
+      const result = original.apply(person, args);
+      if (result && typeof (result as Record<string, unknown>).then === "function") {
+        return (result as Promise<unknown>).then((r) => {
+          decryptResult(r);
+          return r;
+        });
+      }
+      return result;
+    };
+  }
 
-    const result = await next(params);
-
-    if (READ_ACTIONS.includes(params.action)) {
-      decryptResult(result);
-    }
-    if (WRITE_ACTIONS.includes(params.action) && result) {
-      decryptResult(result);
-    }
-
-    return result;
-  };
+  for (const method of ["findFirst", "findUnique", "findMany", "findFirstOrThrow", "findUniqueOrThrow"]) {
+    const original = person[method] as (...args: unknown[]) => unknown;
+    if (!original) continue;
+    person[method] = (...args: unknown[]) => {
+      const result = original.apply(person, args);
+      if (result && typeof (result as Record<string, unknown>).then === "function") {
+        return (result as Promise<unknown>).then((r) => {
+          decryptResult(r);
+          return r;
+        });
+      }
+      return result;
+    };
+  }
 }
