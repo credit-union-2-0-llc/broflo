@@ -4,52 +4,124 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ── Broflo War Room color system ── */
+:root {
+  /* Background scale */
+  --bg: #080809;
+  --s1: #0f0f11;
+  --s2: #141417;
+  --s3: #1a1a1e;
+  --s4: #202026;
+
+  /* Accent: Amber */
+  --amber: #e8a422;
+  --amber2: #c4891a;
+  --amber3: #7a5210;
+  --amber-glow: #e8a42212;
+  --amber-glow2: #e8a42225;
+
+  /* Status */
+  --green: #1a8a46;
+  --green-bright: #22c55e;
+  --green-dim: #0a3d1f;
+  --red: #dc2626;
+  --red-dim: #3d0e0e;
+  --blue: #3b82f6;
+
+  /* Typography */
+  --cream: #e2ddd6;
+  --muted: #555560;
+  --muted2: #888894;
+
+  /* Borders */
+  --border: #1e1e24;
+  --border2: #2a2a34;
+  --border3: #363644;
+
+  /* shadcn overrides — dark-only app */
+  --background: #080809;
+  --foreground: #e2ddd6;
+  --card: #0f0f11;
+  --card-foreground: #e2ddd6;
+  --popover: #0f0f11;
+  --popover-foreground: #e2ddd6;
+  --primary: #e8a422;
+  --primary-foreground: #000000;
+  --secondary: #141417;
+  --secondary-foreground: #e2ddd6;
+  --muted-shadcn: #141417;
+  --muted-foreground: #555560;
+  --accent: #141417;
+  --accent-foreground: #e2ddd6;
+  --destructive: #dc2626;
+  --input: #1a1a1e;
+  --ring: #e8a422;
+  --radius: 0px;
+
+  --sidebar: #0f0f11;
+  --sidebar-foreground: #e2ddd6;
+  --sidebar-primary: #e8a422;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: #141417;
+  --sidebar-accent-foreground: #e2ddd6;
+  --sidebar-border: #1e1e24;
+  --sidebar-ring: #e8a422;
+}
+
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
-  --color-broflo-ink: var(--broflo-ink);
-  --color-broflo-electric: var(--broflo-electric);
-  --color-broflo-electric-light: var(--broflo-electric-light);
-  --color-broflo-electric-subtle: var(--broflo-electric-subtle);
-  --color-broflo-warm: var(--broflo-warm);
-  --color-broflo-warm-light: var(--broflo-warm-light);
-  --color-broflo-gold: var(--broflo-gold);
-  --color-success: var(--color-success);
-  --color-warning: var(--color-warning);
-  --color-error: var(--color-error);
-  --color-info: var(--color-info);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
+  --color-background: #080809;
+  --color-foreground: #e2ddd6;
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-display);
+
+  /* War Room palette */
+  --color-bg: #080809;
+  --color-s1: #0f0f11;
+  --color-s2: #141417;
+  --color-s3: #1a1a1e;
+  --color-s4: #202026;
+  --color-amber: #e8a422;
+  --color-amber-2: #c4891a;
+  --color-amber-3: #7a5210;
+  --color-amber-glow: #e8a42212;
+  --color-amber-glow2: #e8a42225;
+  --color-green-bright: #22c55e;
+  --color-green-dim: #0a3d1f;
+  --color-red: #dc2626;
+  --color-red-dim: #3d0e0e;
+  --color-blue: #3b82f6;
+  --color-cream: #e2ddd6;
+  --color-muted: #555560;
+  --color-muted-2: #888894;
+  --color-border: #1e1e24;
+  --color-border-2: #2a2a34;
+  --color-border-3: #363644;
+
+  /* shadcn token passthrough */
+  --color-card: #0f0f11;
+  --color-card-foreground: #e2ddd6;
+  --color-popover: #0f0f11;
+  --color-popover-foreground: #e2ddd6;
+  --color-primary: #e8a422;
+  --color-primary-foreground: #000000;
+  --color-secondary: #141417;
+  --color-secondary-foreground: #e2ddd6;
+  --color-muted-foreground: #555560;
+  --color-accent: #141417;
+  --color-accent-foreground: #e2ddd6;
+  --color-destructive: #dc2626;
+  --color-input: #1a1a1e;
+  --color-ring: #e8a422;
+  --color-sidebar-ring: #e8a422;
+  --color-sidebar-border: #1e1e24;
+  --color-sidebar-accent-foreground: #e2ddd6;
+  --color-sidebar-accent: #141417;
+  --color-sidebar-primary-foreground: #000000;
+  --color-sidebar-primary: #e8a422;
+  --color-sidebar-foreground: #e2ddd6;
+  --color-sidebar: #0f0f11;
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -59,101 +131,71 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-:root {
-  /* Broflo brand tokens */
-  --broflo-ink: oklch(0.19 0.02 280);
-  --broflo-electric: oklch(0.52 0.20 290);
-  --broflo-electric-light: oklch(0.72 0.14 290);
-  --broflo-electric-subtle: oklch(0.94 0.04 290);
-  --broflo-warm: oklch(0.67 0.18 20);
-  --broflo-warm-light: oklch(0.88 0.06 20);
-  --broflo-gold: oklch(0.82 0.16 85);
-  --color-success: oklch(0.72 0.19 145);
-  --color-warning: oklch(0.77 0.16 75);
-  --color-error: oklch(0.63 0.22 25);
-  --color-info: var(--broflo-electric);
-
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    background: var(--bg);
+    color: var(--cream);
   }
   html {
-    @apply font-sans;
+    font-family: var(--font-body);
   }
 }
 
-/* Mobile touch target enhancement — ensure minimum 44px tap area */
+/* ── CRT scanline overlay ── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 0, 0, 0.015) 3px,
+    rgba(0, 0, 0, 0.015) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── Focus ring ── */
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--s1); }
+::-webkit-scrollbar-thumb { background: var(--border3); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ── Autopilot dot animation ── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.ap-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  background: var(--green-bright);
+  border-radius: 50%;
+  box-shadow: 0 0 5px var(--green-bright);
+  animation: blink 2s infinite;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Mobile touch targets ── */
 @media (pointer: coarse) {
   button,
   [role="button"],
@@ -165,8 +207,6 @@
     min-height: 44px;
     min-width: 44px;
   }
-
-  /* Exempt icon-only buttons that use padding for tap area */
   [data-slot="button"].size-6,
   [data-slot="button"].size-7 {
     min-height: unset;

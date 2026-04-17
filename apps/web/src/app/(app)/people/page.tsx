@@ -3,32 +3,9 @@ import { redirect } from "next/navigation";
 import { api } from "@/lib/api";
 import { VOICE } from "@broflo/shared";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { CompletenessRing } from "@/components/completeness-ring";
-
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
-
-function formatBudget(minCents: number | null, maxCents: number | null) {
-  if (!minCents && !maxCents) return null;
-  const min = minCents ? `$${(minCents / 100).toFixed(0)}` : "$0";
-  const max = maxCents ? `$${(maxCents / 100).toFixed(0)}` : "...";
-  return `${min} - ${max}`;
-}
+import { Users, Plus } from "lucide-react";
+import { SectionHeader } from "@/components/radar/SectionHeader";
+import { PlayerCard } from "@/components/dossier/PlayerCard";
 
 export default async function PeoplePage() {
   const session = await auth();
@@ -42,73 +19,60 @@ export default async function PeoplePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Your People</h1>
-            <p className="mt-1 text-muted-foreground">
-              {people.length === 0
-                ? VOICE.emptyStates.people
-                : `${people.length} ${people.length === 1 ? "person" : "people"} in your circle`}
-            </p>
-          </div>
-          <Link href="/people/new" className="shrink-0">
-            <Button>{people.length === 0 ? VOICE.people.addFirst : VOICE.people.addAnother}</Button>
+    <>
+      <SectionHeader
+        title="Assets"
+        count={people.length}
+        countLabel="people"
+        actionLabel="Add Asset +"
+        actionHref="/people/new"
+      />
+
+      {people.length === 0 ? (
+        <div
+          className="text-center py-10 border"
+          style={{ borderColor: "var(--border)", background: "var(--s1)" }}
+        >
+          <Users
+            className="mx-auto h-8 w-8 mb-3"
+            style={{ color: "var(--border3)" }}
+          />
+          <p
+            className="text-sm italic"
+            style={{ color: "var(--muted2)", fontFamily: "var(--font-body)" }}
+          >
+            {VOICE.emptyStates.people}
+          </p>
+          <Link
+            href="/people/new"
+            className="inline-flex items-center gap-1.5 mt-4 text-[9px] uppercase px-3 py-1.5"
+            style={{
+              fontFamily: "var(--font-mono)",
+              letterSpacing: ".1em",
+              color: "#000",
+              background: "var(--amber)",
+            }}
+          >
+            <Plus className="h-3 w-3" />
+            {VOICE.people.addFirst}
           </Link>
         </div>
-
-        {people.length > 0 && (
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-            {people.map((person) => (
-              <Link key={person.id} href={`/people/${person.id}`}>
-                <Card className="transition-shadow hover:shadow-md cursor-pointer h-full">
-                  <CardHeader className="flex flex-row items-center gap-3 pb-2">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
-                        {initials(person.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <CardTitle className="text-base truncate">{person.name}</CardTitle>
-                      <Badge variant="secondary" className="mt-1 text-xs capitalize">
-                        {person.relationship}
-                      </Badge>
-                    </div>
-                    <CompletenessRing score={person.completenessScore} />
-                  </CardHeader>
-                  <CardContent className="text-sm text-muted-foreground space-y-1">
-                    {person.birthday && (
-                      <p>
-                        Birthday:{" "}
-                        {new Date(person.birthday).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </p>
-                    )}
-                    {formatBudget(person.budgetMinCents, person.budgetMaxCents) && (
-                      <p>Budget: {formatBudget(person.budgetMinCents, person.budgetMaxCents)}</p>
-                    )}
-                    {person.tags && person.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 pt-1">
-                        {person.tags.slice(0, 3).map((t) => (
-                          <span key={t.id} className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                            {t.tag}
-                          </span>
-                        ))}
-                        {person.tags.length > 3 && (
-                          <span className="text-xs text-muted-foreground">+{person.tags.length - 3} more</span>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {people.map((person, i) => (
+            <PlayerCard
+              key={person.id}
+              id={person.id}
+              index={i + 1}
+              name={person.name}
+              relationship={person.relationship}
+              tags={person.tags}
+              budgetMinCents={person.budgetMinCents}
+              budgetMaxCents={person.budgetMaxCents}
+            />
+          ))}
+        </div>
+      )}
+    </>
   );
 }
