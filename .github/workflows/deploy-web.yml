@@ -37,6 +37,7 @@ jobs:
             cp -rL ./deploy-web/apps/web/* ./deploy-web/
             rm -rf ./deploy-web/apps
           fi
+          mkdir -p ./deploy-web/.next
           cp -r apps/web/.next/static ./deploy-web/.next/static
           cp -r apps/web/public ./deploy-web/public 2>/dev/null || true
           # Hoist pnpm transitive deps so Node can resolve them
