@@ -42,7 +42,7 @@ const AUTO_RECURRING = new Set(["birthday", "anniversary"]);
 interface CreateEventDialogProps {
   people: Person[];
   preselectedPersonId?: string;
-  trigger?: React.ReactNode;
+  trigger?: React.ReactElement;
 }
 
 export function CreateEventDialog({
@@ -132,7 +132,7 @@ export function CreateEventDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
-      <DialogTrigger render={trigger ? <>{trigger}</> : <Button />}>
+      <DialogTrigger render={trigger ? trigger : <Button />}>
         {!trigger && (
           <>
             <Plus className="mr-1.5 h-4 w-4" />
