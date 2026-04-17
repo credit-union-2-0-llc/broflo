@@ -37,6 +37,8 @@ async function bootstrap() {
   validateProductionSecrets();
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
+  app.enableShutdownHooks();
+
   app.use(helmet());
 
   app.enableCors({
