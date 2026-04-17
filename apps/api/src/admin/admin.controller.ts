@@ -1,6 +1,8 @@
-import { Controller, Get, Patch, Param, Body, Query, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Body, Query, NotFoundException, UseGuards } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AdminGuard } from './admin.guard';
 
+@UseGuards(AdminGuard)
 @Controller('admin')
 export class AdminController {
   constructor(private readonly prisma: PrismaService) {}
