@@ -5,6 +5,8 @@ import { OrdersService } from './orders.service';
 import { RetailerAdapter, OrderStatusResult } from './adapters/retailer.adapter';
 import { OrderStatus, StatusChangeSource } from '@prisma/client';
 
+const POLL_BATCH_SIZE = 10;
+
 @Injectable()
 export class OrderPollingScheduler {
   private readonly log = new Logger(OrderPollingScheduler.name);
@@ -29,31 +31,36 @@ export class OrderPollingScheduler {
 
     this.log.debug(`Polling ${activeOrders.length} active orders`);
 
-    for (const order of activeOrders) {
-      try {
-        const result: OrderStatusResult = await this.adapter.getOrderStatus(
-          order.retailerOrderId!,
-        );
+    for (let i = 0; i < activeOrders.length; i += POLL_BATCH_SIZE) {
+      const batch = activeOrders.slice(i, i + POLL_BATCH_SIZE);
+      await Promise.allSettled(batch.map((order) => this.pollOrder(order)));
+    }
+  }
 
-        if (result.status !== order.status) {
-          await this.orders.transitionStatus(
-            order.id,
-            result.status as OrderStatus,
-            'system' as StatusChangeSource,
-            {
-              trackingNumber: result.trackingNumber,
-              trackingUrl: result.trackingUrl,
-              carrierName: result.carrierName,
-              metadata: { source: 'polling' },
-            },
-          );
-          this.log.log(
-            `Order ${order.id}: ${order.status} → ${result.status}`,
-          );
-        }
-      } catch (err) {
-        this.log.error(`Polling failed for order ${order.id}: ${err}`);
+  private async pollOrder(order: { id: string; retailerOrderId: string | null; status: string }) {
+    try {
+      const result: OrderStatusResult = await this.adapter.getOrderStatus(
+        order.retailerOrderId!,
+      );
+
+      if (result.status !== order.status) {
+        await this.orders.transitionStatus(
+          order.id,
+          result.status as OrderStatus,
+          'system' as StatusChangeSource,
+          {
+            trackingNumber: result.trackingNumber,
+            trackingUrl: result.trackingUrl,
+            carrierName: result.carrierName,
+            metadata: { source: 'polling' },
+          },
+        );
+        this.log.log(
+          `Order ${order.id}: ${order.status} → ${result.status}`,
+        );
       }
+    } catch (err) {
+      this.log.error(`Polling failed for order ${order.id}: ${err}`);
     }
   }
 }

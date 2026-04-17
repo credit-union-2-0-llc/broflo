@@ -17,6 +17,7 @@ import type {
   UpdatePersonDto,
   CreateNeverAgainDto,
 } from "./dto/persons.dto";
+import { computeCompleteness } from "../utils/completeness";
 
 @Injectable()
 export class PersonsService {
@@ -92,7 +93,7 @@ export class PersonsService {
         shippingCity: dto.shippingCity ?? null,
         shippingState: dto.shippingState ?? null,
         shippingZip: dto.shippingZip ?? null,
-        completenessScore: this.computeCompleteness(dto),
+        completenessScore: computeCompleteness(dto),
       },
       include: { neverAgainItems: true, tags: true },
     });
@@ -152,7 +153,7 @@ export class PersonsService {
       where: { personId: person.id },
     });
     const mergedForScore = { ...person, ...dto };
-    const newScore = this.computeCompleteness(mergedForScore, photoCount);
+    const newScore = computeCompleteness(mergedForScore, photoCount);
     if (newScore !== person.completenessScore) {
       await this.prisma.person.update({
         where: { id: person.id },
@@ -204,27 +205,6 @@ export class PersonsService {
     if (!item) throw new NotFoundException("Never-again item not found");
 
     await this.prisma.neverAgainItem.delete({ where: { id: itemId } });
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private computeCompleteness(data: any, photoCount = 0): number {
-    let score = 0;
-    // Weights total 100+8 (photos additive, capped at 100) — G14 + G21
-    if (data.hobbies) score += 15;
-    if (data.favoriteBrands) score += 12;
-    if (data.budgetMinCents || data.budgetMaxCents) score += 12;
-    if (data.foodPreferences) score += 10;
-    if (data.birthday) score += 10;
-    if (data.shippingAddress1 && data.shippingCity && data.shippingState && data.shippingZip) score += 10;
-    if (data.musicTaste) score += 7;
-    if (data.clothingSizeTop || data.clothingSizeBottom) score += 6;
-    if (Array.isArray(data.allergens) && data.allergens.length > 0) score += 5;
-    if (data.shoeSize) score += 3;
-    if (data.wishlistUrls) score += 5;
-    if (data.notes) score += 3;
-    if (data.anniversary) score += 2;
-    if (photoCount > 0) score += 8;
-    return Math.min(score, 100);
   }
 
   private async ensureOwnership(userId: string, personId: string) {

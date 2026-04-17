@@ -12,6 +12,7 @@ import { StorageService } from "../storage/storage.service";
 import { RedisService } from "../redis/redis.service";
 import type { PhotoCategory, User } from "@prisma/client";
 import type { PhotoAnalysisJobData } from "./photo-analysis.processor";
+import { computeCompleteness } from "../utils/completeness";
 
 // Magic-byte detection — no ESM dependency, works in CJS + Jest
 function detectFileType(
@@ -358,30 +359,7 @@ export class PhotosService {
       where: { personId },
     });
 
-    // +8 for having at least one photo (approved at G21)
-    let score = 0;
-    if (person.hobbies) score += 15;
-    if (person.favoriteBrands) score += 12;
-    if (person.budgetMinCents || person.budgetMaxCents) score += 12;
-    if (person.foodPreferences) score += 10;
-    if (person.birthday) score += 10;
-    if (
-      person.shippingAddress1 &&
-      person.shippingCity &&
-      person.shippingState &&
-      person.shippingZip
-    )
-      score += 10;
-    if (person.musicTaste) score += 7;
-    if (person.clothingSizeTop || person.clothingSizeBottom) score += 6;
-    if (person.allergens.length > 0) score += 5;
-    if (person.shoeSize) score += 3;
-    if (person.wishlistUrls) score += 5;
-    if (person.notes) score += 3;
-    if (person.anniversary) score += 2;
-    if (photoCount > 0) score += 8;
-
-    const capped = Math.min(score, 100);
+    const capped = computeCompleteness(person, photoCount);
     if (capped !== person.completenessScore) {
       await this.prisma.person.update({
         where: { id: personId },
