@@ -39,7 +39,7 @@ function validateProductionSecrets() {
     "BROWSER_AGENT_URL",
     "BROWSER_AGENT_SERVICE_KEY",
     "APPLICATIONINSIGHTS_CONNECTION_STRING",
-    "SERPAPI_KEY",
+    "EXA_API_KEY",
   ].filter((k) => !process.env[k]);
   if (warned.length > 0) {
     log.warn(`Optional env vars not set (features degraded): ${warned.join(", ")}`);
