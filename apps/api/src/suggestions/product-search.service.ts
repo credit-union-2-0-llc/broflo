@@ -2,6 +2,13 @@ import { Injectable, Logger } from "@nestjs/common";
 
 const SEARCH_TIMEOUT_MS = 5000;
 const PRICE_REGEX = /\$(\d{1,5}(?:\.\d{2})?)/;
+const LOGO_PATTERNS = [/logo/i, /meta_tag/i, /favicon/i, /static\/img/i, /\/nav\//i];
+
+function isProductImage(url: string | undefined): boolean {
+  if (!url) return false;
+  if (LOGO_PATTERNS.some((p) => p.test(url))) return false;
+  return true;
+}
 
 export interface ProductSearchResult {
   imageUrl: string | null;
@@ -23,8 +30,8 @@ export class ProductSearchService {
     }
 
     const query = retailerHint
-      ? `buy ${title} ${retailerHint}`
-      : `buy ${title} gift`;
+      ? `${title} ${retailerHint} product`
+      : `${title} product listing`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
@@ -39,7 +46,7 @@ export class ProductSearchService {
         body: JSON.stringify({
           query,
           type: "auto",
-          numResults: 1,
+          numResults: 3,
           contents: { text: { maxCharacters: 500 } },
         }),
         signal: controller.signal,
@@ -51,20 +58,29 @@ export class ProductSearchService {
       }
 
       const data = await res.json();
-      const result = data.results?.[0];
-      if (!result) {
+      const results = data.results || [];
+
+      const best = results.find(
+        (r: Record<string, unknown>) => isProductImage(r.image as string),
+      ) || results[0];
+
+      if (!best) {
         return { imageUrl: null, productUrl: null, priceCents: null };
       }
 
       let priceCents: number | null = null;
-      const priceMatch = result.text?.match(PRICE_REGEX);
+      const priceMatch = (best.text as string)?.match(PRICE_REGEX);
       if (priceMatch) {
         priceCents = Math.round(parseFloat(priceMatch[1]) * 100);
       }
 
+      const imageUrl = isProductImage(best.image as string)
+        ? (best.image as string)
+        : null;
+
       return {
-        imageUrl: result.image || null,
-        productUrl: result.url || null,
+        imageUrl,
+        productUrl: (best.url as string) || null,
         priceCents,
       };
     } catch (err) {
