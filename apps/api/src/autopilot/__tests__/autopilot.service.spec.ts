@@ -133,7 +133,7 @@ describe('AutopilotService', () => {
       prisma.autopilotRule.findUnique.mockResolvedValue(null);
       prisma.autopilotRule.create.mockResolvedValue(mockRule);
 
-      const { leadDays, ...dtoWithoutLead } = baseDto;
+      const { leadDays: _, ...dtoWithoutLead } = baseDto;
       await service.createRule(userId, dtoWithoutLead as any, '127.0.0.1');
 
       expect(prisma.autopilotRule.create).toHaveBeenCalledWith(
