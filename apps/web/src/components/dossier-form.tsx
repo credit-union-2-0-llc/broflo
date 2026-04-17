@@ -327,7 +327,7 @@ export function DossierForm({
                         className={`px-3 py-1 rounded-full text-sm border transition-colors ${
                           selected
                             ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background border-border hover:border-primary/50"
+                            : "bg-background border-border hover:border-amber-3"
                         }`}
                         onClick={() => {
                           const current = watch("allergens") ?? [];
@@ -358,7 +358,7 @@ export function DossierForm({
                         className={`px-3 py-1 rounded-full text-sm border transition-colors ${
                           selected
                             ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background border-border hover:border-primary/50"
+                            : "bg-background border-border hover:border-amber-3"
                         }`}
                         onClick={() => {
                           const current = watch("dietaryRestrictions") ?? [];

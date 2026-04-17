@@ -40,7 +40,7 @@ export function StarRating({
             className={cn(
               iconSize,
               star <= (value || 0)
-                ? "text-broflo-gold fill-broflo-gold"
+                ? "text-amber fill-broflo-gold"
                 : "text-muted-foreground",
             )}
           />
@@ -63,15 +63,15 @@ export function StarRating({
             role="radio"
             aria-checked={value === star}
             aria-label={`${star} star${star > 1 ? "s" : ""} - ${LABELS[star]}`}
-            className="p-1 rounded-md transition-colors hover:bg-muted focus:outline-none focus:ring-2 focus:ring-broflo-electric"
+            className="p-1 rounded-md transition-colors hover:bg-muted focus:outline-none focus:ring-2 focus:ring-amber"
             onClick={() => onChange?.(star)}
           >
             <Star
               className={cn(
                 iconSize,
                 star <= (value || 0)
-                  ? "text-broflo-gold fill-broflo-gold"
-                  : "text-muted-foreground hover:text-broflo-gold/60",
+                  ? "text-amber fill-broflo-gold"
+                  : "text-muted-foreground hover:text-amber/60",
               )}
             />
           </button>

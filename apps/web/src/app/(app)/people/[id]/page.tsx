@@ -83,8 +83,8 @@ export default async function PersonDetailPage({
   ];
 
   return (
-    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
-      <div className="mx-auto max-w-2xl space-y-6">
+    <>
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <Link href="/people">
             <Button variant="ghost" size="sm">&larr; Back</Button>
@@ -168,7 +168,7 @@ export default async function PersonDetailPage({
                   <h3 className="text-sm font-semibold text-muted-foreground mb-2">Interests</h3>
                   <div className="flex flex-wrap gap-2">
                     {person.tags.slice(0, 8).map((t) => (
-                      <span key={t.id} className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                      <span key={t.id} className="inline-flex items-center rounded-full bg-amber-glow px-2.5 py-1 text-xs font-medium text-primary">
                         {t.tag}
                       </span>
                     ))}
@@ -187,12 +187,12 @@ export default async function PersonDetailPage({
                   <h3 className="text-sm font-semibold text-muted-foreground mb-2">Dietary</h3>
                   <div className="flex flex-wrap gap-2">
                     {person.allergens.map((a) => (
-                      <span key={a} className="inline-flex items-center rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive capitalize">
+                      <span key={a} className="inline-flex items-center rounded-full bg-red-dim px-2.5 py-1 text-xs font-medium text-destructive capitalize">
                         &#9888; {a}
                       </span>
                     ))}
                     {person.dietaryRestrictions.map((d) => (
-                      <span key={d} className="inline-flex items-center rounded-full bg-yellow-500/10 px-2.5 py-1 text-xs font-medium text-yellow-700 capitalize">
+                      <span key={d} className="inline-flex items-center rounded-full bg-amber-glow px-2.5 py-1 text-xs font-medium text-amber capitalize">
                         {d}
                       </span>
                     ))}
@@ -283,6 +283,6 @@ export default async function PersonDetailPage({
           </CardContent>
         </Card>
       </div>
-    </div>
+    </>
   );
 }

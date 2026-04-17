@@ -89,7 +89,7 @@ export function AgentSessionLog({
                       "flex h-6 w-6 shrink-0 items-center justify-center rounded-full",
                       step.status === "completed" && "bg-green-100 text-green-600",
                       step.status === "failed" && "bg-red-100 text-red-600",
-                      step.status === "running" && "bg-blue-100 text-blue-600",
+                      step.status === "running" && "bg-blue-100 text-blue",
                       step.status === "pending" && "bg-muted text-muted-foreground",
                     )}>
                       <CheckCircle className="h-3 w-3" />

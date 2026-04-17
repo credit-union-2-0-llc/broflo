@@ -30,9 +30,9 @@ function countdownLabel(days: number) {
 }
 
 function urgencyClass(days: number) {
-  if (days <= 1) return "bg-broflo-warm text-white";
-  if (days <= 7) return "bg-amber-100 text-amber-800 border-amber-300";
-  if (days <= 29) return "bg-broflo-electric-subtle text-broflo-electric";
+  if (days <= 1) return "bg-red text-white";
+  if (days <= 7) return "bg-amber-glow text-amber border-amber-3";
+  if (days <= 29) return "bg-amber-glow text-amber";
   return "bg-secondary text-muted-foreground";
 }
 
@@ -41,7 +41,7 @@ export function EventCard({ event }: { event: UpcomingEvent }) {
 
   return (
     <Link href={`/events/${event.id}`}>
-      <Card className="transition-shadow hover:shadow-md cursor-pointer">
+      <Card className="transition-shadow hover:border-border-3 cursor-pointer">
         <CardHeader className="flex flex-row items-center gap-3 pb-2">
           <Avatar className="h-10 w-10">
             <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">

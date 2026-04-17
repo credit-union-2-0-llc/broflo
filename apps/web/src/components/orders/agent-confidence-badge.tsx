@@ -9,7 +9,7 @@ interface AgentConfidenceBadgeProps {
 export function AgentConfidenceBadge({ confidence }: AgentConfidenceBadgeProps) {
   if (confidence >= 0.8) {
     return (
-      <Badge className="bg-green-100 text-green-700 border-green-200 border">
+      <Badge className="bg-green-dim text-green-bright border-green-bright/30 border">
         Strong match
       </Badge>
     );

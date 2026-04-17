@@ -42,7 +42,7 @@ export function PhotoCategoryPicker({ onSelect, onSkip }: PhotoCategoryPickerPro
           <button
             key={value}
             onClick={() => onSelect(value)}
-            className="flex flex-col items-center gap-1.5 rounded-lg border border-border p-3 text-sm transition-colors hover:border-primary hover:bg-primary/5"
+            className="flex flex-col items-center gap-1.5 rounded-lg border border-border p-3 text-sm transition-colors hover:border-primary hover:bg-amber-glow"
           >
             <Icon className="h-5 w-5 text-muted-foreground" />
             <span className="text-xs">{label}</span>

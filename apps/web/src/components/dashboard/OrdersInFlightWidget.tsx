@@ -90,7 +90,7 @@ export function OrdersInFlightWidget({ token }: OrdersInFlightWidgetProps) {
             </div>
             <Link
               href="/orders"
-              className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
+              className="flex items-center gap-1 text-sm text-blue hover:underline"
             >
               View all orders
               <ArrowRight className="h-3 w-3" />

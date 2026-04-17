@@ -308,7 +308,7 @@ function GiftRow({
             </p>
           )}
           {gift.suggestionSnapshot && (
-            <blockquote className="text-xs italic text-muted-foreground border-l-2 border-broflo-electric-light pl-3">
+            <blockquote className="text-xs italic text-muted-foreground border-l-2 border-amber-3 pl-3">
               {(gift.suggestionSnapshot as { reasoning: string }).reasoning}
             </blockquote>
           )}

@@ -12,7 +12,7 @@ export function OrderMethodBadge({ method }: OrderMethodBadgeProps) {
     return (
       <Badge
         variant="outline"
-        className="text-broflo-electric border-broflo-electric-light text-xs gap-1"
+        className="text-amber border-amber-3 text-xs gap-1"
         aria-label="Order method: Browser Agent"
       >
         <Bot className="h-3 w-3" />

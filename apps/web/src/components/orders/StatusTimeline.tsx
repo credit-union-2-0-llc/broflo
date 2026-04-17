@@ -61,7 +61,7 @@ export function StatusTimeline({ entries, currentStatus }: StatusTimelineProps) 
               <div
                 className={cn(
                   "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                  isCurrent && "bg-blue-100 text-blue-600 ring-2 ring-blue-400",
+                  isCurrent && "bg-blue-100 text-blue ring-2 ring-blue-400",
                   isCompleted && !isCurrent && "bg-green-100 text-green-600",
                   isFuture && "bg-muted text-muted-foreground",
                 )}

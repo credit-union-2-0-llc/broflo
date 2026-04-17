@@ -7,8 +7,8 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 function getColor(score: number) {
   if (score < 40) return "text-destructive";
-  if (score < 70) return "text-yellow-500";
-  return "text-green-500";
+  if (score < 70) return "text-amber";
+  return "text-green-bright";
 }
 
 function getNudge(score: number): string | null {

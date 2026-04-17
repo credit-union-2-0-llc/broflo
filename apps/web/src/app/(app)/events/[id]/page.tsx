@@ -40,9 +40,9 @@ function countdownLabel(days: number) {
 }
 
 function urgencyClass(days: number) {
-  if (days <= 1) return "bg-broflo-warm text-white";
-  if (days <= 7) return "bg-amber-100 text-amber-800 border-amber-300";
-  if (days <= 29) return "bg-broflo-electric-subtle text-broflo-electric";
+  if (days <= 1) return "bg-red text-white";
+  if (days <= 7) return "bg-amber-glow text-amber border-amber-3";
+  if (days <= 29) return "bg-amber-glow text-amber";
   return "bg-secondary text-muted-foreground";
 }
 
@@ -73,8 +73,8 @@ export default async function EventDetailPage({
       : null;
 
   return (
-    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
-      <div className="mx-auto max-w-2xl space-y-6">
+    <>
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <Link href="/events">
             <Button variant="ghost" size="sm">
@@ -172,6 +172,6 @@ export default async function EventDetailPage({
           </CardContent>
         </Card>
       </div>
-    </div>
+    </>
   );
 }

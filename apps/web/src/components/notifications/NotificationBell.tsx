@@ -139,7 +139,7 @@ export function NotificationBell() {
             >
               <div className="flex items-center gap-2 w-full">
                 {!notif.isRead && (
-                  <span className="h-2 w-2 rounded-full bg-broflo-electric shrink-0" />
+                  <span className="h-2 w-2 rounded-full bg-amber shrink-0" />
                 )}
                 <span className={`text-sm font-medium truncate ${notif.isRead ? "text-muted-foreground" : ""}`}>
                   {notif.title}

@@ -89,8 +89,8 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
-      <div className="mx-auto max-w-4xl">
+    <>
+      <>
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Orders</h1>
         </div>
@@ -139,7 +139,7 @@ export default function OrdersPage() {
           <div className="space-y-3">
             {orders.map((order) => (
               <Link key={order.id} href={`/orders/${order.id}`}>
-                <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                <Card className="hover:bg-s2 transition-colors cursor-pointer">
                   <CardContent className="flex items-center gap-4 py-4">
                     {order.productImageUrl ? (
                       <img
@@ -166,7 +166,7 @@ export default function OrdersPage() {
                       {order.retailerKey === "browser-agent" && (
                         <Badge
                           variant="outline"
-                          className="text-broflo-electric border-broflo-electric-light text-[10px] gap-1 w-fit mt-0.5"
+                          className="text-amber border-amber-3 text-[10px] gap-1 w-fit mt-0.5"
                           aria-label="This order was placed by the Broflo browser agent"
                         >
                           <Bot className="h-3 w-3" />
@@ -221,7 +221,7 @@ export default function OrdersPage() {
             </Button>
           </div>
         )}
-      </div>
-    </div>
+      </>
+    </>
   );
 }

@@ -67,13 +67,13 @@ function formatAddress(addr: AgentFailureStateProps["shippingAddress"]) {
 function FailureIcon({ type }: { type: FailureType }) {
   switch (type) {
     case "captcha":
-      return <ShieldAlert className="h-10 w-10 text-broflo-warm" />;
+      return <ShieldAlert className="h-10 w-10 text-red" />;
     case "out_of_stock":
       return <PackageX className="h-10 w-10 text-muted-foreground" />;
     case "blocked":
       return <Globe className="h-10 w-10 text-muted-foreground" />;
     case "timeout":
-      return <Clock className="h-10 w-10 text-broflo-warm" />;
+      return <Clock className="h-10 w-10 text-red" />;
     case "price_mismatch":
       return <DollarSign className="h-10 w-10 text-amber-500" />;
     default:
@@ -145,7 +145,7 @@ export function AgentFailureState({
             {isHigher ? VOICE.agent.priceMismatch : VOICE.agent.priceLower}
           </p>
 
-          <Card className="bg-muted/50 p-3">
+          <Card className="bg-s2 p-3">
             <dl className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Expected:</dt>
@@ -157,7 +157,7 @@ export function AgentFailureState({
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Difference:</dt>
-                <dd className={`font-mono ${isHigher ? "text-broflo-warm" : "text-green-600"}`}>
+                <dd className={`font-mono ${isHigher ? "text-red" : "text-green-600"}`}>
                   {isHigher ? "+" : "-"}{dollars(Math.abs(diff))} {isHigher ? "above" : "under"} budget
                 </dd>
               </div>
@@ -190,7 +190,7 @@ export function AgentFailureState({
 
         {/* S7: Product context for manual fallback */}
         {(productTitle || priceExpected != null) && (
-          <Card className="w-full bg-muted/50 p-3">
+          <Card className="w-full bg-s2 p-3">
             <dl className="space-y-1 text-sm">
               {productTitle && (
                 <div className="flex justify-between">
@@ -214,7 +214,7 @@ export function AgentFailureState({
 
         {/* S2: Shipping address with copy button */}
         {shippingAddress && (
-          <Card className="w-full bg-muted/50 p-3">
+          <Card className="w-full bg-s2 p-3">
             <div className="flex items-start justify-between">
               <div className="text-sm text-muted-foreground whitespace-pre-line">
                 {formatAddress(shippingAddress)}

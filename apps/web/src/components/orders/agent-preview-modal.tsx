@@ -211,10 +211,10 @@ export function AgentPreviewModal({
                 <DialogTitle>Finding Your Gift on {displayRetailer}</DialogTitle>
               </DialogHeader>
               <div className="flex flex-col items-center py-6 space-y-4">
-                <Search className="h-10 w-10 text-broflo-electric animate-pulse" />
+                <Search className="h-10 w-10 text-amber animate-pulse" />
                 <RotatingCopy lines={VOICE.agent.searching} intervalMs={4000} />
                 <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-broflo-electric h-full rounded-full animate-[indeterminate_1.5s_ease-in-out_infinite]"
+                  <div className="bg-amber h-full rounded-full animate-[indeterminate_1.5s_ease-in-out_infinite]"
                     style={{ width: "40%" }} />
                 </div>
               </div>
@@ -273,7 +273,7 @@ export function AgentPreviewModal({
                 {/* Price exceeds budget warning (M4) */}
                 {job.foundProductPrice != null && job.maxBudgetCents != null &&
                   job.foundProductPrice > job.maxBudgetCents && (
-                  <Card className="bg-amber-50 border-amber-200 p-3">
+                  <Card className="bg-amber-glow border-amber-200 p-3">
                     <p className="text-sm text-amber-800">
                       {VOICE.agent.priceOverBudget(
                         dollars(job.foundProductPrice),
@@ -285,7 +285,7 @@ export function AgentPreviewModal({
 
                 {/* Low confidence warning */}
                 {job.matchConfidence != null && job.matchConfidence < 0.5 && (
-                  <Card className="bg-amber-50 border-amber-200 p-3">
+                  <Card className="bg-amber-glow border-amber-200 p-3">
                     <p className="text-sm text-amber-800">
                       We&apos;re not 100% sure this is the right product. Double-check before confirming.
                     </p>
@@ -304,7 +304,7 @@ export function AgentPreviewModal({
                 )}
 
                 {/* Info banner */}
-                <Card className="bg-muted/50 border p-3">
+                <Card className="bg-s2 border p-3">
                   <p className="text-sm text-muted-foreground flex items-start gap-2">
                     <Info className="h-4 w-4 shrink-0 mt-0.5" />
                     Broflo will place this order on {displayRetailer} on your behalf. {VOICE.cancelWindow}
@@ -396,7 +396,7 @@ export function AgentPreviewModal({
                             className={cn(
                               "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
                               isCompleted && "bg-green-100 text-green-600",
-                              isRunning && "bg-blue-100 text-blue-600 ring-2 ring-blue-400",
+                              isRunning && "bg-blue-100 text-blue ring-2 ring-blue-400",
                               isFuture && "bg-muted text-muted-foreground",
                             )}
                             aria-current={isRunning ? "step" : undefined}

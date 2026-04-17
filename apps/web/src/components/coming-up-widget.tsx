@@ -24,9 +24,9 @@ function countdownLabel(days: number) {
 }
 
 function urgencyClass(days: number) {
-  if (days <= 1) return "bg-broflo-warm text-white";
-  if (days <= 7) return "bg-amber-100 text-amber-800";
-  if (days <= 29) return "bg-broflo-electric-subtle text-broflo-electric";
+  if (days <= 1) return "bg-red text-white";
+  if (days <= 7) return "bg-amber-glow text-amber";
+  if (days <= 29) return "bg-amber-glow text-amber";
   return "bg-secondary text-muted-foreground";
 }
 
@@ -40,7 +40,7 @@ export function ComingUpWidget({ events }: { events: UpcomingEvent[] }) {
         {events.length > 0 && (
           <Link
             href="/events"
-            className="text-xs text-broflo-electric hover:underline"
+            className="text-xs text-amber hover:underline"
           >
             View All &rarr;
           </Link>
@@ -66,7 +66,7 @@ export function ComingUpWidget({ events }: { events: UpcomingEvent[] }) {
               <Link
                 key={event.id}
                 href={`/events/${event.id}`}
-                className="flex items-center gap-3 py-2 rounded-md hover:bg-muted/50 px-2 -mx-2 transition-colors"
+                className="flex items-center gap-3 py-2 rounded-md hover:bg-s2 px-2 -mx-2 transition-colors"
                 aria-label={`${event.personName}'s ${event.occasionType}, ${countdownLabel(event.daysUntil)}`}
               >
                 <Avatar className="h-8 w-8">

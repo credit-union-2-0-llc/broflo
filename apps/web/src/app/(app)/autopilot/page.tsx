@@ -141,9 +141,9 @@ export default function AutopilotPage() {
   // Tier gate screen
   if (!hasAccess && !loading) {
     return (
-      <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
+      <div className="bg-transparent px-4 py-6 sm:px-6 sm:py-8 md:px-8">
         <div className="mx-auto max-w-2xl text-center py-20">
-          <Zap className="h-12 w-12 text-broflo-electric mx-auto mb-4" />
+          <Zap className="h-12 w-12 text-amber mx-auto mb-4" />
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">Autopilot</h1>
           <p className="text-muted-foreground mb-6 italic">
             {VOICE.autopilot.tierGate}
@@ -158,11 +158,11 @@ export default function AutopilotPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
+    <div className="bg-transparent px-4 py-6 sm:px-6 sm:py-8 md:px-8">
       <div className="mx-auto max-w-4xl">
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Zap className="h-6 w-6 text-broflo-electric" />
+            <Zap className="h-6 w-6 text-amber" />
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Autopilot</h1>
           </div>
           <Dialog open={showCreate} onOpenChange={setShowCreate}>
@@ -258,7 +258,7 @@ function RuleCard({
             <button
               onClick={onToggleActive}
               className={`shrink-0 h-5 w-9 rounded-full transition-colors relative ${
-                rule.isActive ? "bg-broflo-electric" : "bg-muted"
+                rule.isActive ? "bg-amber" : "bg-muted"
               }`}
               aria-label={rule.isActive ? "Disable rule" : "Enable rule"}
             >
@@ -456,7 +456,7 @@ function CreateRuleDialog({
                 onClick={() => toggleOccasion(ot.value)}
                 className={`px-3 py-1 text-xs rounded-full border transition-colors ${
                   occasionTypes.includes(ot.value)
-                    ? "bg-broflo-electric text-white border-broflo-electric"
+                    ? "bg-amber text-white border-amber"
                     : "bg-background border-border text-muted-foreground hover:border-foreground"
                 }`}
               >
@@ -529,7 +529,7 @@ function CreateRuleDialog({
             id="autopilot-consent"
             checked={consent}
             onChange={(e) => setConsent(e.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-border accent-broflo-electric"
+            className="mt-0.5 h-4 w-4 rounded border-border accent-amber"
           />
           <label htmlFor="autopilot-consent" className="text-sm leading-snug">
             {VOICE.autopilot.consentLabel(formatCents(monthlyCap * 100))}

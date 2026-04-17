@@ -153,7 +153,7 @@ export function OrderPreviewModal({
               )}
             </div>
 
-            <div className="rounded-md bg-muted/50 border px-3 py-2 text-sm text-muted-foreground">
+            <div className="rounded-md bg-s2 border px-3 py-2 text-sm text-muted-foreground">
               {VOICE.cancelWindow}
             </div>
 

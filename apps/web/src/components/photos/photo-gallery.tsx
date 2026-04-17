@@ -23,8 +23,8 @@ interface PhotoGalleryProps {
 const STATUS_ICONS: Record<string, React.ReactNode> = {
   pending: <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500" />,
   processing: <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />,
-  complete: <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />,
-  failed: <AlertCircle className="h-3.5 w-3.5 text-red-500" />,
+  complete: <CheckCircle2 className="h-3.5 w-3.5 text-green-bright" />,
+  failed: <AlertCircle className="h-3.5 w-3.5 text-red" />,
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -45,7 +45,7 @@ export function PhotoGallery({ photos, tier, onPhotoClick, onDelete }: PhotoGall
       {photos.map((photo) => (
         <div
           key={photo.id}
-          className="group relative cursor-pointer overflow-hidden rounded-lg border border-border bg-muted transition-shadow hover:shadow-md"
+          className="group relative cursor-pointer overflow-hidden rounded-lg border border-border bg-muted transition-shadow hover:border-border-3"
           onClick={() => onPhotoClick(photo.id)}
         >
           {/* Thumbnail */}
@@ -94,7 +94,7 @@ export function PhotoGallery({ photos, tier, onPhotoClick, onDelete }: PhotoGall
             className={`absolute bottom-1.5 right-1.5 rounded-full bg-background/80 p-1.5 backdrop-blur-sm transition-opacity ${confirmDelete === photo.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
             title={confirmDelete === photo.id ? "Click again to confirm" : "Delete photo"}
           >
-            <Trash2 className={`h-4 w-4 ${confirmDelete === photo.id ? "text-red-500" : "text-muted-foreground"}`} />
+            <Trash2 className={`h-4 w-4 ${confirmDelete === photo.id ? "text-red" : "text-muted-foreground"}`} />
           </button>
         </div>
       ))}

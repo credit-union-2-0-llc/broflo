@@ -66,7 +66,7 @@ export function PhotoUploadTrigger({
       onDragLeave={() => setIsDragging(false)}
       onDrop={handleDrop}
       className={`flex flex-col items-center gap-3 rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
-        isDragging ? "border-primary bg-primary/5" : "border-border"
+        isDragging ? "border-primary bg-amber-glow" : "border-border"
       }`}
     >
       <ImagePlus className="h-10 w-10 text-muted-foreground" />

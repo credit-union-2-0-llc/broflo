@@ -65,7 +65,7 @@ export default function OrderDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
+      <div className="bg-transparent px-4 py-6 sm:px-6 sm:py-8 md:px-8">
         <div className="mx-auto max-w-2xl space-y-4">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-64 w-full rounded-lg" />
@@ -78,7 +78,7 @@ export default function OrderDetailPage() {
   if (!order) return null;
 
   return (
-    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
+    <div className="bg-transparent px-4 py-6 sm:px-6 sm:py-8 md:px-8">
       <div className="mx-auto max-w-2xl">
         {/* Back link */}
         <Link
@@ -104,7 +104,7 @@ export default function OrderDetailPage() {
             {order.retailerKey === "browser-agent" && (
               <Badge
                 variant="outline"
-                className="text-broflo-electric border-broflo-electric-light text-xs gap-1"
+                className="text-amber border-amber-3 text-xs gap-1"
                 aria-label="This order was placed by the Broflo browser agent"
               >
                 <Bot className="h-3 w-3" />

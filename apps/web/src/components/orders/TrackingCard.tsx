@@ -48,7 +48,7 @@ export function TrackingCard({ trackingNumber, trackingUrl, carrierName }: Track
             href={trackingUrl!}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+            className="inline-flex items-center gap-1 text-sm text-blue hover:underline"
           >
             Track Package
             <ExternalLink className="h-3 w-3" />

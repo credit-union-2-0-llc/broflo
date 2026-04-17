@@ -98,11 +98,11 @@ function UpgradeContent() {
               key={tier}
               className={cn(
                 "relative flex flex-col",
-                isHighlighted && "border-broflo-electric shadow-md",
+                isHighlighted && "border-amber shadow-md",
               )}
             >
               {isHighlighted && (
-                <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-broflo-electric text-white">
+                <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber text-white">
                   Most Popular
                 </Badge>
               )}
@@ -135,7 +135,7 @@ function UpgradeContent() {
                 <ul className="space-y-2">
                   {FEATURES[tier].map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-sm">
-                      <Check className="h-4 w-4 mt-0.5 text-broflo-electric shrink-0" />
+                      <Check className="h-4 w-4 mt-0.5 text-amber shrink-0" />
                       {feature}
                     </li>
                   ))}
@@ -156,7 +156,7 @@ function UpgradeContent() {
                       className={cn(
                         "w-full",
                         isHighlighted &&
-                          "bg-broflo-electric hover:bg-broflo-electric-light text-white",
+                          "bg-amber hover:bg-amber-light text-white",
                       )}
                       onClick={() => {
                         const priceId =

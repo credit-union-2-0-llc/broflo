@@ -63,7 +63,7 @@ export function MainNav() {
                 className={cn(
                   "px-3 py-1.5 text-sm rounded-md transition-colors",
                   isActive(tab.href)
-                    ? "text-broflo-electric font-semibold bg-broflo-electric-subtle"
+                    ? "text-amber font-semibold bg-amber-glow"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
                 aria-current={isActive(tab.href) ? "page" : undefined}
@@ -75,7 +75,7 @@ export function MainNav() {
         </div>
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="gap-1.5 font-normal">
-            <Trophy className="h-3.5 w-3.5 text-broflo-gold" />
+            <Trophy className="h-3.5 w-3.5 text-amber" />
             {user?.brofloScore ?? 0}
           </Badge>
           <NotificationBell />
@@ -102,7 +102,7 @@ export function MainNav() {
               </DropdownMenuItem>
               {user?.subscriptionTier === "free" ? (
                 <DropdownMenuItem
-                  className="cursor-pointer text-broflo-electric"
+                  className="cursor-pointer text-amber"
                   onClick={() => window.location.href = "/upgrade"}
                 >
                   <Sparkles className="mr-2 h-4 w-4" />
@@ -149,7 +149,7 @@ export function MainNav() {
                 className={cn(
                   "flex flex-col items-center gap-0.5 text-xs transition-colors",
                   active
-                    ? "text-broflo-electric font-semibold"
+                    ? "text-amber font-semibold"
                     : "text-muted-foreground"
                 )}
               >
@@ -165,7 +165,7 @@ export function MainNav() {
             className={cn(
               "flex flex-col items-center gap-0.5 text-xs transition-colors",
               isActive("/profile")
-                ? "text-broflo-electric font-semibold"
+                ? "text-amber font-semibold"
                 : "text-muted-foreground"
             )}
           >

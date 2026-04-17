@@ -14,7 +14,7 @@ function dollars(cents: number) {
 }
 
 function confidenceColor(score: number) {
-  if (score >= 0.8) return "bg-emerald-500";
+  if (score >= 0.8) return "bg-green-bright";
   if (score >= 0.5) return "bg-amber-400";
   return "bg-gray-300";
 }
@@ -59,7 +59,7 @@ function OrderActions({
       <Button
         variant="default"
         size="sm"
-        className="bg-emerald-600 hover:bg-emerald-700"
+        className="bg-green-bright hover:bg-green-bright/80"
         onClick={() => onOrderThis(suggestionId)}
       >
         <ShoppingBag className="mr-1 h-3.5 w-3.5" />
@@ -86,9 +86,9 @@ export function SuggestionCard({
 
   return (
     <Card
-      className={`transition-shadow hover:shadow-md ${
+      className={`transition-shadow hover:border-border-3 ${
         s.isSelected
-          ? "ring-2 ring-broflo-electric bg-broflo-electric-subtle/20"
+          ? "ring-2 ring-amber bg-amber-glow"
           : ""
       }`}
       role="listitem"
@@ -108,7 +108,7 @@ export function SuggestionCard({
           </span>
         </div>
         {isTopPick && s.confidenceScore >= 0.8 && (
-          <Badge className="bg-broflo-electric-subtle text-broflo-electric text-xs w-fit">
+          <Badge className="bg-amber-glow text-amber text-xs w-fit">
             {VOICE.suggestions.topPick}
           </Badge>
         )}
@@ -116,7 +116,7 @@ export function SuggestionCard({
       <CardContent className="space-y-3">
         <p className="text-sm text-foreground">{s.description}</p>
 
-        <blockquote className="text-sm italic text-muted-foreground border-l-2 border-broflo-electric-light pl-3">
+        <blockquote className="text-sm italic text-muted-foreground border-l-2 border-amber-3 pl-3">
           {s.reasoning}
         </blockquote>
 

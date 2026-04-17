@@ -30,7 +30,7 @@ export function InsightCard({
   // Pro users see teaser
   if (tier === "pro") {
     return (
-      <Card className="border border-dashed border-primary/30 bg-primary/5">
+      <Card className="border border-dashed border-amber-3 bg-amber-glow">
         <CardContent className="p-4 text-center">
           <p className="text-sm font-medium text-primary mb-1">
             AI Gift Profile
@@ -82,12 +82,12 @@ export function InsightCard({
 
   // Elite with insight
   return (
-    <Card className="relative overflow-hidden border-2 border-transparent bg-gradient-to-br from-primary/5 via-background to-primary/10" style={{ borderImage: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.3)) 1" }}>
+    <Card className="relative overflow-hidden border-2 border-transparent bg-gradient-to-br from-amber-glow via-background to-amber-glow2" style={{ borderImage: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.3)) 1" }}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold">Gift Profile</h3>
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+            <span className="inline-flex items-center rounded-full bg-amber-glow px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
               Elite
             </span>
           </div>

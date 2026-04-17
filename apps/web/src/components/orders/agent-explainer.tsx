@@ -46,7 +46,7 @@ export function AgentExplainer({ open, onDismiss, onProceed }: AgentExplainerPro
 
         <div className="space-y-4 py-2">
           <div className="flex justify-center">
-            <Bot className="h-8 w-8 text-broflo-electric" />
+            <Bot className="h-8 w-8 text-amber" />
           </div>
 
           <p className="text-sm text-muted-foreground">

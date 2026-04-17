@@ -21,20 +21,20 @@ function reminderCopy(reminder: Reminder) {
 function reminderStyle(leadDays: number) {
   if (leadDays === 1)
     return {
-      bg: "bg-red-50 border-l-4 border-red-500",
+      bg: "bg-red-dim border-l-4 border-red",
       icon: AlertCircle,
-      iconClass: "text-red-500",
+      iconClass: "text-red",
     };
   if (leadDays === 7)
     return {
-      bg: "bg-amber-50 border-l-4 border-amber-500",
+      bg: "bg-amber-glow border-l-4 border-amber",
       icon: Bell,
-      iconClass: "text-amber-600",
+      iconClass: "text-amber",
     };
   return {
-    bg: "bg-broflo-electric-subtle border-l-4 border-broflo-electric",
+    bg: "bg-amber-glow border-l-4 border-amber",
     icon: Bell,
-    iconClass: "text-broflo-electric",
+    iconClass: "text-amber",
   };
 }
 

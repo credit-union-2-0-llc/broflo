@@ -41,7 +41,7 @@ export function BrofloScoreWidget({
     return (
       <Card>
         <CardContent className="flex items-center gap-3 py-4">
-          <Trophy className="h-5 w-5 text-broflo-gold" />
+          <Trophy className="h-5 w-5 text-amber" />
           <div>
             <span className="text-lg font-bold">{score}</span>
             <span className="text-sm text-muted-foreground ml-2">
@@ -52,7 +52,7 @@ export function BrofloScoreWidget({
             <div className="flex-1">
               <div className="h-2 bg-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-broflo-electric rounded-full transition-all"
+                  className="h-full bg-amber rounded-full transition-all"
                   style={{ width: `${Math.min(progress, 100)}%` }}
                 />
               </div>
@@ -73,13 +73,13 @@ export function BrofloScoreWidget({
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center gap-3">
-          <Trophy className="h-8 w-8 text-broflo-gold" />
+          <Trophy className="h-8 w-8 text-amber" />
           <span className="text-3xl font-bold">{score}</span>
         </div>
 
         <div className="h-2.5 bg-muted rounded-full overflow-hidden">
           <div
-            className="h-full bg-broflo-electric rounded-full transition-all"
+            className="h-full bg-amber rounded-full transition-all"
             style={{ width: `${Math.min(progress, 100)}%` }}
           />
         </div>

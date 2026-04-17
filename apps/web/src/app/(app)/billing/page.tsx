@@ -48,7 +48,7 @@ function BillingContent() {
       <h1 className="text-2xl font-bold tracking-tight mb-6">Billing</h1>
 
       {success && (
-        <div className="mb-4 p-3 rounded-md bg-broflo-electric-subtle text-sm">
+        <div className="mb-4 p-3 rounded-md bg-amber-glow text-sm">
           {VOICE.billing.checkoutSuccess}
         </div>
       )}
@@ -62,7 +62,7 @@ function BillingContent() {
             </CardTitle>
             <Badge
               variant={isPaid ? "default" : "outline"}
-              className={isPaid ? "bg-broflo-electric text-white" : ""}
+              className={isPaid ? "bg-amber text-white" : ""}
             >
               {tier.charAt(0).toUpperCase() + tier.slice(1)}
             </Badge>
@@ -94,7 +94,7 @@ function BillingContent() {
               </p>
               <Link
                 href="/upgrade"
-                className="inline-flex w-full items-center justify-center rounded-lg h-8 px-2.5 text-sm font-medium bg-broflo-electric hover:bg-broflo-electric-light text-white transition-colors"
+                className="inline-flex w-full items-center justify-center rounded-lg h-8 px-2.5 text-sm font-medium bg-amber hover:bg-amber-light text-white transition-colors"
               >
                 {VOICE.billing.upgradeCta}
               </Link>

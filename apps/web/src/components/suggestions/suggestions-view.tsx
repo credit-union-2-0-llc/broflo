@@ -172,7 +172,7 @@ export function SuggestionsView({
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-12" aria-live="polite" aria-busy="true">
-            <Loader2 className="h-8 w-8 animate-spin text-broflo-electric mb-4" />
+            <Loader2 className="h-8 w-8 animate-spin text-amber mb-4" />
             <p className="text-sm text-muted-foreground italic text-center">
               {VOICE.suggestions.loading[loadingMsgIdx]}
             </p>
@@ -332,12 +332,12 @@ export function SuggestionsView({
 
         {/* Free tier upsell */}
         {tier === "free" && suggestions.length > 0 && (
-          <Card className="border-broflo-electric/30 bg-gradient-to-r from-broflo-electric-subtle/50 to-transparent">
+          <Card className="border-amber-3 bg-gradient-to-r from-amber-glow2 to-transparent">
             <CardContent className="flex items-start gap-3 py-4">
-              <Sparkles className="h-6 w-6 text-broflo-electric shrink-0" />
+              <Sparkles className="h-6 w-6 text-amber shrink-0" />
               <div>
                 <p className="text-sm font-semibold">{VOICE.upsell.moreSuggestions}</p>
-                <Button size="sm" className="mt-2 bg-broflo-electric hover:bg-broflo-electric-light text-white">
+                <Button size="sm" className="mt-2 bg-amber hover:bg-amber-light text-white">
                   Upgrade to Pro – $9.99/mo
                 </Button>
               </div>
@@ -347,7 +347,7 @@ export function SuggestionsView({
 
         {/* Selected confirmation */}
         {hasSelected && (
-          <p className="text-sm font-medium text-broflo-electric" aria-live="polite">
+          <p className="text-sm font-medium text-amber" aria-live="polite">
             {VOICE.suggestions.selected(personName)}
           </p>
         )}

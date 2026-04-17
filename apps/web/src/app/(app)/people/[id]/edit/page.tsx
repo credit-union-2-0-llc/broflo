@@ -47,13 +47,13 @@ export default function EditPersonPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
-      <div className="mx-auto max-w-2xl">
+    <>
+      <>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-6">
           Edit {person?.name || "Person"}
         </h1>
         {person && <DossierForm defaultValues={person} onSubmit={handleSubmit} submitLabel="Save Changes" />}
-      </div>
-    </div>
+      </>
+    </>
   );
 }

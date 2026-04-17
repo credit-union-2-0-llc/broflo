@@ -16,9 +16,9 @@ function countdownLabel(days: number) {
 }
 
 function urgencyClass(days: number) {
-  if (days <= 1) return "bg-broflo-warm text-white";
-  if (days <= 7) return "bg-amber-100 text-amber-800";
-  if (days <= 29) return "bg-broflo-electric-subtle text-broflo-electric";
+  if (days <= 1) return "bg-red text-white";
+  if (days <= 7) return "bg-amber-glow text-amber";
+  if (days <= 29) return "bg-amber-glow text-amber";
   return "bg-secondary text-muted-foreground";
 }
 
@@ -56,7 +56,7 @@ export function PersonEventsSection({
             <Link
               key={event.id}
               href={`/events/${event.id}`}
-              className="flex items-center gap-2 text-sm py-1 hover:bg-muted/50 rounded px-1 -mx-1 transition-colors"
+              className="flex items-center gap-2 text-sm py-1 hover:bg-s2 rounded px-1 -mx-1 transition-colors"
               aria-label={`${event.occasionType} on ${formatDate(event.nextOccurrence)}, ${countdownLabel(event.daysUntil)}`}
             >
               <span className="text-muted-foreground capitalize">{event.occasionType}</span>

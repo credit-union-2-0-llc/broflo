@@ -54,7 +54,7 @@ export default async function ProfilePage() {
               {(user?.subscriptionTier || "free") === "free" ? (
                 <Link
                   href="/upgrade"
-                  className="inline-flex items-center justify-center rounded-lg h-7 px-2.5 text-[0.8rem] font-medium border border-broflo-electric text-broflo-electric hover:bg-muted transition-colors"
+                  className="inline-flex items-center justify-center rounded-lg h-7 px-2.5 text-[0.8rem] font-medium border border-amber text-amber hover:bg-muted transition-colors"
                 >
                   Upgrade
                 </Link>

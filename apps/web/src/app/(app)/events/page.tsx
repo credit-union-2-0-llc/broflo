@@ -34,14 +34,14 @@ export default async function EventsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
+      <div className="bg-transparent px-4 py-6 sm:px-6 sm:py-8 md:px-8">
         <div className="mx-auto max-w-4xl">
           <div className="mb-6 sm:mb-8 flex items-center justify-between">
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Events</h1>
           </div>
           <div className="text-center py-12">
             <p className="text-sm text-destructive">{VOICE.errors.eventsLoad}</p>
-            <Link href="/events" className="text-sm text-broflo-electric hover:underline mt-2 inline-block">
+            <Link href="/events" className="text-sm text-amber hover:underline mt-2 inline-block">
               Try Again
             </Link>
           </div>
@@ -51,7 +51,7 @@ export default async function EventsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-8 md:px-8">
+    <div className="bg-transparent px-4 py-6 sm:px-6 sm:py-8 md:px-8">
       <div className="mx-auto max-w-4xl">
         <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
