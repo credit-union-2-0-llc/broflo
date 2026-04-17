@@ -10,6 +10,7 @@ import { VOICE } from "@broflo/shared";
 import { api } from "@/lib/api";
 import type { GiftSuggestion, SuggestionMetaResponse, Order } from "@/lib/api";
 import { SuggestionCard } from "./suggestion-card";
+import { GuidedInterview } from "./guided-interview";
 import { OrderPreviewModal } from "@/components/orders/order-preview-modal";
 import { CancelCountdown } from "@/components/orders/cancel-countdown";
 
@@ -38,6 +39,8 @@ export function SuggestionsView({
   const [showGuidance, setShowGuidance] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [showInterview, setShowInterview] = useState(false);
+  const [interviewChecked, setInterviewChecked] = useState(false);
 
   // Order modal state
   const [orderingSuggestionId, setOrderingSuggestionId] = useState<string | null>(null);
@@ -54,7 +57,7 @@ export function SuggestionsView({
     return () => clearInterval(interval);
   }, [loading]);
 
-  // Load existing suggestions on mount
+  // Load existing suggestions + check dossier completeness on mount
   useEffect(() => {
     (async () => {
       try {
@@ -68,8 +71,17 @@ export function SuggestionsView({
       } catch {
         // No suggestions yet — that's fine
       }
+      try {
+        const person = await api.getPerson(token, personId);
+        if (person.completenessScore < 40) {
+          setShowInterview(true);
+        }
+      } catch {
+        // Non-critical — skip interview check
+      }
+      setInterviewChecked(true);
     })();
-  }, [token, eventId]);
+  }, [token, eventId, personId]);
 
   const generate = useCallback(async () => {
     setLoading(true);
@@ -182,8 +194,25 @@ export function SuggestionsView({
     );
   }
 
-  // Not yet generated
+  // Not yet generated — show interview or generate button
   if (!hasGenerated) {
+    if (interviewChecked && showInterview) {
+      return (
+        <GuidedInterview
+          personId={personId}
+          personName={personName}
+          token={token}
+          onComplete={() => {
+            setShowInterview(false);
+            generate();
+          }}
+          onSkip={() => {
+            setShowInterview(false);
+            generate();
+          }}
+        />
+      );
+    }
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">

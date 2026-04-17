@@ -240,6 +240,43 @@ export const VOICE = {
       `This costs ${price}, which is over your ${budget} budget.`,
   },
 
+  interview: {
+    title: "Quick Q&A",
+    subtitle: (name: string) =>
+      `Let's learn a bit about ${name} so we can nail the gift.`,
+    skipLabel: "Skip — wing it",
+    submitLabel: "Find Gifts",
+    thankYou: (name: string) =>
+      `Got it. Let's find ${name} something amazing.`,
+    questions: [
+      {
+        field: "hobbies" as const,
+        label: "What does their weekend look like?",
+        placeholder: "e.g., hiking, reading, gaming, cooking",
+      },
+      {
+        field: "favoriteBrands" as const,
+        label: "Any go-to brands or stores?",
+        placeholder: "e.g., Patagonia, Sephora, REI",
+      },
+      {
+        field: "musicTaste" as const,
+        label: "What music are they into?",
+        placeholder: "e.g., indie, jazz, lo-fi, country",
+      },
+      {
+        field: "foodPreferences" as const,
+        label: "What's their food vibe?",
+        placeholder: "e.g., sushi lover, backyard griller, wine snob",
+      },
+      {
+        field: "notes" as const,
+        label: "Anything else that makes them... them?",
+        placeholder: "e.g., just redecorated, training for a marathon, obsessed with their dog",
+      },
+    ],
+  },
+
   billing: {
     upgradePrompt:
       "You've hit the Free limit. Three people is a lot... for a free tier. Upgrade and we'll remember everyone.",
