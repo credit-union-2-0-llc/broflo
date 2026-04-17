@@ -1,8 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { Resend } from "resend";
 
 @Injectable()
 export class EmailService {
+  private readonly log = new Logger(EmailService.name);
   private resend: Resend | null;
 
   constructor() {
@@ -12,7 +13,7 @@ export class EmailService {
 
   async sendOtpCode(email: string, code: string): Promise<void> {
     if (!this.resend) {
-      console.log(`[broflo-email] DEV MODE — OTP for ${email}: ${code}`);
+      this.log.debug(`DEV MODE — OTP for ${email}: ${code}`);
       return;
     }
 

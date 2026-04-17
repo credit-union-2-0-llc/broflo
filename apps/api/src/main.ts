@@ -1,5 +1,11 @@
+import { useAzureMonitor } from "@azure/monitor-opentelemetry";
+
+if (process.env.APPLICATIONINSIGHTS_CONNECTION_STRING) {
+  useAzureMonitor();
+}
+
 import { NestFactory } from "@nestjs/core";
-import { ValidationPipe } from "@nestjs/common";
+import { Logger, ValidationPipe } from "@nestjs/common";
 import { readFileSync } from "fs";
 import { join } from "path";
 import helmet from "helmet";
@@ -51,7 +57,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3001;
   await app.listen(port);
-  console.log(`[broflo-api] v${pkg.version} listening on port ${port}`);
+  new Logger("Bootstrap").log(`broflo-api v${pkg.version} listening on port ${port}`);
 }
 
 bootstrap();

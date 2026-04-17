@@ -1,4 +1,7 @@
+import { Logger } from "@nestjs/common";
 import type { Request, Response, NextFunction } from "express";
+
+const logger = new Logger("HTTP");
 
 export function RequestLoggerMiddleware(
   req: Request,
@@ -8,9 +11,7 @@ export function RequestLoggerMiddleware(
   const start = Date.now();
   _res.on("finish", () => {
     const duration = Date.now() - start;
-    console.log(
-      `[broflo-api] ${req.method} ${req.originalUrl} ${_res.statusCode} ${duration}ms`,
-    );
+    logger.log(`${req.method} ${req.originalUrl} ${_res.statusCode} ${duration}ms`);
   });
   next();
 }
