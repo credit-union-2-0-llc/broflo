@@ -11,7 +11,7 @@ import { RedisService } from "../redis/redis.service";
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
 const AI_SERVICE_KEY = process.env.AI_SERVICE_KEY || "";
-const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS || "30000", 10);
+const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS || "60000", 10);
 
 // Debounce windows
 const TAG_DEBOUNCE_S = 300; // 5 minutes

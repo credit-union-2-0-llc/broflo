@@ -51,6 +51,6 @@ VISION_MODELS: dict[SubscriptionTier, str] = {
 }
 
 # Timeouts
-ANTHROPIC_TIMEOUT_S = 30
+ANTHROPIC_TIMEOUT_S = 45
 VISION_TIMEOUT_S = 45  # Vision calls are heavier
 MAX_RETRIES = 1
