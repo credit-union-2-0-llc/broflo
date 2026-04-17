@@ -6,7 +6,7 @@ import { StorageService } from "../storage/storage.service";
 import { PhotoTagMergeService } from "./photo-tag-merge.service";
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
-const AI_SERVICE_KEY = process.env.AI_SERVICE_KEY || "dev-ai-service-key";
+const AI_SERVICE_KEY = process.env.AI_SERVICE_KEY || "";
 const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS || "45000", 10);
 
 export interface PhotoAnalysisJobData {

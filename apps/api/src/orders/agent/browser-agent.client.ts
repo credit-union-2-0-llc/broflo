@@ -53,7 +53,7 @@ export class BrowserAgentClient {
 
   constructor() {
     this.baseUrl = process.env.BROWSER_AGENT_URL || 'http://localhost:8001';
-    this.serviceKey = process.env.BROWSER_AGENT_SERVICE_KEY || 'dev-browser-agent-key';
+    this.serviceKey = process.env.BROWSER_AGENT_SERVICE_KEY || '';
   }
 
   async execute(params: AgentExecuteParams): Promise<AgentExecuteResult> {

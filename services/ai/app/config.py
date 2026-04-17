@@ -1,11 +1,15 @@
 """Configuration for the AI service."""
 
 import os
+import sys
 
 from .schemas import SubscriptionTier
 
 # Service authentication
-SERVICE_KEY = os.getenv("AI_SERVICE_KEY", "dev-ai-service-key")
+SERVICE_KEY = os.getenv("AI_SERVICE_KEY", "")
+if not SERVICE_KEY and os.getenv("ENVIRONMENT", "development") != "development":
+    print("Fatal: AI_SERVICE_KEY is required in non-development environments", file=sys.stderr)
+    sys.exit(1)
 
 # Anthropic API
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")

@@ -20,7 +20,7 @@ export class BillingService {
     if (!key) {
       this.log.warn("STRIPE_SECRET_KEY not set — billing disabled");
     }
-    this.stripe = new Stripe(key || "sk_test_placeholder");
+    this.stripe = new Stripe(key || "");
   }
 
   async getOrCreateCustomer(user: User): Promise<string> {

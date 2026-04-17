@@ -1,9 +1,13 @@
 """Configuration for the browser agent service."""
 
 import os
+import sys
 
 # Service authentication
-SERVICE_KEY = os.getenv("BROWSER_AGENT_SERVICE_KEY", "dev-browser-agent-key")
+SERVICE_KEY = os.getenv("BROWSER_AGENT_SERVICE_KEY", "")
+if not SERVICE_KEY and os.getenv("ENVIRONMENT", "development") != "development":
+    print("Fatal: BROWSER_AGENT_SERVICE_KEY is required in non-development environments", file=sys.stderr)
+    sys.exit(1)
 
 # Browserbase
 BROWSERBASE_API_KEY = os.getenv("BROWSERBASE_API_KEY", "")
@@ -18,7 +22,7 @@ SCREENSHOT_CONTAINER = "agent-screenshots"
 
 # Callback URL (NestJS API)
 CALLBACK_URL = os.getenv("CALLBACK_URL", "http://localhost:3001/orders/agent/callback")
-CALLBACK_HMAC_SECRET = os.getenv("CALLBACK_HMAC_SECRET", "dev-hmac-secret")
+CALLBACK_HMAC_SECRET = os.getenv("CALLBACK_HMAC_SECRET", "")
 
 # Agent execution limits
 MAX_EXECUTION_SECONDS = 180  # 3-minute hard timeout

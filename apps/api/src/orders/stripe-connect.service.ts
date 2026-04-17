@@ -20,7 +20,7 @@ export class StripeConnectService {
     if (!key) {
       this.log.warn('STRIPE_SECRET_KEY not set — Connect charges disabled');
     }
-    this.stripe = new Stripe(key || 'sk_test_placeholder');
+    this.stripe = new Stripe(key || '');
     this.platformFeeBps = parseInt(process.env.STRIPE_PLATFORM_FEE_BPS || '500', 10); // 500 bps = 5%
     this.mockRetailerAccountId = process.env.STRIPE_MOCK_RETAILER_ACCOUNT_ID || '';
   }

@@ -11,7 +11,24 @@ const pkg = JSON.parse(
   readFileSync(join(__dirname, "..", "package.json"), "utf-8"),
 );
 
+function validateProductionSecrets() {
+  if (process.env.NODE_ENV !== "production") return;
+  const required = [
+    "STRIPE_SECRET_KEY",
+    "AI_SERVICE_KEY",
+    "JWT_SECRET",
+    "BROWSER_AGENT_SERVICE_KEY",
+  ];
+  const missing = required.filter((k) => !process.env[k]);
+  if (missing.length > 0) {
+    throw new Error(
+      `Fatal: missing required secrets in production: ${missing.join(", ")}`,
+    );
+  }
+}
+
 async function bootstrap() {
+  validateProductionSecrets();
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
   app.use(helmet());

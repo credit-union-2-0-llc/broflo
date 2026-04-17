@@ -15,7 +15,7 @@ import type {
 } from "./dto/suggestions.dto";
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
-const AI_SERVICE_KEY = process.env.AI_SERVICE_KEY || "dev-ai-service-key";
+const AI_SERVICE_KEY = process.env.AI_SERVICE_KEY || "";
 const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS || "30000", 10);
 
 const TIER_MAX_REQUESTS: Record<string, number> = {
