@@ -153,9 +153,14 @@ export class AgentOrdersService {
     });
     if (!job) throw new NotFoundException('Agent job not found or not in preview state');
 
-    const person = await this.prisma.person.findFirst({
-      where: { userId: user.id, name: job.shippingName, deletedAt: null },
-    });
+    let personId: string | null = null;
+    if (job.suggestionId) {
+      const suggestion = await this.prisma.giftSuggestion.findUnique({
+        where: { id: job.suggestionId },
+        select: { personId: true },
+      });
+      personId = suggestion?.personId ?? null;
+    }
 
     // Create virtual card for this purchase
     const virtualCard = await this.stripeIssuing.createVirtualCard({
@@ -200,7 +205,7 @@ export class AgentOrdersService {
         const order = await this.prisma.order.create({
           data: {
             userId: user.id,
-            personId: person?.id || job.shippingName,
+            personId: personId || job.shippingName,
             eventId: null,
             retailerKey: 'browser-agent',
             retailerProductId: result.found_product_url || job.retailerUrl,

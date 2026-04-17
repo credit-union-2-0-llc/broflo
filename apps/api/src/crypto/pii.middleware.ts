@@ -3,6 +3,9 @@ import { encrypt, decrypt, hasKey } from "./crypto";
 
 const PII_STRING_FIELDS = [
   "name",
+  "notes",
+  "foodPreferences",
+  "wishlistUrls",
   "shippingAddress1",
   "shippingAddress2",
   "shippingCity",
