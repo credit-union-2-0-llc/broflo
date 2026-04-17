@@ -39,7 +39,7 @@ export function ThreatRoster({ events }: ThreatRosterProps) {
           </p>
           <Link
             href="/events"
-            className="inline-flex items-center gap-1.5 mt-4 text-[9px] uppercase px-3 py-1.5"
+            className="inline-flex items-center gap-1.5 mt-4 text-[9px] uppercase px-3 py-1.5 min-h-[44px] min-w-[44px] items-center"
             style={{
               fontFamily: "var(--font-mono)",
               letterSpacing: ".1em",
@@ -52,45 +52,61 @@ export function ThreatRoster({ events }: ThreatRosterProps) {
           </Link>
         </div>
       ) : (
-        <div>
-          {/* Header row */}
-          <div
-            className="grid items-center py-2"
-            style={{
-              gridTemplateColumns: GRID_COLS,
-              background: "var(--s2)",
-              borderBottom: "1px solid var(--border2)",
-            }}
-          >
-            <span />
-            <span />
-            <span className="px-3 text-[8px] uppercase" style={headerStyle}>
-              Name / Event
-            </span>
-            <span className="text-center text-[8px] uppercase" style={headerStyle}>
-              Days Out
-            </span>
-            <span className="text-center text-[8px] uppercase" style={headerStyle}>
-              Status
-            </span>
-            <span className="text-center text-[8px] uppercase" style={headerStyle}>
-              Budget
-            </span>
-            <span className="text-right pr-3 text-[8px] uppercase" style={headerStyle}>
-              Action
-            </span>
+        <>
+          {/* Desktop: table layout */}
+          <div className="hidden md:block">
+            {/* Header row */}
+            <div
+              className="grid items-center py-2"
+              style={{
+                gridTemplateColumns: GRID_COLS,
+                background: "var(--s2)",
+                borderBottom: "1px solid var(--border2)",
+              }}
+            >
+              <span />
+              <span />
+              <span className="px-3 text-[8px] uppercase" style={headerStyle}>
+                Name / Event
+              </span>
+              <span className="text-center text-[8px] uppercase" style={headerStyle}>
+                Days Out
+              </span>
+              <span className="text-center text-[8px] uppercase" style={headerStyle}>
+                Status
+              </span>
+              <span className="text-center text-[8px] uppercase" style={headerStyle}>
+                Budget
+              </span>
+              <span className="text-right pr-3 text-[8px] uppercase" style={headerStyle}>
+                Action
+              </span>
+            </div>
+
+            {events.map((event, i) => (
+              <ThreatRow
+                key={event.id}
+                event={event}
+                index={i + 1}
+                gridCols={GRID_COLS}
+                mode="table"
+              />
+            ))}
           </div>
 
-          {/* Body rows */}
-          {events.map((event, i) => (
-            <ThreatRow
-              key={event.id}
-              event={event}
-              index={i + 1}
-              gridCols={GRID_COLS}
-            />
-          ))}
-        </div>
+          {/* Mobile: card stack */}
+          <div className="md:hidden flex flex-col gap-2">
+            {events.map((event, i) => (
+              <ThreatRow
+                key={event.id}
+                event={event}
+                index={i + 1}
+                gridCols={GRID_COLS}
+                mode="card"
+              />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

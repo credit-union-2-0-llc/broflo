@@ -9,7 +9,6 @@ import {
   Calendar,
   Package,
   Zap,
-  User,
   Trophy,
   Settings,
   LogOut,
@@ -50,14 +49,14 @@ export function Sidebar() {
 
   return (
     <aside
-      className="flex flex-col bg-s1 overflow-y-auto"
+      className="hidden md:flex flex-col bg-s1 overflow-y-auto"
       style={{ borderRight: "1px solid var(--border2)" }}
     >
       <nav className="flex-1 py-4">
         {sections.map((section) => (
           <div key={section.label}>
             <div
-              className="px-[18px] pt-4 pb-1.5 text-[8px] uppercase"
+              className="xl:px-[18px] px-0 pt-4 pb-1.5 text-[8px] uppercase xl:block hidden"
               style={{
                 color: "var(--muted)",
                 letterSpacing: ".18em",
@@ -66,6 +65,7 @@ export function Sidebar() {
             >
               {section.label}
             </div>
+            <div className="xl:hidden pt-3 first:pt-0" />
             {section.items.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
@@ -73,7 +73,8 @@ export function Sidebar() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="flex items-center gap-2.5 h-[38px] px-[18px] transition-all duration-[120ms]"
+                  title={item.label}
+                  className="flex items-center xl:gap-2.5 gap-0 h-[38px] xl:px-[18px] px-0 xl:justify-start justify-center transition-all duration-[120ms]"
                   style={{
                     borderLeft: active
                       ? "2px solid var(--amber)"
@@ -97,8 +98,8 @@ export function Sidebar() {
                     }
                   }}
                 >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="xl:inline hidden">{item.label}</span>
                 </Link>
               );
             })}
@@ -108,7 +109,7 @@ export function Sidebar() {
 
       {/* Autopilot status footer */}
       <div
-        className="mx-2.5 mb-3 px-2.5 py-[7px]"
+        className="mx-2.5 mb-3 px-2.5 py-[7px] xl:block hidden"
         style={{
           background: "var(--green-dim)",
           border: "1px solid rgba(34, 197, 94, 0.2)",
@@ -137,11 +138,17 @@ export function Sidebar() {
           Monitoring all assets
         </span>
       </div>
+      {/* Icon-only autopilot indicator at lg */}
+      <div
+        className="xl:hidden flex justify-center mb-3"
+      >
+        <div className="ap-dot" />
+      </div>
 
       {/* Sign out */}
       <button
         onClick={() => signOut({ callbackUrl: "/login" })}
-        className="flex items-center gap-2 px-[18px] py-3 transition-colors duration-[120ms]"
+        className="flex items-center xl:gap-2 gap-0 xl:px-[18px] px-0 xl:justify-start justify-center py-3 transition-colors duration-[120ms]"
         style={{
           color: "var(--muted)",
           fontSize: "11px",
@@ -155,8 +162,8 @@ export function Sidebar() {
           e.currentTarget.style.color = "var(--muted)";
         }}
       >
-        <LogOut className="h-3.5 w-3.5" />
-        Sign out
+        <LogOut className="h-3.5 w-3.5 shrink-0" />
+        <span className="xl:inline hidden">Sign out</span>
       </button>
     </aside>
   );
