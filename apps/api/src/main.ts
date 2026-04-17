@@ -20,16 +20,28 @@ const pkg = JSON.parse(
 function validateProductionSecrets() {
   if (process.env.NODE_ENV !== "production") return;
   const log = new Logger("Bootstrap");
-  const required = ["STRIPE_SECRET_KEY", "JWT_SECRET"];
+  const required = [
+    "JWT_SECRET",
+    "STRIPE_SECRET_KEY",
+    "WEB_URL",
+    "AI_SERVICE_URL",
+    "AI_SERVICE_KEY",
+    "AZURE_STORAGE_ACCOUNT_NAME",
+    "AZURE_STORAGE_CONTAINER_NAME",
+  ];
   const missing = required.filter((k) => !process.env[k]);
   if (missing.length > 0) {
     throw new Error(
-      `Fatal: missing required secrets in production: ${missing.join(", ")}`,
+      `Fatal: missing required env vars in production: ${missing.join(", ")}`,
     );
   }
-  const warned = ["AI_SERVICE_KEY", "BROWSER_AGENT_SERVICE_KEY"].filter((k) => !process.env[k]);
+  const warned = [
+    "BROWSER_AGENT_URL",
+    "BROWSER_AGENT_SERVICE_KEY",
+    "APPLICATIONINSIGHTS_CONNECTION_STRING",
+  ].filter((k) => !process.env[k]);
   if (warned.length > 0) {
-    log.warn(`Optional service keys not set (features degraded): ${warned.join(", ")}`);
+    log.warn(`Optional env vars not set (features degraded): ${warned.join(", ")}`);
   }
 }
 

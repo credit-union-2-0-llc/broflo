@@ -6,7 +6,7 @@ import { StorageService } from "../storage/storage.service";
 import { PhotoTagMergeService } from "./photo-tag-merge.service";
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
-const AI_SERVICE_KEY = process.env.AI_SERVICE_KEY || "";
+const AI_SERVICE_KEY = process.env.AI_SERVICE_KEY;
 const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS || "45000", 10);
 
 export interface PhotoAnalysisJobData {
@@ -62,7 +62,7 @@ export class PhotoAnalysisProcessor {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Service-Key": AI_SERVICE_KEY,
+            ...(AI_SERVICE_KEY && { "X-Service-Key": AI_SERVICE_KEY }),
           },
           body: JSON.stringify({
             image_base64: imageBase64,

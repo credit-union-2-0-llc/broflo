@@ -53,7 +53,7 @@ export class BrowserAgentClient {
 
   constructor() {
     this.baseUrl = process.env.BROWSER_AGENT_URL || 'http://localhost:8001';
-    this.serviceKey = process.env.BROWSER_AGENT_SERVICE_KEY || '';
+    this.serviceKey = process.env.BROWSER_AGENT_SERVICE_KEY ?? '';
   }
 
   async execute(params: AgentExecuteParams): Promise<AgentExecuteResult> {
@@ -76,7 +76,7 @@ export class BrowserAgentClient {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Service-Key': this.serviceKey,
+        ...(this.serviceKey && { 'X-Service-Key': this.serviceKey }),
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(200000), // 3m20s (agent has 3m, plus buffer)

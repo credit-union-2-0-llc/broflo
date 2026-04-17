@@ -10,11 +10,9 @@ import {
 import { DefaultAzureCredential } from "@azure/identity";
 import sharp from "sharp";
 
-const ACCOUNT_NAME =
-  process.env.AZURE_STORAGE_ACCOUNT_NAME || "broflophotostore";
-const CONTAINER_NAME =
-  process.env.AZURE_STORAGE_CONTAINER_NAME || "photos";
-const ACCOUNT_KEY = process.env.AZURE_STORAGE_ACCOUNT_KEY || "";
+const ACCOUNT_NAME = process.env.AZURE_STORAGE_ACCOUNT_NAME;
+const CONTAINER_NAME = process.env.AZURE_STORAGE_CONTAINER_NAME;
+const ACCOUNT_KEY = process.env.AZURE_STORAGE_ACCOUNT_KEY;
 const SAS_TTL_MINUTES = 15;
 const THUMB_WIDTH = 400;
 const THUMB_QUALITY = 80;
@@ -23,29 +21,34 @@ const MAX_DIMENSION = 1568; // Max for Claude Vision
 @Injectable()
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
+  private readonly accountName: string;
+  private readonly containerName: string;
   private containerClient: ContainerClient;
   private sharedKeyCred: StorageSharedKeyCredential | null = null;
 
   constructor() {
+    if (!ACCOUNT_NAME || !CONTAINER_NAME) {
+      throw new Error("AZURE_STORAGE_ACCOUNT_NAME and AZURE_STORAGE_CONTAINER_NAME must be set");
+    }
+    this.accountName = ACCOUNT_NAME;
+    this.containerName = CONTAINER_NAME;
     if (ACCOUNT_KEY) {
-      // Use shared key (local dev / explicit key)
       this.sharedKeyCred = new StorageSharedKeyCredential(
-        ACCOUNT_NAME,
+        this.accountName,
         ACCOUNT_KEY,
       );
       const blobService = new BlobServiceClient(
-        `https://${ACCOUNT_NAME}.blob.core.windows.net`,
+        `https://${this.accountName}.blob.core.windows.net`,
         this.sharedKeyCred,
       );
-      this.containerClient = blobService.getContainerClient(CONTAINER_NAME);
+      this.containerClient = blobService.getContainerClient(this.containerName);
     } else {
-      // Use Managed Identity (Azure)
       const credential = new DefaultAzureCredential();
       const blobService = new BlobServiceClient(
-        `https://${ACCOUNT_NAME}.blob.core.windows.net`,
+        `https://${this.accountName}.blob.core.windows.net`,
         credential,
       );
-      this.containerClient = blobService.getContainerClient(CONTAINER_NAME);
+      this.containerClient = blobService.getContainerClient(this.containerName);
     }
   }
 
@@ -124,7 +127,7 @@ export class StorageService {
       this.logger.warn(
         "No shared key credential — returning unsigned URL (dev mode)",
       );
-      return `https://${ACCOUNT_NAME}.blob.core.windows.net/${CONTAINER_NAME}/${blobPath}`;
+      return `https://${this.accountName}.blob.core.windows.net/${this.containerName}/${blobPath}`;
     }
 
     const expiresOn = new Date();
@@ -132,7 +135,7 @@ export class StorageService {
 
     const sas = generateBlobSASQueryParameters(
       {
-        containerName: CONTAINER_NAME,
+        containerName: this.containerName,
         blobName: blobPath,
         permissions: BlobSASPermissions.parse("r"),
         expiresOn,
@@ -141,7 +144,7 @@ export class StorageService {
       this.sharedKeyCred,
     );
 
-    return `https://${ACCOUNT_NAME}.blob.core.windows.net/${CONTAINER_NAME}/${blobPath}?${sas.toString()}`;
+    return `https://${this.accountName}.blob.core.windows.net/${this.containerName}/${blobPath}?${sas.toString()}`;
   }
 
   /**

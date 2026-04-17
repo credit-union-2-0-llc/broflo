@@ -15,7 +15,7 @@ import type {
 } from "./dto/suggestions.dto";
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
-const AI_SERVICE_KEY = process.env.AI_SERVICE_KEY || "";
+const AI_SERVICE_KEY = process.env.AI_SERVICE_KEY;
 const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS || "60000", 10);
 
 const TIER_MAX_REQUESTS: Record<string, number> = {
@@ -172,7 +172,7 @@ export class SuggestionsService {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Service-Key": AI_SERVICE_KEY,
+          ...(AI_SERVICE_KEY && { "X-Service-Key": AI_SERVICE_KEY }),
         },
         body: JSON.stringify({
           person: {
