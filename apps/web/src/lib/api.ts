@@ -73,6 +73,9 @@ export interface GiftSuggestion {
   noveltyScore: number;
   retailerHint: string | null;
   suggestedMessage: string | null;
+  imageUrl: string | null;
+  productUrl: string | null;
+  productSourcePriceCents: number | null;
   requestIndex: number;
   surpriseFactor: "safe" | "bold";
   isSelected: boolean;

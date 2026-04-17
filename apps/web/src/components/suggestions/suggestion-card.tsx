@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { X, Check, ShoppingBag } from "lucide-react";
+import { X, Check, ShoppingBag, ExternalLink } from "lucide-react";
 import { VOICE } from "@broflo/shared";
 import type { GiftSuggestion } from "@/lib/api";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
@@ -114,7 +114,44 @@ export function SuggestionCard({
         )}
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-sm text-foreground">{s.description}</p>
+        {s.imageUrl && (
+          <div className="flex gap-3">
+            <a
+              href={s.productUrl || undefined}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0"
+            >
+              <img
+                src={s.imageUrl}
+                alt={s.title}
+                className="h-20 w-20 rounded-md object-cover border border-border"
+                loading="lazy"
+              />
+            </a>
+            <div className="space-y-1 min-w-0">
+              <p className="text-sm text-foreground">{s.description}</p>
+              {s.productSourcePriceCents && (
+                <p className="text-xs font-medium text-green-bright">
+                  Found for {dollars(s.productSourcePriceCents)}
+                </p>
+              )}
+              {s.productUrl && (
+                <a
+                  href={s.productUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  View product <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+        {!s.imageUrl && (
+          <p className="text-sm text-foreground">{s.description}</p>
+        )}
 
         <blockquote className="text-sm italic text-muted-foreground border-l-2 border-amber-3 pl-3">
           {s.reasoning}

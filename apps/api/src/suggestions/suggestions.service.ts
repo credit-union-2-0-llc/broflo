@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
+import { ProductSearchService } from "./product-search.service";
 import type {
   GenerateSuggestionsDto,
   SelectSuggestionDto,
@@ -33,6 +34,7 @@ export class SuggestionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly productSearch: ProductSearchService,
   ) {}
 
   async generate(userId: string, dto: GenerateSuggestionsDto) {
@@ -236,10 +238,18 @@ export class SuggestionsService {
       clearTimeout(timeout);
     }
 
+    // Enrich suggestions with product images
+    const productResults = await this.productSearch.searchProducts(
+      aiResponse.suggestions.map((s: Record<string, unknown>) => ({
+        title: s.title as string,
+        retailerHint: (s.retailer_hint as string) || null,
+      })),
+    );
+
     // Persist suggestions
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const created = await Promise.all(
-      aiResponse.suggestions.map((s: Record<string, unknown>) =>
+      aiResponse.suggestions.map((s: Record<string, unknown>, i: number) =>
         this.prisma.giftSuggestion.create({
           data: {
             personId: dto.personId,
@@ -255,6 +265,9 @@ export class SuggestionsService {
             noveltyScore: s.novelty_score as number,
             retailerHint: (s.retailer_hint as string) || null,
             suggestedMessage: (s.suggested_message as string) || null,
+            imageUrl: productResults[i]?.imageUrl || null,
+            productUrl: productResults[i]?.productUrl || null,
+            productSourcePriceCents: productResults[i]?.priceCents || null,
             modelVersion: aiResponse.model,
             promptTokens: aiResponse.input_tokens,
             completionTokens: aiResponse.output_tokens,
@@ -311,6 +324,9 @@ export class SuggestionsService {
         noveltyScore: s.noveltyScore,
         retailerHint: s.retailerHint,
         suggestedMessage: s.suggestedMessage,
+        imageUrl: s.imageUrl,
+        productUrl: s.productUrl,
+        productSourcePriceCents: s.productSourcePriceCents,
         requestIndex: s.requestIndex,
         surpriseFactor: s.surpriseFactor,
         isSelected: s.isSelected,
@@ -384,6 +400,9 @@ export class SuggestionsService {
         noveltyScore: s.noveltyScore,
         retailerHint: s.retailerHint,
         suggestedMessage: s.suggestedMessage,
+        imageUrl: s.imageUrl,
+        productUrl: s.productUrl,
+        productSourcePriceCents: s.productSourcePriceCents,
         requestIndex: s.requestIndex,
         surpriseFactor: s.surpriseFactor,
         isSelected: s.isSelected,
