@@ -2,7 +2,6 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { api } from "./api";
 
-// Deduplicate concurrent token refreshes — only one refresh in flight at a time
 let refreshPromise: Promise<{ accessToken: string; refreshToken: string }> | null =
   null;
 
@@ -54,34 +53,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     Credentials({
       credentials: {
         email: {},
-        password: {},
+        code: {},
       },
       async authorize(credentials) {
         try {
-          const password = credentials.password as string;
-
-          // OAuth exchange: callback page passes tokens via __oauth__ prefix
-          if (password?.startsWith("__oauth__:")) {
-            const accessToken = password.slice("__oauth__:".length);
-            const me = await api.me(accessToken);
-            // Fetch refresh token from the exchange response passed through
-            // The callback stores the full exchange result
-            return {
-              id: me.id as string,
-              email: me.email as string,
-              name: me.name as string | null,
-              accessToken,
-              refreshToken: (credentials as Record<string, string>).refreshToken || "",
-              avatarUrl: me.avatarUrl as string | null,
-              subscriptionTier: me.subscriptionTier as string,
-              brofloScore: me.brofloScore as number,
-            };
-          }
-
-          const result = await api.login({
-            email: credentials.email as string,
-            password,
-          });
+          const result = await api.verifyOtp(
+            credentials.email as string,
+            credentials.code as string,
+          );
 
           return {
             id: result.user.id as string,
@@ -119,7 +98,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         };
       }
 
-      // Refresh access token if expired or expiring within 60s
       if (Date.now() > (token.accessTokenExpires as number) - 60_000) {
         try {
           if (!refreshPromise) {

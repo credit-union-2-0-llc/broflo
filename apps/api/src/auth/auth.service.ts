@@ -1,28 +1,16 @@
 import {
   Injectable,
   UnauthorizedException,
-  ConflictException,
   BadRequestException,
-  ForbiddenException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import * as bcrypt from "bcrypt";
 import { v4 as uuidv4 } from "uuid";
+import * as crypto from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailService } from "../email/email.service";
+import { RedisService } from "../redis/redis.service";
 import type { User } from "@prisma/client";
-import type {
-  SignupDto,
-  LoginDto,
-  ForgotPasswordDto,
-  ResetPasswordDto,
-} from "./dto/auth.dto";
-
-const LOCKOUT_THRESHOLD = 5;
-const LOCKOUT_MINUTES = 30;
-const RESET_TOKEN_HOURS = 1;
-const SALT_ROUNDS = 12;
-const OAUTH_CODE_TTL_MS = 60_000; // 60 seconds
+import type { SendOtpDto, VerifyOtpDto } from "./dto/auth.dto";
 
 @Injectable()
 export class AuthService {
@@ -30,81 +18,51 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly email: EmailService,
+    private readonly redis: RedisService,
   ) {}
 
-  async signup(dto: SignupDto) {
-    const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
-    });
-    if (existing) {
-      throw new ConflictException("Email already registered");
+  async sendOtp(dto: SendOtpDto): Promise<{ sent: true; code?: string }> {
+    const emailLower = dto.email.toLowerCase();
+
+    const rl = await this.redis.checkOtpRateLimit(emailLower);
+    if (!rl.allowed) {
+      throw new BadRequestException("Too many code requests. Try again in a few minutes.");
     }
 
-    if (!dto.password || dto.password.length < 8) {
-      throw new BadRequestException(
-        "Password must be at least 8 characters",
-      );
+    const code = crypto.randomInt(100000, 999999).toString();
+    await this.redis.setOtp(emailLower, code);
+    await this.email.sendOtpCode(emailLower, code);
+
+    // In test mode, return the code so E2E tests can use it
+    if (process.env.NODE_ENV === "test") {
+      return { sent: true, code };
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email.toLowerCase(),
-        name: dto.name,
-        passwordHash,
-      },
-    });
-
-    return this.issueTokens(user);
+    return { sent: true };
   }
 
-  async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
+  async verifyOtp(dto: VerifyOtpDto) {
+    const emailLower = dto.email.toLowerCase();
+
+    const storedCode = await this.redis.getOtp(emailLower);
+    if (!storedCode || storedCode !== dto.code) {
+      throw new UnauthorizedException("Invalid or expired code");
+    }
+
+    await this.redis.deleteOtp(emailLower);
+
+    let user = await this.prisma.user.findUnique({
+      where: { email: emailLower },
     });
+
     if (!user) {
-      throw new UnauthorizedException("Invalid credentials");
-    }
-
-    // Check account lockout
-    if (user.lockedUntil && user.lockedUntil > new Date()) {
-      const minutesLeft = Math.ceil(
-        (user.lockedUntil.getTime() - Date.now()) / 60000,
-      );
-      throw new ForbiddenException(
-        `Account locked. Try again in ${minutesLeft} minute(s).`,
-      );
-    }
-
-    if (!user.passwordHash) {
-      throw new UnauthorizedException(
-        "This account uses Google sign-in. Please log in with Google.",
-      );
-    }
-
-    const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) {
-      // Increment failed logins
-      const failedLogins = user.failedLogins + 1;
-      const lockedUntil =
-        failedLogins >= LOCKOUT_THRESHOLD
-          ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000)
-          : null;
-
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { failedLogins, lockedUntil },
+      user = await this.prisma.user.create({
+        data: { email: emailLower },
       });
-
-      throw new UnauthorizedException("Invalid credentials");
     }
 
-    // Reset failed logins on success
-    if (user.failedLogins > 0) {
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { failedLogins: 0, lockedUntil: null },
-      });
+    if (!user.isActive) {
+      throw new UnauthorizedException("Account is deactivated");
     }
 
     return this.issueTokens(user);
@@ -118,13 +76,10 @@ export class AuthService {
       throw new UnauthorizedException("Invalid refresh token");
     }
 
-    // Rotation: issueTokens generates a new refresh token and persists it,
-    // so the old refresh token is automatically invalidated.
     return this.issueTokens(user);
   }
 
   async logout(userId: string, jti: string, exp: number) {
-    // Revoke the current access token
     await this.prisma.revokedToken.create({
       data: {
         jti,
@@ -132,93 +87,10 @@ export class AuthService {
       },
     });
 
-    // Clear refresh token
     await this.prisma.user.update({
       where: { id: userId },
       data: { refreshToken: null },
     });
-  }
-
-  async forgotPassword(dto: ForgotPasswordDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
-    });
-
-    // Always return success to prevent email enumeration
-    if (!user) return;
-
-    const resetToken = uuidv4();
-    const resetTokenExpires = new Date(
-      Date.now() + RESET_TOKEN_HOURS * 60 * 60 * 1000,
-    );
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { resetToken, resetTokenExpires },
-    });
-
-    await this.email.sendPasswordReset(user.email, resetToken);
-  }
-
-  async resetPassword(dto: ResetPasswordDto) {
-    const user = await this.prisma.user.findFirst({
-      where: { resetToken: dto.token },
-    });
-
-    if (!user || !user.resetTokenExpires || user.resetTokenExpires < new Date()) {
-      throw new BadRequestException("Invalid or expired reset token");
-    }
-
-    if (!dto.password || dto.password.length < 8) {
-      throw new BadRequestException(
-        "Password must be at least 8 characters",
-      );
-    }
-
-    const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        passwordHash,
-        resetToken: null,
-        resetTokenExpires: null,
-        failedLogins: 0,
-        lockedUntil: null,
-      },
-    });
-
-    return { message: "Password reset successful" };
-  }
-
-  // --- OAuth auth code exchange (F-04: tokens must not appear in URLs) ---
-
-  private oauthCodes = new Map<string, { tokens: Record<string, unknown>; expiresAt: number }>();
-
-  async createOAuthCode(user: User): Promise<string> {
-    const tokens = await this.issueTokens(user);
-    const code = uuidv4();
-    this.oauthCodes.set(code, {
-      tokens,
-      expiresAt: Date.now() + OAUTH_CODE_TTL_MS,
-    });
-    return code;
-  }
-
-  exchangeOAuthCode(code: string) {
-    const entry = this.oauthCodes.get(code);
-    if (!entry) {
-      throw new UnauthorizedException("Invalid or expired auth code");
-    }
-    this.oauthCodes.delete(code);
-    if (Date.now() > entry.expiresAt) {
-      throw new UnauthorizedException("Invalid or expired auth code");
-    }
-    return entry.tokens;
-  }
-
-  async issueTokensForOAuthUser(user: User) {
-    return this.issueTokens(user);
   }
 
   private async issueTokens(user: User) {

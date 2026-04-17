@@ -4,9 +4,9 @@ import { PassportModule } from "@nestjs/passport";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { JwtStrategy } from "./strategies/jwt.strategy";
-import { GoogleStrategy } from "./strategies/google.strategy";
 import { EmailService } from "../email/email.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { RedisModule } from "../redis/redis.module";
 
 @Module({
   imports: [
@@ -19,12 +19,12 @@ import { PrismaService } from "../prisma/prisma.service";
       })(),
       signOptions: { expiresIn: "15m" },
     }),
+    RedisModule,
   ],
   controllers: [AuthController],
   providers: [
     AuthService,
     JwtStrategy,
-    ...(process.env.GOOGLE_CLIENT_ID ? [GoogleStrategy] : []),
     EmailService,
     PrismaService,
   ],

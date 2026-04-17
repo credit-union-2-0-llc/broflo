@@ -142,6 +142,57 @@ export class RedisService implements OnModuleDestroy {
     return { withinCap: newTotal <= this.DAILY_CAP_CENTS };
   }
 
+  // --- OTP storage (5 min TTL, single use) ---
+
+  private readonly OTP_TTL_SECONDS = 300;
+  private readonly OTP_RATE_LIMIT_SECONDS = 900; // 15 min window
+  private readonly OTP_RATE_LIMIT_MAX = 3;
+
+  async setOtp(email: string, code: string): Promise<void> {
+    const key = `otp:${email.toLowerCase()}`;
+    if (!this.isConnected) {
+      this.memSet(key, code, this.OTP_TTL_SECONDS);
+      return;
+    }
+    await this.getClient().setex(key, this.OTP_TTL_SECONDS, code);
+  }
+
+  async getOtp(email: string): Promise<string | null> {
+    const key = `otp:${email.toLowerCase()}`;
+    if (!this.isConnected) return this.memGet(key);
+    return this.getClient().get(key);
+  }
+
+  async deleteOtp(email: string): Promise<void> {
+    const key = `otp:${email.toLowerCase()}`;
+    if (!this.isConnected) {
+      this.memCache.delete(key);
+      return;
+    }
+    await this.getClient().del(key);
+  }
+
+  async checkOtpRateLimit(email: string): Promise<{ allowed: boolean; remaining: number }> {
+    const key = `otp-rate:${email.toLowerCase()}`;
+    const limit = this.OTP_RATE_LIMIT_MAX;
+
+    if (!this.isConnected) {
+      const raw = this.memGet(key);
+      const count = raw ? parseInt(raw, 10) : 0;
+      if (count >= limit) return { allowed: false, remaining: 0 };
+      this.memSet(key, String(count + 1), this.OTP_RATE_LIMIT_SECONDS);
+      return { allowed: true, remaining: limit - count - 1 };
+    }
+
+    const client = this.getClient();
+    const current = await client.incr(key);
+    if (current === 1) {
+      await client.expire(key, this.OTP_RATE_LIMIT_SECONDS);
+    }
+    const allowed = current <= limit;
+    return { allowed, remaining: Math.max(0, limit - current) };
+  }
+
   async onModuleDestroy(): Promise<void> {
     if (this.client) {
       await this.client.quit();

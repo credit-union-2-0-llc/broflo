@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,46 +16,129 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { api } from "@/lib/api";
 
-const loginSchema = z.object({
+const emailSchema = z.object({
   email: z.string().email("Enter a valid email"),
-  password: z.string().min(1, "Password is required"),
 });
 
-type LoginForm = z.infer<typeof loginSchema>;
+const codeSchema = z.object({
+  code: z.string().length(6, "Enter the 6-digit code"),
+});
+
+type EmailForm = z.infer<typeof emailSchema>;
+type CodeForm = z.infer<typeof codeSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const [step, setStep] = useState<"email" | "code">("email");
+  const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const codeInputRef = useRef<HTMLInputElement | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
+  const emailForm = useForm<EmailForm>({
+    resolver: zodResolver(emailSchema),
   });
 
-  async function onSubmit(data: LoginForm) {
+  const codeForm = useForm<CodeForm>({
+    resolver: zodResolver(codeSchema),
+  });
+
+  useEffect(() => {
+    if (step === "code" && codeInputRef.current) {
+      codeInputRef.current.focus();
+    }
+  }, [step]);
+
+  async function onSendCode(data: EmailForm) {
+    setLoading(true);
+    setError(null);
+
+    try {
+      await api.sendOtp(data.email);
+      setEmail(data.email);
+      setStep("code");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send code");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onVerifyCode(data: CodeForm) {
     setLoading(true);
     setError(null);
 
     const result = await signIn("credentials", {
-      email: data.email,
-      password: data.password,
+      email,
+      code: data.code,
       redirect: false,
     });
 
     setLoading(false);
 
     if (result?.error) {
-      setError("Invalid email or password.");
+      setError("Invalid or expired code.");
     } else {
       router.push("/dashboard");
     }
+  }
+
+  if (step === "code") {
+    return (
+      <Card>
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold">broflo.</CardTitle>
+          <CardDescription>
+            We sent a code to {email}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={codeForm.handleSubmit(onVerifyCode)} className="space-y-4">
+            {error && (
+              <p className="text-sm text-destructive text-center">{error}</p>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="code">6-digit code</Label>
+              <Input
+                id="code"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="000000"
+                className="text-center text-2xl tracking-[0.3em] font-mono"
+                {...codeForm.register("code")}
+                ref={(e) => {
+                  codeForm.register("code").ref(e);
+                  codeInputRef.current = e;
+                }}
+              />
+              {codeForm.formState.errors.code && (
+                <p className="text-sm text-destructive">
+                  {codeForm.formState.errors.code.message}
+                </p>
+              )}
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Verifying..." : "Sign in"}
+            </Button>
+          </form>
+          <button
+            type="button"
+            className="mt-4 w-full text-center text-sm text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              setStep("email");
+              setError(null);
+              codeForm.reset();
+            }}
+          >
+            Use a different email
+          </button>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -64,11 +146,11 @@ export default function LoginPage() {
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-bold">broflo.</CardTitle>
         <CardDescription>
-          Sign in to your account
+          Sign in with your email
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={emailForm.handleSubmit(onSendCode)} className="space-y-4">
           {error && (
             <p className="text-sm text-destructive text-center">{error}</p>
           )}
@@ -78,56 +160,18 @@ export default function LoginPage() {
               id="email"
               type="email"
               placeholder="you@example.com"
-              {...register("email")}
+              {...emailForm.register("email")}
             />
-            {errors.email && (
-              <p className="text-sm text-destructive">{errors.email.message}</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link
-                href="/forgot-password"
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                Forgot?
-              </Link>
-            </div>
-            <Input
-              id="password"
-              type="password"
-              {...register("password")}
-            />
-            {errors.password && (
+            {emailForm.formState.errors.email && (
               <p className="text-sm text-destructive">
-                {errors.password.message}
+                {emailForm.formState.errors.email.message}
               </p>
             )}
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? "Sending code..." : "Send code"}
           </Button>
         </form>
-
-        <Separator className="my-6" />
-
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => {
-            window.location.href = api.getGoogleLoginUrl();
-          }}
-        >
-          Continue with Google
-        </Button>
-
-        <p className="mt-4 text-center text-sm text-muted-foreground">
-          No account?{" "}
-          <Link href="/signup" className="text-foreground hover:underline">
-            Sign up
-          </Link>
-        </p>
       </CardContent>
     </Card>
   );

@@ -412,16 +412,16 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
 }
 
 export const api = {
-  signup: (data: { email: string; password: string; name?: string }) =>
-    apiFetch<{ accessToken: string; refreshToken: string; user: Record<string, unknown> }>("/auth/signup", {
+  sendOtp: (email: string) =>
+    apiFetch<{ sent: true; code?: string }>("/auth/send-otp", {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify({ email }),
     }),
 
-  login: (data: { email: string; password: string }) =>
-    apiFetch<{ accessToken: string; refreshToken: string; user: Record<string, unknown> }>("/auth/login", {
+  verifyOtp: (email: string, code: string) =>
+    apiFetch<{ accessToken: string; refreshToken: string; user: Record<string, unknown> }>("/auth/verify-otp", {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify({ email, code }),
     }),
 
   refresh: (refreshToken: string) =>
@@ -432,20 +432,6 @@ export const api = {
 
   me: (token: string) =>
     apiFetch<Record<string, unknown>>("/auth/me", { token }),
-
-  forgotPassword: (email: string) =>
-    apiFetch<{ message: string }>("/auth/forgot", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    }),
-
-  resetPassword: (token: string, password: string) =>
-    apiFetch<{ message: string }>("/auth/reset", {
-      method: "POST",
-      body: JSON.stringify({ token, password }),
-    }),
-
-  getGoogleLoginUrl: () => `${API_URL}/auth/google`,
 
   // Persons
   listPersons: (token: string) =>

@@ -1,56 +1,26 @@
 import {
   IsEmail,
   IsNotEmpty,
-  IsOptional,
   IsString,
-  MinLength,
+  Length,
 } from "class-validator";
 
-export class SignupDto {
+export class SendOtpDto {
   @IsEmail()
   email!: string;
-
-  @IsString()
-  @MinLength(8)
-  password!: string;
-
-  @IsOptional()
-  @IsString()
-  name?: string;
 }
 
-export class LoginDto {
+export class VerifyOtpDto {
   @IsEmail()
   email!: string;
 
   @IsString()
-  @IsNotEmpty()
-  password!: string;
+  @Length(6, 6)
+  code!: string;
 }
 
 export class RefreshDto {
   @IsString()
   @IsNotEmpty()
   refreshToken!: string;
-}
-
-export class ForgotPasswordDto {
-  @IsEmail()
-  email!: string;
-}
-
-export class ResetPasswordDto {
-  @IsString()
-  @IsNotEmpty()
-  token!: string;
-
-  @IsString()
-  @MinLength(8)
-  password!: string;
-}
-
-export class OAuthExchangeDto {
-  @IsString()
-  @IsNotEmpty()
-  code!: string;
 }
