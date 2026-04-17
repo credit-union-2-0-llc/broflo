@@ -19,17 +19,17 @@ const pkg = JSON.parse(
 
 function validateProductionSecrets() {
   if (process.env.NODE_ENV !== "production") return;
-  const required = [
-    "STRIPE_SECRET_KEY",
-    "AI_SERVICE_KEY",
-    "JWT_SECRET",
-    "BROWSER_AGENT_SERVICE_KEY",
-  ];
+  const log = new Logger("Bootstrap");
+  const required = ["STRIPE_SECRET_KEY", "JWT_SECRET"];
   const missing = required.filter((k) => !process.env[k]);
   if (missing.length > 0) {
     throw new Error(
       `Fatal: missing required secrets in production: ${missing.join(", ")}`,
     );
+  }
+  const warned = ["AI_SERVICE_KEY", "BROWSER_AGENT_SERVICE_KEY"].filter((k) => !process.env[k]);
+  if (warned.length > 0) {
+    log.warn(`Optional service keys not set (features degraded): ${warned.join(", ")}`);
   }
 }
 
