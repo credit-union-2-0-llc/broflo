@@ -29,41 +29,22 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: https://broflo-api.azurewebsites.net
 
-      - name: Debug standalone structure
-        run: |
-          echo "=== standalone root ==="
-          ls -la apps/web/.next/standalone/
-          echo "=== standalone .next exists? ==="
-          ls -la apps/web/.next/standalone/.next/ 2>/dev/null || echo "NO .next at root"
-          echo "=== standalone apps/web exists? ==="
-          ls -la apps/web/.next/standalone/apps/web/ 2>/dev/null || echo "NO apps/web nesting"
-          echo "=== find server.js ==="
-          find apps/web/.next/standalone -name "server.js" -not -path "*/node_modules/*"
-          echo "=== find BUILD_ID ==="
-          find apps/web/.next/standalone -name "BUILD_ID"
-
       - name: Create deploy package
         run: |
-          # Copy standalone output
           cp -rL apps/web/.next/standalone ./deploy-web
-          # If nested (apps/web/server.js), flatten
+          # Standalone nests under apps/web/ in monorepo — flatten to root
           if [ -f ./deploy-web/apps/web/server.js ]; then
-            # Move app-level files up, preserving .next/ build artifacts
-            cp -rL ./deploy-web/apps/web/.next/* ./deploy-web/.next/ 2>/dev/null || mkdir -p ./deploy-web/.next
-            cp -rL ./deploy-web/apps/web/server.js ./deploy-web/
-            cp -rL ./deploy-web/apps/web/package.json ./deploy-web/ 2>/dev/null || true
+            mkdir -p ./deploy-web/.next
+            cp -rL ./deploy-web/apps/web/.next/* ./deploy-web/.next/
+            cp ./deploy-web/apps/web/server.js ./deploy-web/
+            cp ./deploy-web/apps/web/package.json ./deploy-web/ 2>/dev/null || true
             cp -rL ./deploy-web/apps/web/node_modules/* ./deploy-web/node_modules/ 2>/dev/null || true
             rm -rf ./deploy-web/apps
           fi
-          # Ensure .next/static is present (standalone excludes it)
+          mkdir -p ./deploy-web/.next
           cp -r apps/web/.next/static ./deploy-web/.next/static 2>/dev/null || true
           cp -r apps/web/public ./deploy-web/public 2>/dev/null || true
-          # Hoist pnpm transitive deps so Node can resolve them
           cp -rL ./deploy-web/node_modules/.pnpm/node_modules/* ./deploy-web/node_modules/ 2>/dev/null || true
-          echo "=== deploy-web root ==="
-          ls -la ./deploy-web/
-          echo "=== deploy-web .next ==="
-          ls ./deploy-web/.next/ | head -20
 
       - uses: azure/webapps-deploy@v3
         with:
