@@ -1,12 +1,16 @@
 import { type Page, expect } from "@playwright/test";
 import path from "path";
 import { config } from "dotenv";
+import { fetchLatestOtp } from "@cu2/shared-lib/testing";
 
 config({ path: path.join(__dirname, "..", "..", "..", ".env.test") });
 
 export const AUTH_DIR = path.join(__dirname, "..", ".auth");
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL =
+  process.env.BROFLO_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:4002";
 
 function acct(id: string) {
   const upper = id.toUpperCase();
@@ -29,16 +33,24 @@ export function authFile(id: AccountId): string {
   return path.join(AUTH_DIR, `${id}.json`);
 }
 
-async function getOtpCode(email: string): Promise<string> {
-  const res = await fetch(`${API_URL}/auth/send-otp`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
+async function fetchOtp(email: string): Promise<string> {
+  const token = process.env.E2E_TEST_HATCH_TOKEN;
+  if (!token) {
+    throw new Error(
+      "E2E_TEST_HATCH_TOKEN not set — add to .env.test (and ensure the target api has E2E_TEST_HATCH_ENABLED=1 with a matching token + email allowlist)",
+    );
+  }
+  return fetchLatestOtp({
+    apiUrl: API_URL,
+    email,
+    fetchImpl: (input, init) =>
+      fetch(input, {
+        ...init,
+        headers: { ...(init?.headers || {}), "X-E2E-Token": token },
+      }),
+    timeoutMs: 10_000,
+    pollIntervalMs: 300,
   });
-  if (!res.ok) throw new Error(`send-otp failed: ${res.status}`);
-  const body = await res.json();
-  if (!body.code) throw new Error("OTP code not returned — is NODE_ENV=test?");
-  return body.code;
 }
 
 export async function signup(
@@ -54,8 +66,6 @@ export async function login(
   user: { email: string; name?: string },
   attempt = 1,
 ): Promise<void> {
-  const code = await getOtpCode(user.email);
-
   await page.goto("/login");
   await page.fill("#email", user.email);
   await page.click('button:has-text("Send code")');
@@ -76,6 +86,7 @@ export async function login(
     throw new Error(`Login failed at send-code step (${codeOrError}) — stuck on ${page.url()}`);
   }
 
+  const code = await fetchOtp(user.email);
   await page.fill("#code", code);
   await page.click('button:has-text("Sign in")');
 

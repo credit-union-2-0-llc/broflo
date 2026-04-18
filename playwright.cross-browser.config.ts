@@ -16,7 +16,10 @@ import {
 } from '@cu2/shared-lib/testing';
 
 const BASE_URL = process.env.BROFLO_BASE_URL || 'http://localhost:4000';
-const API_URL = process.env.BROFLO_API_URL || 'http://localhost:3001';
+const API_URL =
+  process.env.BROFLO_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  'http://localhost:4002';
 
 export default createPlaywrightConfig({
   baseUrl: BASE_URL,

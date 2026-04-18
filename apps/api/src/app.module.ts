@@ -22,6 +22,9 @@ import { AdminModule } from "./admin/admin.module";
 import { EnrichmentModule } from "./enrichment/enrichment.module";
 import { StorageModule } from "./storage/storage.module";
 import { PhotosModule } from "./photos/photos.module";
+import { TestingModule } from "./testing/testing.module";
+
+const TEST_HATCH_ENABLED = process.env.E2E_TEST_HATCH_ENABLED === "1";
 
 @Module({
   imports: [
@@ -52,6 +55,7 @@ import { PhotosModule } from "./photos/photos.module";
     EnrichmentModule,
     StorageModule,
     PhotosModule,
+    ...(TEST_HATCH_ENABLED ? [TestingModule] : []),
   ],
   controllers: [HealthController],
   providers: [

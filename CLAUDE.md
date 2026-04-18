@@ -11,6 +11,13 @@
 - **Repo:** `credit-union-2-0-llc/broflo`
 - **Phase:** S-0 Walking Skeleton (Foundation)
 
+## Deployed URLs
+
+- **Production web:** https://broflo.ai
+- **Production api:** https://broflo-api.azurewebsites.net (Azure App Service)
+- Cross-browser E2E runs against these two URLs
+- Local dev: web :4000, api :4002, ai :8000
+
 ## Stack
 
 | Layer | Choice |
