@@ -14,6 +14,7 @@ import { AuthService } from "./auth.service";
 import { Public } from "./decorators/public.decorator";
 import { CurrentUser } from "./decorators/current-user.decorator";
 import { SendOtpDto, VerifyOtpDto, RefreshDto } from "./dto/auth.dto";
+import { isE2EHatchRequest } from "./util/e2e-hatch";
 
 @Throttle({ short: { ttl: 60000, limit: parseInt(process.env.THROTTLE_AUTH_LIMIT || "5", 10) } })
 @Controller("auth")
@@ -23,8 +24,8 @@ export class AuthController {
   @Public()
   @Post("send-otp")
   @HttpCode(HttpStatus.OK)
-  async sendOtp(@Body() dto: SendOtpDto) {
-    return this.auth.sendOtp(dto);
+  async sendOtp(@Body() dto: SendOtpDto, @Req() req: Request) {
+    return this.auth.sendOtp(dto, isE2EHatchRequest(req, dto.email));
   }
 
   @Public()

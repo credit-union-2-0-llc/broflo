@@ -21,12 +21,17 @@ export class AuthService {
     private readonly redis: RedisService,
   ) {}
 
-  async sendOtp(dto: SendOtpDto): Promise<{ sent: true; code?: string }> {
+  async sendOtp(
+    dto: SendOtpDto,
+    bypassRateLimit = false,
+  ): Promise<{ sent: true; code?: string }> {
     const emailLower = dto.email.toLowerCase();
 
-    const rl = await this.redis.checkOtpRateLimit(emailLower);
-    if (!rl.allowed) {
-      throw new BadRequestException("Too many code requests. Try again in a few minutes.");
+    if (!bypassRateLimit) {
+      const rl = await this.redis.checkOtpRateLimit(emailLower);
+      if (!rl.allowed) {
+        throw new BadRequestException("Too many code requests. Try again in a few minutes.");
+      }
     }
 
     const code = crypto.randomInt(100000, 999999).toString();
