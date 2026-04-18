@@ -23,15 +23,24 @@ export class StorageService {
   private readonly logger = new Logger(StorageService.name);
   private readonly accountName: string;
   private readonly containerName: string;
-  private containerClient: ContainerClient;
+  private _containerClient: ContainerClient | null = null;
   private sharedKeyCred: StorageSharedKeyCredential | null = null;
 
   constructor() {
+    this.accountName = ACCOUNT_NAME || "";
+    this.containerName = CONTAINER_NAME || "";
     if (!ACCOUNT_NAME || !CONTAINER_NAME) {
-      throw new Error("AZURE_STORAGE_ACCOUNT_NAME and AZURE_STORAGE_CONTAINER_NAME must be set");
+      this.logger.warn(
+        "AZURE_STORAGE_ACCOUNT_NAME and/or AZURE_STORAGE_CONTAINER_NAME not set — blob storage disabled",
+      );
     }
-    this.accountName = ACCOUNT_NAME;
-    this.containerName = CONTAINER_NAME;
+  }
+
+  private get containerClient(): ContainerClient {
+    if (this._containerClient) return this._containerClient;
+    if (!this.accountName || !this.containerName) {
+      throw new Error("Azure Blob Storage not configured — set AZURE_STORAGE_ACCOUNT_NAME and AZURE_STORAGE_CONTAINER_NAME");
+    }
     if (ACCOUNT_KEY) {
       this.sharedKeyCred = new StorageSharedKeyCredential(
         this.accountName,
@@ -41,15 +50,16 @@ export class StorageService {
         `https://${this.accountName}.blob.core.windows.net`,
         this.sharedKeyCred,
       );
-      this.containerClient = blobService.getContainerClient(this.containerName);
+      this._containerClient = blobService.getContainerClient(this.containerName);
     } else {
       const credential = new DefaultAzureCredential();
       const blobService = new BlobServiceClient(
         `https://${this.accountName}.blob.core.windows.net`,
         credential,
       );
-      this.containerClient = blobService.getContainerClient(this.containerName);
+      this._containerClient = blobService.getContainerClient(this.containerName);
     }
+    return this._containerClient;
   }
 
   /**

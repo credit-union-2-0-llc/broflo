@@ -11,10 +11,23 @@ const TIER_PRICES_CENTS: Record<string, number> = {
 @Injectable()
 export class ServiceCreditService {
   private readonly log = new Logger(ServiceCreditService.name);
-  private readonly stripe: InstanceType<typeof Stripe>;
+  private stripeClient: InstanceType<typeof Stripe> | null = null;
 
   constructor(private readonly prisma: PrismaService) {
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+    if (!process.env.STRIPE_SECRET_KEY) {
+      this.log.warn('STRIPE_SECRET_KEY not set — service credits disabled');
+    }
+  }
+
+  private get stripe(): InstanceType<typeof Stripe> {
+    if (!this.stripeClient) {
+      const key = process.env.STRIPE_SECRET_KEY;
+      if (!key) {
+        throw new Error('STRIPE_SECRET_KEY is not configured — service credits unavailable');
+      }
+      this.stripeClient = new Stripe(key);
+    }
+    return this.stripeClient;
   }
 
   /**

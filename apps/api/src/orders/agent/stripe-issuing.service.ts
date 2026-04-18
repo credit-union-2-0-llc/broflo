@@ -12,18 +12,26 @@ export interface VirtualCard {
 
 @Injectable()
 export class StripeIssuingService {
-  private readonly stripe: InstanceType<typeof Stripe>;
+  private stripeClient: InstanceType<typeof Stripe> | null = null;
   private readonly log = new Logger(StripeIssuingService.name);
   private readonly cardholderId: string;
 
   constructor() {
-    const key = process.env.STRIPE_SECRET_KEY;
-    if (!key) {
+    if (!process.env.STRIPE_SECRET_KEY) {
       this.log.warn('STRIPE_SECRET_KEY not set — Issuing disabled');
     }
-    this.stripe = new Stripe(key || '');
-    // Broflo's Stripe Issuing cardholder (created once via Stripe dashboard)
     this.cardholderId = process.env.STRIPE_ISSUING_CARDHOLDER_ID || '';
+  }
+
+  private get stripe(): InstanceType<typeof Stripe> {
+    if (!this.stripeClient) {
+      const key = process.env.STRIPE_SECRET_KEY;
+      if (!key) {
+        throw new Error('STRIPE_SECRET_KEY is not configured — Issuing unavailable');
+      }
+      this.stripeClient = new Stripe(key);
+    }
+    return this.stripeClient;
   }
 
   /**

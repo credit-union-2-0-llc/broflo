@@ -10,19 +10,28 @@ export interface ChargeResult {
 
 @Injectable()
 export class StripeConnectService {
-  private readonly stripe: StripeInstance;
+  private stripeClient: StripeInstance | null = null;
   private readonly log = new Logger(StripeConnectService.name);
   private readonly platformFeeBps: number;
   private readonly mockRetailerAccountId: string;
 
   constructor() {
-    const key = process.env.STRIPE_SECRET_KEY;
-    if (!key) {
+    if (!process.env.STRIPE_SECRET_KEY) {
       this.log.warn('STRIPE_SECRET_KEY not set — Connect charges disabled');
     }
-    this.stripe = new Stripe(key || '');
     this.platformFeeBps = parseInt(process.env.STRIPE_PLATFORM_FEE_BPS || '500', 10); // 500 bps = 5%
     this.mockRetailerAccountId = process.env.STRIPE_MOCK_RETAILER_ACCOUNT_ID || '';
+  }
+
+  private get stripe(): StripeInstance {
+    if (!this.stripeClient) {
+      const key = process.env.STRIPE_SECRET_KEY;
+      if (!key) {
+        throw new Error('STRIPE_SECRET_KEY is not configured — Connect charges unavailable');
+      }
+      this.stripeClient = new Stripe(key);
+    }
+    return this.stripeClient;
   }
 
   /**

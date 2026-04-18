@@ -12,15 +12,24 @@ type StripeInstance = InstanceType<typeof Stripe>;
 
 @Injectable()
 export class BillingService {
-  private readonly stripe: StripeInstance;
+  private stripeClient: StripeInstance | null = null;
   private readonly log = new Logger(BillingService.name);
 
   constructor(private readonly prisma: PrismaService) {
-    const key = process.env.STRIPE_SECRET_KEY;
-    if (!key) {
+    if (!process.env.STRIPE_SECRET_KEY) {
       this.log.warn("STRIPE_SECRET_KEY not set — billing disabled");
     }
-    this.stripe = new Stripe(key || "");
+  }
+
+  private get stripe(): StripeInstance {
+    if (!this.stripeClient) {
+      const key = process.env.STRIPE_SECRET_KEY;
+      if (!key) {
+        throw new Error("STRIPE_SECRET_KEY is not configured — billing unavailable");
+      }
+      this.stripeClient = new Stripe(key);
+    }
+    return this.stripeClient;
   }
 
   async getOrCreateCustomer(user: User): Promise<string> {
