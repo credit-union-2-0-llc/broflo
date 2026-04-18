@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
-import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { ScheduleModule } from "@nestjs/schedule";
 import { BullModule } from "@nestjs/bull";
 import { HealthController } from "./health/health.controller";
@@ -17,6 +17,7 @@ import { AutopilotModule } from "./autopilot/autopilot.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { RedisModule } from "./redis/redis.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
+import { E2EAwareThrottlerGuard } from "./auth/guards/e2e-aware-throttler.guard";
 import { AgentOrdersModule } from "./orders/agent/agent-orders.module";
 import { AdminModule } from "./admin/admin.module";
 import { EnrichmentModule } from "./enrichment/enrichment.module";
@@ -66,7 +67,7 @@ const TEST_HATCH_ENABLED = process.env.E2E_TEST_HATCH_ENABLED === "1";
     },
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: E2EAwareThrottlerGuard,
     },
   ],
 })

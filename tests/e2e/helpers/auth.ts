@@ -66,13 +66,17 @@ export async function login(
   user: { email: string; name?: string },
   attempt = 1,
 ): Promise<void> {
+  const hatchToken = process.env.E2E_TEST_HATCH_TOKEN;
+  if (hatchToken) {
+    await page.setExtraHTTPHeaders({ "X-E2E-Token": hatchToken });
+  }
   await page.goto("/login");
   await page.fill("#email", user.email);
   await page.click('button:has-text("Send code")');
 
   const codeOrError = await Promise.race([
     page.locator("#code").waitFor({ timeout: 10_000 }).then(() => "code-visible" as const),
-    page.locator("text=Too many code requests").waitFor({ timeout: 10_000 }).then(() => "throttled" as const),
+    page.getByText(/too many|throttlerexception/i).waitFor({ timeout: 10_000 }).then(() => "throttled" as const),
     page.locator("text=Failed to send").waitFor({ timeout: 10_000 }).then(() => "error" as const),
   ]).catch(() => "timeout" as const);
 
