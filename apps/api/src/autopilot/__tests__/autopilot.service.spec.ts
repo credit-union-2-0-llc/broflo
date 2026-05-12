@@ -133,6 +133,7 @@ describe('AutopilotService', () => {
       prisma.autopilotRule.findUnique.mockResolvedValue(null);
       prisma.autopilotRule.create.mockResolvedValue(mockRule);
 
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { leadDays: _, ...dtoWithoutLead } = baseDto;
       await service.createRule(userId, dtoWithoutLead as any, '127.0.0.1');
 
