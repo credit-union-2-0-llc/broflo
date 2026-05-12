@@ -63,6 +63,8 @@ describe("AutopilotScheduler", () => {
   let suggestionsService: Record<string, jest.Mock>;
 
   beforeEach(async () => {
+    process.env.AUTOPILOT_ENABLED = 'true';
+
     prisma = {
       autopilotRule: { findMany: jest.fn().mockResolvedValue([]) },
       autopilotRun: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({}) },
@@ -100,6 +102,10 @@ describe("AutopilotScheduler", () => {
     }).compile();
 
     scheduler = module.get(AutopilotScheduler);
+  });
+
+  afterEach(() => {
+    delete process.env.AUTOPILOT_ENABLED;
   });
 
   describe("spending cap enforcement", () => {
