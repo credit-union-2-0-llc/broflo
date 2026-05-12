@@ -49,6 +49,18 @@ docs/             — Slice specs and project docs
 - **pnpm workspaces** — no Turborepo
 - All secrets in `cu2-apps-kv` Azure Key Vault
 
+## Scheduler Feature Flags
+
+Expensive background schedulers are gated behind env vars to prevent idle cost burn:
+
+| Env Var | Default | What it controls |
+|---------|---------|------------------|
+| `AUTOPILOT_ENABLED` | `false` (off) | Daily AI suggestion generation (Claude + Exa API costs) |
+| `ORDER_POLLING_ENABLED` | `false` (off) | Retailer order status polling (every 15 min when enabled) |
+| `REMINDERS_ENABLED` | `true` (on) | Daily reminder generation (DB-only, no external API cost) |
+
+Set `AUTOPILOT_ENABLED=true` and `ORDER_POLLING_ENABLED=true` in Azure App Service config when real users onboard.
+
 ## Slice Approach
 
 Build in vertical slices. Each slice is full-stack, deployed, and acceptance-tested before the next begins. Slice docs in `docs/slices/`.
