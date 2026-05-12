@@ -28,7 +28,14 @@
   },
   "pnpm": {
     "overrides": {
-      "hono": ">=4.12.14"
+      "hono": ">=4.12.18",
+      "fast-uri": ">=3.1.2",
+      "fast-xml-builder": ">=1.1.7",
+      "fast-xml-parser": ">=5.7.0",
+      "uuid": ">=13.0.1",
+      "ip-address": ">=10.1.1",
+      "@opentelemetry/sdk-node": ">=0.217.0",
+      "@opentelemetry/exporter-prometheus": ">=0.217.0"
     }
   },
   "devDependencies": {
