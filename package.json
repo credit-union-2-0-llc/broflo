@@ -35,7 +35,10 @@
       "uuid": ">=13.0.1",
       "ip-address": ">=10.1.1",
       "@opentelemetry/sdk-node": ">=0.217.0",
-      "@opentelemetry/exporter-prometheus": ">=0.217.0"
+      "@opentelemetry/exporter-prometheus": ">=0.217.0",
+      "protobufjs": ">=8.0.2",
+      "@protobufjs/utf8": ">=1.1.1",
+      "postcss": ">=8.5.10"
     }
   },
   "devDependencies": {
