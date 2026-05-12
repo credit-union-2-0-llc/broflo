@@ -13,6 +13,7 @@ const MAX_RUNS_PER_CYCLE = 50;
 @Injectable()
 export class AutopilotScheduler {
   private readonly log = new Logger(AutopilotScheduler.name);
+  private readonly enabled: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -21,10 +22,14 @@ export class AutopilotScheduler {
     private readonly autopilotService: AutopilotService,
     private readonly notifications: NotificationsService,
     private readonly suggestionsService: SuggestionsService,
-  ) {}
+  ) {
+    this.enabled = process.env.AUTOPILOT_ENABLED === 'true';
+    if (!this.enabled) this.log.warn('Autopilot scheduler disabled (AUTOPILOT_ENABLED != true)');
+  }
 
-  @Cron('0 7 * * *') // Daily at 7 AM UTC
+  @Cron('0 7 * * *')
   async runAutopilot() {
+    if (!this.enabled) return;
     this.log.log('Autopilot cron started');
 
     const today = new Date();

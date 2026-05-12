@@ -5,11 +5,15 @@ import { RemindersService } from "./reminders.service";
 @Injectable()
 export class RemindersScheduler {
   private readonly logger = new Logger(RemindersScheduler.name);
+  private readonly enabled: boolean;
 
-  constructor(private readonly reminders: RemindersService) {}
+  constructor(private readonly reminders: RemindersService) {
+    this.enabled = process.env.REMINDERS_ENABLED !== 'false';
+  }
 
   @Cron(CronExpression.EVERY_DAY_AT_6AM)
   async handleDailyReminderGeneration() {
+    if (!this.enabled) return;
     this.logger.log("Running daily reminder generation");
     try {
       await this.reminders.generateReminders();

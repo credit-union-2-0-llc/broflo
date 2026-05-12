@@ -1,5 +1,5 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrdersService } from './orders.service';
 import { RetailerAdapter, OrderStatusResult } from './adapters/retailer.adapter';
@@ -10,15 +10,20 @@ const POLL_BATCH_SIZE = 10;
 @Injectable()
 export class OrderPollingScheduler {
   private readonly log = new Logger(OrderPollingScheduler.name);
+  private readonly enabled: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly orders: OrdersService,
     @Inject('RETAILER_ADAPTER') private readonly adapter: RetailerAdapter,
-  ) {}
+  ) {
+    this.enabled = process.env.ORDER_POLLING_ENABLED === 'true';
+    if (!this.enabled) this.log.warn('Order polling disabled (ORDER_POLLING_ENABLED != true)');
+  }
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron('*/15 * * * *')
   async pollActiveOrders() {
+    if (!this.enabled) return;
     const activeOrders = await this.prisma.order.findMany({
       where: {
         status: { in: ['ordered', 'processing', 'shipped'] },
