@@ -33,11 +33,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
-      - name: Auth for private GitHub deps
-        run: |
-          git config --global url."https://x-access-token:${{ secrets.PACKAGES_TOKEN }}@github.com/".insteadOf "https://github.com/"
-          echo "//codeload.github.com/:_authToken=${{ secrets.PACKAGES_TOKEN }}" >> ~/.npmrc
-
       - run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma Client
@@ -103,11 +98,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
-      - name: Auth for private GitHub deps
-        run: |
-          git config --global url."https://x-access-token:${{ secrets.PACKAGES_TOKEN }}@github.com/".insteadOf "https://github.com/"
-          echo "//codeload.github.com/:_authToken=${{ secrets.PACKAGES_TOKEN }}" >> ~/.npmrc
-
       - run: pnpm install --frozen-lockfile
 
       - name: Build standalone
@@ -163,11 +153,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-
-      - name: Auth for private GitHub deps
-        run: |
-          git config --global url."https://x-access-token:${{ secrets.PACKAGES_TOKEN }}@github.com/".insteadOf "https://github.com/"
-          echo "//codeload.github.com/:_authToken=${{ secrets.PACKAGES_TOKEN }}" >> ~/.npmrc
 
       - run: pnpm install --frozen-lockfile
 

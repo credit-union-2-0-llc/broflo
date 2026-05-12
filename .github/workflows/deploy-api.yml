@@ -23,11 +23,6 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - name: Auth for private GitHub deps
-        run: |
-          git config --global url."https://x-access-token:${{ secrets.PACKAGES_TOKEN }}@github.com/".insteadOf "https://github.com/"
-          echo "//codeload.github.com/:_authToken=${{ secrets.PACKAGES_TOKEN }}" >> ~/.npmrc
-
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm --filter @broflo/api run prisma:generate
