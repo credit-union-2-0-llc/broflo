@@ -24,7 +24,9 @@ jobs:
           cache: pnpm
 
       - name: Auth for private GitHub deps
-        run: echo "//codeload.github.com/:_authToken=${{ github.token }}" >> ~/.npmrc
+        run: |
+          git config --global url."https://x-access-token:${{ github.token }}@github.com/".insteadOf "https://github.com/"
+          echo "//codeload.github.com/:_authToken=${{ github.token }}" >> ~/.npmrc
 
       - run: pnpm install --frozen-lockfile
 
