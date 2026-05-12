@@ -42,7 +42,7 @@
     }
   },
   "devDependencies": {
-    "@cu2/shared-lib": "github:CU2CU2/cu2-shared-lib",
+    "@cu2/shared-lib": "github:credit-union-2-0-llc/cu2-shared-lib",
     "@playwright/test": "^1.59.1",
     "dotenv": "^17.4.2"
   }

@@ -22,8 +22,8 @@ importers:
   .:
     devDependencies:
       '@cu2/shared-lib':
-        specifier: github:CU2CU2/cu2-shared-lib
-        version: https://codeload.github.com/CU2CU2/cu2-shared-lib/tar.gz/114f72572e6cf607fe997056d13ab5a043274c88(@azure/identity@4.13.1)(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/jwt@11.0.2(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)))(@playwright/test@1.59.1)(express@5.2.1)(ioredis@5.10.1)(jsonwebtoken@9.0.3)(jwks-rsa@4.0.1)(stripe@22.0.1(@types/node@20.19.39))(winston@3.19.0)
+        specifier: github:credit-union-2-0-llc/cu2-shared-lib
+        version: '@credit-union-2-0-llc/shared-lib@git+https://github.com/credit-union-2-0-llc/cu2-shared-lib.git#6d96539cfc1a23f597db2e2e6a6c1d2b3980cdff(@azure/identity@4.13.1)(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/jwt@11.0.2(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)))(@playwright/test@1.59.1)(eslint@9.39.4(jiti@2.6.1))(express@5.2.1)(ioredis@5.10.1)(jsonwebtoken@9.0.3)(jwks-rsa@4.0.1)(resend@6.10.0)(stripe@22.0.1(@types/node@20.19.39))(winston@3.19.0)'
       '@playwright/test':
         specifier: ^1.59.1
         version: 1.59.1
@@ -656,13 +656,9 @@ packages:
     resolution: {integrity: sha512-Ir+AOibqzrIsL6ajt3Rz3LskB7OiMVHqltZmspbW/TJuTVuyOMirVqAkjfY6JISiLHgyNqicAC8AyHHGzNd/dA==}
     engines: {node: '>=0.1.90'}
 
-  '@cspotcode/source-map-support@0.8.1':
-    resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
-    engines: {node: '>=12'}
-
-  '@cu2/shared-lib@https://codeload.github.com/CU2CU2/cu2-shared-lib/tar.gz/114f72572e6cf607fe997056d13ab5a043274c88':
-    resolution: {tarball: https://codeload.github.com/CU2CU2/cu2-shared-lib/tar.gz/114f72572e6cf607fe997056d13ab5a043274c88}
-    version: 1.0.0
+  '@credit-union-2-0-llc/shared-lib@git+https://github.com/credit-union-2-0-llc/cu2-shared-lib.git#6d96539cfc1a23f597db2e2e6a6c1d2b3980cdff':
+    resolution: {commit: 6d96539cfc1a23f597db2e2e6a6c1d2b3980cdff, repo: https://github.com/credit-union-2-0-llc/cu2-shared-lib.git, type: git}
+    version: 1.2.0
     peerDependencies:
       '@anthropic-ai/sdk': '>=0.30.0'
       '@azure/identity': '>=4.0.0'
@@ -675,12 +671,15 @@ packages:
       '@sendgrid/mail': '>=8.0.0'
       applicationinsights: '>=2.9.0'
       axios: '>=1.0.0'
+      eslint: '>=8.0.0'
       express: '>=4.18.0'
       ioredis: '>=5.0.0'
       jsonwebtoken: '>=9.0.0'
       jwks-rsa: '>=3.0.0'
       node-cron: '>=3.0.0'
       pg: '>=8.0.0'
+      plaid: '>=28.0.0'
+      resend: '>=4.0.0'
       stripe: '>=14.0.0'
       twilio: '>=4.0.0'
       winston: '>=3.10.0'
@@ -707,16 +706,26 @@ packages:
         optional: true
       axios:
         optional: true
+      eslint:
+        optional: true
       ioredis:
         optional: true
       node-cron:
         optional: true
       pg:
         optional: true
+      plaid:
+        optional: true
+      resend:
+        optional: true
       stripe:
         optional: true
       twilio:
         optional: true
+
+  '@cspotcode/source-map-support@0.8.1':
+    resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
+    engines: {node: '>=12'}
 
   '@dabh/diagnostics@2.0.8':
     resolution: {integrity: sha512-R4MSXTVnuMzGD7bzHdW2ZhhdPC/igELENcq5IjEverBvq5hn1SXCWcsi6eSsdWP0/Ur+SItRRjAktmdoX/8R/Q==}
@@ -6425,11 +6434,7 @@ snapshots:
 
   '@colors/colors@1.6.0': {}
 
-  '@cspotcode/source-map-support@0.8.1':
-    dependencies:
-      '@jridgewell/trace-mapping': 0.3.9
-
-  '@cu2/shared-lib@https://codeload.github.com/CU2CU2/cu2-shared-lib/tar.gz/114f72572e6cf607fe997056d13ab5a043274c88(@azure/identity@4.13.1)(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/jwt@11.0.2(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)))(@playwright/test@1.59.1)(express@5.2.1)(ioredis@5.10.1)(jsonwebtoken@9.0.3)(jwks-rsa@4.0.1)(stripe@22.0.1(@types/node@20.19.39))(winston@3.19.0)':
+  '@credit-union-2-0-llc/shared-lib@git+https://github.com/credit-union-2-0-llc/cu2-shared-lib.git#6d96539cfc1a23f597db2e2e6a6c1d2b3980cdff(@azure/identity@4.13.1)(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/jwt@11.0.2(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)))(@playwright/test@1.59.1)(eslint@9.39.4(jiti@2.6.1))(express@5.2.1)(ioredis@5.10.1)(jsonwebtoken@9.0.3)(jwks-rsa@4.0.1)(resend@6.10.0)(stripe@22.0.1(@types/node@20.19.39))(winston@3.19.0)':
     dependencies:
       express: 5.2.1
       jsonwebtoken: 9.0.3
@@ -6442,8 +6447,14 @@ snapshots:
       '@nestjs/core': 11.1.18(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/jwt': 11.0.2(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))
       '@playwright/test': 1.59.1
+      eslint: 9.39.4(jiti@2.6.1)
       ioredis: 5.10.1
+      resend: 6.10.0
       stripe: 22.0.1(@types/node@20.19.39)
+
+  '@cspotcode/source-map-support@0.8.1':
+    dependencies:
+      '@jridgewell/trace-mapping': 0.3.9
 
   '@dabh/diagnostics@2.0.8':
     dependencies:
