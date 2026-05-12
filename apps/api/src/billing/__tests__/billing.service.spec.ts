@@ -132,7 +132,7 @@ describe("BillingService", () => {
 
     beforeEach(() => {
       stripeMock = { subscriptions: { retrieve: jest.fn() } };
-      (service as any).stripe = stripeMock;
+      (service as any).stripeClient = stripeMock;
     });
 
     it("upgrades user to pro after checkout", async () => {
@@ -222,7 +222,7 @@ describe("BillingService", () => {
 
     beforeEach(() => {
       stripeMock = { subscriptions: { retrieve: jest.fn() } };
-      (service as any).stripe = stripeMock;
+      (service as any).stripeClient = stripeMock;
     });
 
     it("updates tier and payment method on plan change", async () => {
