@@ -1,0 +1,42 @@
+# ops-platform app descriptor
+app_id: broflo
+company: cu2
+display_name: Broflo
+repo: credit-union-2-0-llc/broflo
+stack: nestjs-nextjs-fastapi-monorepo
+
+test:
+  command: pnpm --filter './apps/**' --filter './packages/**' run test
+lint:
+  command: pnpm --filter './apps/**' --filter './packages/**' run lint
+security:
+  tools: [gitleaks, trivy]
+
+qa:
+  run_tests: true
+  checklist:
+    - Multi-tenant data isolation enforced at API layer
+    - OAuth tokens never logged or persisted in plaintext
+    - File upload endpoints validate MIME type and size limits
+    - Background job queues drain cleanly on shutdown
+
+risk:
+  severity_threshold: medium
+  pii_fields: [email, name, address, phone]
+  regulations: [glba]
+  ignore_paths:
+    - "**/test/**"
+    - "**/__tests__/**"
+    - "**/*.spec.ts"
+    - "**/*.test.ts"
+    - "**/dist/**"
+    - "**/node_modules/**"
+    - "**/.planning/**"
+
+release:
+  auto_commit_docs: true
+  target_branch: ops-docs
+
+notifications:
+  github_pr_comments: true
+  email: []
