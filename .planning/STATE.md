@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: MVP + Commerce + Intelligence
 status: idle
-last_updated: "2026-04-20T17:30:00.000Z"
+last_updated: "2026-05-22T00:00:00.000Z"
 stopped_at: "S-12 Photo Dossier Enrichment — G23 Deploy approved 2026-04-13. All services deployed, DB migrated, ops debt cleared. Open blocker: api Stripe-init empty-key crash preventing local boot / browser-matrix runs."
-last_activity: "2026-04-13T00:00:00.000Z"
+last_activity: "2026-05-22T00:00:00.000Z"
 current_phase_name: "S-13 Growth (not yet started) — next roadmap slice"
 progress:
   total_phases: 13
