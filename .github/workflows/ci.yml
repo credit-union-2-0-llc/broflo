@@ -219,3 +219,25 @@ jobs:
             --name broflo-ai \
             --resource-group rg-broflo \
             --image ${{ env.ACR_LOGIN_SERVER }}/broflo-ai:${{ github.sha }}
+
+      # Pin Anthropic traffic through the LiteLLM gateway. Self-heals on
+      # every deploy so manual edits / Bicep reruns can't drop the routing.
+      - name: Pin Anthropic env to LiteLLM gateway
+        run: |
+          az containerapp update \
+            --name broflo-ai \
+            --resource-group rg-broflo \
+            --set-env-vars \
+              "ANTHROPIC_BASE_URL=https://ca-litellm-gateway.wittyflower-1831f2a2.westus2.azurecontainerapps.io" \
+              "ANTHROPIC_API_KEY=secretref:litellm-api-key"
+          az containerapp secret remove \
+            --name broflo-ai \
+            --resource-group rg-broflo \
+            --secret-names anthropic-api-key || true
+          env_json=$(az containerapp show \
+            --name broflo-ai \
+            --resource-group rg-broflo \
+            --query "properties.template.containers[0].env[?contains(name,'ANTHROPIC')]" -o json)
+          echo "$env_json"
+          echo "$env_json" | grep -q "ca-litellm-gateway.wittyflower-1831f2a2" || { echo "::error::ANTHROPIC_BASE_URL not pointing at LiteLLM gateway"; exit 1; }
+          echo "$env_json" | grep -q "litellm-api-key" || { echo "::error::ANTHROPIC_API_KEY not bound to litellm-api-key secretRef"; exit 1; }
