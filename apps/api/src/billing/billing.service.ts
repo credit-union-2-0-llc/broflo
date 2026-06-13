@@ -1,268 +1,212 @@
-import {
-  Injectable,
-  Logger,
-  BadRequestException,
-  InternalServerErrorException,
-} from "@nestjs/common";
-import Stripe from "stripe";
-import { PrismaService } from "../prisma/prisma.service";
-import type { User } from "@prisma/client";
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import Stripe from 'stripe';
+import { PrismaService } from '../prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 
-type StripeInstance = InstanceType<typeof Stripe>;
+type User = Prisma.UserGetPayload<Record<string, never>>;
 
 @Injectable()
 export class BillingService {
-  private stripeClient: StripeInstance | null = null;
-  private readonly log = new Logger(BillingService.name);
+  private stripe: Stripe;
 
-  constructor(private readonly prisma: PrismaService) {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      this.log.warn("STRIPE_SECRET_KEY not set — billing disabled");
-    }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {
+    this.stripe = new Stripe(this.config.get<string>('STRIPE_SECRET_KEY', ''), {
+      apiVersion: '2025-01-27.acacia',
+    });
   }
 
-  private get stripe(): StripeInstance {
-    if (!this.stripeClient) {
-      const key = process.env.STRIPE_SECRET_KEY;
-      if (!key) {
-        throw new Error("STRIPE_SECRET_KEY is not configured — billing unavailable");
-      }
-      this.stripeClient = new Stripe(key);
-    }
-    return this.stripeClient;
-  }
-
-  async getOrCreateCustomer(user: User): Promise<string> {
-    if (user.stripeCustomerId) return user.stripeCustomerId;
-
-    const customer = await this.stripe.customers.create({
-      email: user.email,
-      name: user.name || undefined,
-      metadata: { brofloUserId: user.id },
+  async getSubscription(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        subscriptionTier: true,
+        stripeCustomerId: true,
+        stripeSubscriptionId: true,
+        stripePaymentMethodId: true,
+        subscriptionExpiresAt: true,
+      },
     });
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { stripeCustomerId: customer.id },
-    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
 
-    return customer.id;
+    return {
+      tier: user.subscriptionTier,
+      stripeCustomerId: user.stripeCustomerId,
+      stripeSubscriptionId: user.stripeSubscriptionId,
+      stripePaymentMethodId: user.stripePaymentMethodId,
+      subscriptionExpiresAt: user.subscriptionExpiresAt,
+    };
   }
 
-  async createCheckoutSession(
-    user: User,
-    priceId: string,
-  ): Promise<{ url: string }> {
-    const customerId = await this.getOrCreateCustomer(user);
+  async createCheckoutSession(userId: string, tier: string, returnUrl: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const validTiers = ['pro', 'family'];
+    if (!validTiers.includes(tier)) {
+      throw new BadRequestException(`Invalid tier: ${tier}`);
+    }
+
+    const priceId = this.getPriceIdForTier(tier);
+
+    let customerId = user.stripeCustomerId;
+    if (!customerId) {
+      const customer = await this.stripe.customers.create({
+        email: user.email,
+        metadata: { userId },
+      });
+      customerId = customer.id;
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { stripeCustomerId: customerId },
+      });
+    }
 
     const session = await this.stripe.checkout.sessions.create({
       customer: customerId,
-      mode: "subscription",
+      payment_method_types: ['card'],
+      mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${process.env.WEB_URL || "http://localhost:3000"}/billing?success=true`,
-      cancel_url: `${process.env.WEB_URL || "http://localhost:3000"}/upgrade?canceled=true`,
-      subscription_data: {
-        metadata: { brofloUserId: user.id },
-      },
-      payment_method_collection: "always",
+      success_url: `${returnUrl}?success=true`,
+      cancel_url: `${returnUrl}?canceled=true`,
+      metadata: { userId, tier },
     });
-
-    if (!session.url) {
-      throw new InternalServerErrorException("Stripe returned no checkout URL");
-    }
 
     return { url: session.url };
   }
 
-  async createPortalSession(user: User): Promise<{ url: string }> {
+  async createPortalSession(userId: string, returnUrl: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
     if (!user.stripeCustomerId) {
-      throw new BadRequestException("No billing account found");
+      throw new BadRequestException('No billing account found');
     }
 
     const session = await this.stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
-      return_url: `${process.env.WEB_URL || "http://localhost:3000"}/billing`,
+      return_url: returnUrl,
     });
 
     return { url: session.url };
   }
 
-  async getSubscription(user: User) {
-    return {
-      subscriptionTier: user.subscriptionTier,
-      stripeSubscriptionId: user.stripeSubscriptionId,
-      stripeCustomerId: user.stripeCustomerId,
-      hasPaymentMethod: !!user.stripePaymentMethodId,
-    };
-  }
+  async handleWebhook(payload: Buffer, signature: string) {
+    const webhookSecret = this.config.get<string>('STRIPE_WEBHOOK_SECRET', '');
+    let event: Stripe.Event;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private webhookEvent(rawBody: Buffer, signature: string, secret: string): any {
-    return this.stripe.webhooks.constructEvent(rawBody, signature, secret);
-  }
-
-  async handleWebhook(rawBody: Buffer, signature: string) {
-    const secret = process.env.STRIPE_WEBHOOK_SECRET;
-    if (!secret) {
-      throw new InternalServerErrorException("Webhook secret not configured");
-    }
-
-    let event: { type: string; id: string; data: { object: Record<string, unknown> } };
     try {
-      event = this.webhookEvent(rawBody, signature, secret);
-    } catch (err) {
-      this.log.error(`Webhook signature verification failed: ${err}`);
-      throw new BadRequestException("Invalid webhook signature");
+      event = this.stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+    } catch {
+      throw new BadRequestException('Invalid webhook signature');
     }
-
-    this.log.log(`Stripe event: ${event.type} (${event.id})`);
 
     switch (event.type) {
-      case "checkout.session.completed":
-        await this.handleCheckoutCompleted(event.data.object);
+      case 'checkout.session.completed':
+        await this.handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
         break;
-      case "customer.subscription.updated":
-        await this.handleSubscriptionUpdated(event.data.object);
+      case 'customer.subscription.updated':
+        await this.handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
         break;
-      case "customer.subscription.deleted":
-        await this.handleSubscriptionDeleted(event.data.object);
-        break;
-      case "invoice.payment_failed":
-        await this.handlePaymentFailed(event.data.object);
+      case 'customer.subscription.deleted':
+        await this.handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
         break;
       default:
-        this.log.log(`Unhandled event type: ${event.type}`);
+        break;
     }
+
+    return { received: true };
   }
 
-  private async handleCheckoutCompleted(
-    session: Record<string, unknown>,
-  ) {
-    const userId = session.subscription
-      ? (
-          await this.stripe.subscriptions.retrieve(
-            session.subscription as string,
-          )
-        ).metadata?.brofloUserId
-      : (session.metadata as Record<string, string> | undefined)?.brofloUserId;
+  async getServiceCredits(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { serviceCreditCents: true },
+    });
 
-    if (!userId) {
-      this.log.warn("checkout.session.completed: no brofloUserId in metadata");
-      return;
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
 
-    const subscriptionId = session.subscription as string;
-    const subscription = await this.stripe.subscriptions.retrieve(
-      subscriptionId,
-      { expand: ["default_payment_method"] },
-    );
+    return { serviceCreditCents: user.serviceCreditCents ?? 0 };
+  }
 
-    const tier = this.tierFromPriceId(
-      subscription.items.data[0]?.price?.id,
-    );
+  private getPriceIdForTier(tier: string): string {
+    const priceMap: Record<string, string> = {
+      pro: this.config.get<string>('STRIPE_PRO_PRICE_ID', 'price_pro'),
+      family: this.config.get<string>('STRIPE_FAMILY_PRICE_ID', 'price_family'),
+    };
+    return priceMap[tier];
+  }
 
-    const pm = subscription.default_payment_method;
-    const paymentMethodId = typeof pm === "object" && pm !== null
-      ? (pm as { id: string }).id
-      : null;
+  private async handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+    const userId = session.metadata?.userId;
+    const tier = session.metadata?.tier;
+
+    if (!userId || !tier) return;
 
     await this.prisma.user.update({
       where: { id: userId },
       data: {
         subscriptionTier: tier,
-        stripeSubscriptionId: subscriptionId,
-        stripeCustomerId: session.customer as string,
-        stripePaymentMethodId: paymentMethodId,
+        stripeSubscriptionId: session.subscription as string,
       },
     });
-
-    this.log.log(`User ${userId} upgraded to ${tier}`);
   }
 
-  private async handleSubscriptionUpdated(
-    sub: Record<string, unknown>,
-  ) {
-    const metadata = sub.metadata as Record<string, string> | undefined;
-    const userId = metadata?.brofloUserId;
-    if (!userId) return;
-
-    const items = sub.items as { data: Array<{ price?: { id: string } }> };
-    const tier = this.tierFromPriceId(items?.data[0]?.price?.id);
-
-    const expanded = await this.stripe.subscriptions.retrieve(
-      sub.id as string,
-      { expand: ["default_payment_method"] },
-    );
-    const pm = expanded.default_payment_method;
-    const paymentMethodId = typeof pm === "object" && pm !== null
-      ? (pm as { id: string }).id
-      : null;
-
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        subscriptionTier: tier,
-        stripeSubscriptionId: sub.id as string,
-        stripePaymentMethodId: paymentMethodId,
-      },
-    });
-
-    this.log.log(`User ${userId} subscription updated → ${tier}`);
-  }
-
-  private async handleSubscriptionDeleted(
-    sub: Record<string, unknown>,
-  ) {
-    const metadata = sub.metadata as Record<string, string> | undefined;
-    const userId = metadata?.brofloUserId;
-    if (!userId) return;
-
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        subscriptionTier: "free",
-        stripeSubscriptionId: null,
-        stripePaymentMethodId: null,
-      },
-    });
-
-    this.log.log(`User ${userId} subscription canceled → free`);
-  }
-
-  private async handlePaymentFailed(invoice: Record<string, unknown>) {
-    const customerId = invoice.customer as string;
-    if (!customerId) return;
+  private async handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+    const customerId = subscription.customer as string;
 
     const user = await this.prisma.user.findFirst({
       where: { stripeCustomerId: customerId },
     });
 
-    if (!user) {
-      this.log.warn(`payment_failed: no user for customer ${customerId}`);
-      return;
+    if (!user) return;
+
+    const status = subscription.status;
+    if (status === 'active' || status === 'trialing') {
+      // subscription remains active
+    } else {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { subscriptionTier: 'free' },
+      });
     }
+  }
+
+  private async handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+    const customerId = subscription.customer as string;
+
+    const user = await this.prisma.user.findFirst({
+      where: { stripeCustomerId: customerId },
+    });
+
+    if (!user) return;
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { subscriptionTier: "free" },
+      data: { subscriptionTier: 'free', stripeSubscriptionId: null },
     });
-
-    this.log.warn(`User ${user.id} payment failed → downgraded to free`);
-    // TODO: Send notification email via Resend
   }
 
-  private tierFromPriceId(priceId: string | undefined): string {
-    if (!priceId) return "free";
-
-    const proMonthly = process.env.STRIPE_PRO_MONTHLY_PRICE_ID;
-    const proAnnual = process.env.STRIPE_PRO_ANNUAL_PRICE_ID;
-    const eliteMonthly = process.env.STRIPE_ELITE_MONTHLY_PRICE_ID;
-    const eliteAnnual = process.env.STRIPE_ELITE_ANNUAL_PRICE_ID;
-
-    if (priceId === proMonthly || priceId === proAnnual) return "pro";
-    if (priceId === eliteMonthly || priceId === eliteAnnual) return "elite";
-
-    this.log.warn(`Unknown price ID: ${priceId} — defaulting to pro`);
-    return "pro";
-  }
+  // Used for internal type resolution of User shape from Prisma
+  private _userTypeRef?: User;
 }

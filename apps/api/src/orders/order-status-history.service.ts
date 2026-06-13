@@ -1,39 +1,26 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { OrderStatus, StatusChangeSource, Prisma } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { OrderStatus } from '@prisma/client';
 
 @Injectable()
 export class OrderStatusHistoryService {
-  private readonly log = new Logger(OrderStatusHistoryService.name);
-
   constructor(private readonly prisma: PrismaService) {}
 
   async record(
     orderId: string,
-    fromStatus: OrderStatus | null,
+    fromStatus: OrderStatus,
     toStatus: OrderStatus,
-    source: StatusChangeSource = 'system',
+    reason?: string,
     metadata?: Record<string, unknown>,
-  ) {
-    this.log.debug(
-      `Status change: ${fromStatus ?? 'null'} → ${toStatus} [${source}] for order ${orderId}`,
-    );
-    return this.prisma.orderStatusHistory.create({
+  ): Promise<void> {
+    await this.prisma.orderStatusHistory.create({
       data: {
         orderId,
         fromStatus,
         toStatus,
-        source,
-        metadata: metadata ? (metadata as Prisma.InputJsonValue) : undefined,
-        changedAt: new Date(),
+        reason: reason ?? null,
+        metadata: metadata ? JSON.stringify(metadata) : null,
       },
-    });
-  }
-
-  async getTimeline(orderId: string) {
-    return this.prisma.orderStatusHistory.findMany({
-      where: { orderId },
-      orderBy: { changedAt: 'asc' },
     });
   }
 }
