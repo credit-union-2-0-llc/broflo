@@ -1,17 +1,33 @@
-import { IsString, IsOptional, IsInt, Min } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsNumber, IsOptional, Min } from 'class-validator';
 
 export class PreviewOrderDto {
+  @ApiProperty()
   @IsString()
-  suggestionId!: string;
+  userId!: string;
 
+  @ApiProperty()
   @IsString()
   personId!: string;
 
+  @ApiProperty()
   @IsString()
-  eventId!: string;
+  retailerSlug!: string;
 
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsInt()
+  @IsString()
+  keyword?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
   @Min(0)
-  budgetMaxCents?: number;
+  minBudgetCents?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  maxBudgetCents?: number;
 }
