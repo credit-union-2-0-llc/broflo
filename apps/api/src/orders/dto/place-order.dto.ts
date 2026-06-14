@@ -1,49 +1,64 @@
-import { IsString, IsOptional, MaxLength, MinLength } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsUrl, IsEmail } from 'class-validator';
 
 export class PlaceOrderDto {
   @IsString()
-  suggestionId!: string;
+  productUrl!: string;
 
   @IsString()
-  personId!: string;
+  productTitle!: string;
+
+  @IsInt()
+  productPriceCents!: number;
 
   @IsString()
-  eventId!: string;
-
-  @IsString()
-  retailerProductId!: string;
-
   @IsOptional()
-  @IsString()
-  giftRecordId?: string;
+  productImageUrl?: string;
 
-  @IsString()
-  @MinLength(1)
-  @MaxLength(200)
-  shippingName!: string;
-
-  @IsString()
-  @MinLength(1)
-  @MaxLength(200)
-  shippingAddress1!: string;
-
+  @IsInt()
   @IsOptional()
+  shippingCents?: number;
+
   @IsString()
-  @MaxLength(200)
+  @IsOptional()
+  shippingAddress1?: string;
+
+  @IsString()
+  @IsOptional()
   shippingAddress2?: string;
 
   @IsString()
-  @MinLength(1)
-  @MaxLength(100)
-  shippingCity!: string;
+  @IsOptional()
+  shippingCity?: string;
 
   @IsString()
-  @MinLength(2)
-  @MaxLength(2)
-  shippingState!: string;
+  @IsOptional()
+  shippingState?: string;
 
   @IsString()
-  @MinLength(5)
-  @MaxLength(10)
-  shippingZip!: string;
+  @IsOptional()
+  shippingZip?: string;
+
+  @IsString()
+  @IsOptional()
+  shippingCountry?: string;
+
+  @IsString()
+  @IsOptional()
+  retailerSlug?: string;
+
+  @IsString()
+  @IsOptional()
+  recipientName?: string;
+
+  @IsEmail()
+  @IsOptional()
+  recipientEmail?: string;
+
+  @IsString()
+  @IsOptional()
+  giftRecordId?: string;
+
+  @IsString()
+  @IsOptional()
+  personId?: string;
 }

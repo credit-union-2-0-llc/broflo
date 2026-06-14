@@ -1,17 +1,16 @@
-import { IsString, IsOptional, IsInt, Min } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsUrl } from 'class-validator';
 
 export class PreviewOrderDto {
-  @IsString()
-  suggestionId!: string;
+  @IsUrl()
+  productUrl!: string;
 
   @IsString()
-  personId!: string;
+  productTitle!: string;
 
-  @IsString()
-  eventId!: string;
-
-  @IsOptional()
   @IsInt()
-  @Min(0)
-  budgetMaxCents?: number;
+  productPriceCents!: number;
+
+  @IsString()
+  @IsOptional()
+  suggestionId?: string;
 }

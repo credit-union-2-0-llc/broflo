@@ -4,70 +4,61 @@ import {
   Post,
   Patch,
   Delete,
-  Body,
   Param,
+  Body,
+  UseGuards,
   HttpCode,
   HttpStatus,
-} from "@nestjs/common";
-import type { User } from "@prisma/client";
-import { PersonsService } from "./persons.service";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import {
-  CreatePersonDto,
-  UpdatePersonDto,
-  CreateNeverAgainDto,
-} from "./dto/persons.dto";
+} from '@nestjs/common';
+import { PersonsService } from './persons.service';
+import { CreatePersonDto, UpdatePersonDto } from './dto/persons.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ApplicableFrameworks } from '../compliance/applicable-frameworks.decorator';
 
-@Controller("persons")
+@UseGuards(JwtAuthGuard)
+@Controller('persons')
 export class PersonsController {
-  constructor(private readonly persons: PersonsService) {}
+  constructor(private readonly personsService: PersonsService) {}
 
   @Get()
-  async list(@CurrentUser() user: User) {
-    return this.persons.list(user.id);
+  async findAll(@CurrentUser() user: { id: string }) {
+    return this.personsService.findAll(user.id);
   }
 
+  @Get(':id')
+  async findOne(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
+    return this.personsService.findOne(user.id, id);
+  }
+
+  @ApplicableFrameworks(['GDPR', 'CCPA', 'GLBA'])
   @Post()
-  async create(@CurrentUser() user: User, @Body() dto: CreatePersonDto) {
-    return this.persons.create(user.id, dto);
+  async create(
+    @CurrentUser() user: { id: string },
+    @Body() dto: CreatePersonDto,
+  ) {
+    return this.personsService.create(user.id, dto);
   }
 
-  @Get(":id")
-  async get(@CurrentUser() user: User, @Param("id") id: string) {
-    return this.persons.get(user.id, id);
-  }
-
-  @Patch(":id")
+  @ApplicableFrameworks(['GDPR', 'CCPA', 'GLBA'])
+  @Patch(':id')
   async update(
-    @CurrentUser() user: User,
-    @Param("id") id: string,
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
     @Body() dto: UpdatePersonDto,
   ) {
-    return this.persons.update(user.id, id, dto);
+    return this.personsService.update(user.id, id, dto);
   }
 
-  @Delete(":id")
+  @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@CurrentUser() user: User, @Param("id") id: string) {
-    await this.persons.softDelete(user.id, id);
-  }
-
-  @Post(":id/never-again")
-  async addNeverAgain(
-    @CurrentUser() user: User,
-    @Param("id") id: string,
-    @Body() dto: CreateNeverAgainDto,
+  async remove(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
   ) {
-    return this.persons.addNeverAgain(user.id, id, dto);
-  }
-
-  @Delete(":id/never-again/:itemId")
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async removeNeverAgain(
-    @CurrentUser() user: User,
-    @Param("id") id: string,
-    @Param("itemId") itemId: string,
-  ) {
-    await this.persons.removeNeverAgain(user.id, id, itemId);
+    return this.personsService.remove(user.id, id);
   }
 }

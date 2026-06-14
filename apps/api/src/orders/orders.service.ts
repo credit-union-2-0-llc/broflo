@@ -1,516 +1,293 @@
-import {
-  Injectable,
-  Inject,
-  Logger,
-  NotFoundException,
-  BadRequestException,
-  InternalServerErrorException,
-} from '@nestjs/common';
-import type { User } from '@prisma/client';
-import { OrderStatus, StatusChangeSource } from '@prisma/client';
+import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { RetailerAdapter, RetailerOrderError } from './adapters/retailer.adapter';
+import { RetailerAdapter } from './adapters/retailer.adapter';
 import { OrderAuditService } from './audit/order-audit.service';
 import { OrderStatusHistoryService } from './order-status-history.service';
 import { StripeConnectService } from './stripe-connect.service';
-import { PreviewOrderDto } from './dto/preview-order.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
+import { PreviewOrderDto } from './dto/preview-order.dto';
 import { ListOrdersDto } from './dto/list-orders.dto';
+import { CancelOrderDto } from './dto/cancel-order.dto';
+import { ApplicableFrameworks } from '../compliance/applicable-frameworks.decorator';
+
+const CANCEL_WINDOW_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 @Injectable()
 export class OrdersService {
-  private readonly log = new Logger(OrdersService.name);
-
   constructor(
     private readonly prisma: PrismaService,
-    @Inject('RETAILER_ADAPTER') private readonly adapter: RetailerAdapter,
-    private readonly orderAudit: OrderAuditService,
+    @Inject('RETAILER_ADAPTER') private readonly retailer: RetailerAdapter,
+    private readonly auditService: OrderAuditService,
     private readonly statusHistory: OrderStatusHistoryService,
     private readonly stripeConnect: StripeConnectService,
   ) {}
 
-  async preview(user: User, dto: PreviewOrderDto) {
-    const suggestion = await this.prisma.giftSuggestion.findFirst({
-      where: { id: dto.suggestionId, userId: user.id, eventId: dto.eventId },
+  @ApplicableFrameworks(['GDPR', 'CCPA', 'GLBA'])
+  async preview(userId: string, dto: PreviewOrderDto) {
+    const result = await this.retailer.previewOrder({
+      productUrl: dto.productUrl,
+      productTitle: dto.productTitle,
+      productPriceCents: dto.productPriceCents,
     });
-    if (!suggestion) {
-      throw new NotFoundException('Suggestion not found');
-    }
-
-    const person = await this.prisma.person.findFirst({
-      where: { id: dto.personId, userId: user.id, deletedAt: null },
-    });
-    if (!person) {
-      throw new NotFoundException('Person not found');
-    }
-
-    const products = await this.adapter.searchProducts(
-      suggestion.retailerHint || suggestion.title,
-      suggestion.estimatedPriceMinCents,
-      dto.budgetMaxCents ?? suggestion.estimatedPriceMaxCents,
-    );
-
-    if (products.length === 0) {
-      throw new BadRequestException('No products available for this suggestion');
-    }
-
-    const bestMatch = products[0];
-
-    return {
-      product: bestMatch,
-      suggestion: {
-        id: suggestion.id,
-        title: suggestion.title,
-        description: suggestion.description,
-      },
-      person: {
-        id: person.id,
-        name: person.name,
-        shippingAddress1: person.shippingAddress1,
-        shippingAddress2: person.shippingAddress2,
-        shippingCity: person.shippingCity,
-        shippingState: person.shippingState,
-        shippingZip: person.shippingZip,
-      },
-      cancelWindowHours: 2,
-    };
+    return result;
   }
 
-  async place(user: User, dto: PlaceOrderDto) {
-    if (!user.stripePaymentMethodId) {
-      throw new BadRequestException(
-        'No payment method on file. Add one in Billing settings.',
-      );
+  @ApplicableFrameworks(['GDPR', 'CCPA', 'GLBA'])
+  async place(userId: string, dto: PlaceOrderDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const totalCents =
+      (dto.productPriceCents ?? 0) + (dto.shippingCents ?? 0);
+
+    const feeCents = this.stripeConnect.calculateFeeCents(totalCents);
+    const connectedAccountId = this.stripeConnect.getConnectedAccountId(
+      dto.retailerSlug ?? null,
+    );
+
+    let stripePaymentIntentId: string | null = null;
+    if (user.stripePaymentMethodId && user.stripeCustomerId) {
+      const charge = await this.stripeConnect.createCharge({
+        amountCents: totalCents,
+        feeCents,
+        customerId: user.stripeCustomerId,
+        paymentMethodId: user.stripePaymentMethodId,
+        connectedAccountId,
+      });
+      stripePaymentIntentId = charge.paymentIntentId ?? null;
     }
 
-    const suggestion = await this.prisma.giftSuggestion.findFirst({
-      where: { id: dto.suggestionId, userId: user.id, eventId: dto.eventId },
+    const retailerResult = await this.retailer.placeOrder({
+      productUrl: dto.productUrl,
+      productTitle: dto.productTitle,
+      productPriceCents: dto.productPriceCents,
+      productImageUrl: dto.productImageUrl ?? null,
+      shippingCents: dto.shippingCents ?? 0,
+      shippingAddress1: dto.shippingAddress1,
+      shippingAddress2: dto.shippingAddress2 ?? null,
+      shippingCity: dto.shippingCity,
+      shippingState: dto.shippingState,
+      shippingZip: dto.shippingZip,
+      shippingCountry: dto.shippingCountry ?? 'US',
+      recipientName: dto.recipientName,
+      recipientEmail: dto.recipientEmail ?? null,
+      retailerSlug: dto.retailerSlug ?? null,
     });
-    if (!suggestion) {
-      throw new NotFoundException('Suggestion not found');
-    }
-
-    const product = await this.adapter.getProduct(dto.retailerProductId);
 
     const order = await this.prisma.order.create({
       data: {
-        userId: user.id,
-        personId: dto.personId,
-        eventId: dto.eventId,
-        giftRecordId: dto.giftRecordId ?? null,
-        suggestionId: dto.suggestionId,
-        retailerKey: this.adapter.retailerKey,
-        retailerProductId: dto.retailerProductId,
-        productTitle: product.title,
-        productDescription: product.description,
-        productImageUrl: product.imageUrl,
-        priceCents: product.priceCents,
-        platformFeeCents: this.stripeConnect.calculateFeeCents(product.priceCents),
-        stripePaymentIntentId: null,
-        status: 'pending',
-        shippingName: dto.shippingName,
+        userId,
+        status: 'ordered',
+        placedAt: new Date(),
+        productUrl: dto.productUrl,
+        productTitle: dto.productTitle,
+        productPriceCents: dto.productPriceCents,
+        productImageUrl: dto.productImageUrl ?? null,
+        shippingCents: dto.shippingCents ?? 0,
         shippingAddress1: dto.shippingAddress1,
         shippingAddress2: dto.shippingAddress2 ?? null,
         shippingCity: dto.shippingCity,
         shippingState: dto.shippingState,
         shippingZip: dto.shippingZip,
-        placedAt: new Date(),
+        shippingCountry: dto.shippingCountry ?? 'US',
+        recipientName: dto.recipientName,
+        recipientEmail: dto.recipientEmail ?? null,
+        retailerSlug: dto.retailerSlug ?? null,
+        retailerOrderId: retailerResult.retailerOrderId ?? null,
+        stripePaymentIntentId,
+        giftRecordId: dto.giftRecordId ?? null,
       },
     });
 
-    await this.statusHistory.record(order.id, null, 'pending');
-
-    // Stripe Connect: charge user with destination transfer to retailer
-    let stripePaymentIntentId: string | null = null;
-    const connectedAccountId = this.stripeConnect.getConnectedAccountId(this.adapter.retailerKey);
-
-    if (connectedAccountId && user.stripeCustomerId && user.stripePaymentMethodId) {
-      try {
-        const charge = await this.stripeConnect.createCharge({
-          amountCents: product.priceCents,
-          customerId: user.stripeCustomerId,
-          paymentMethodId: user.stripePaymentMethodId,
-          connectedAccountId,
-          orderId: order.id,
-          userId: user.id,
-        });
-        stripePaymentIntentId = charge.paymentIntentId;
-
-        // Update order with payment intent ID
-        await this.prisma.order.update({
-          where: { id: order.id },
-          data: {
-            stripePaymentIntentId,
-            platformFeeCents: this.stripeConnect.calculateFeeCents(product.priceCents),
-          },
-        });
-      } catch (err) {
-        // Stripe charge failed — mark order as failed, do NOT call retailer
-        this.log.error(`Stripe charge failed for order ${order.id}: ${err}`);
-        await this.prisma.order.update({
-          where: { id: order.id },
-          data: { status: 'failed' },
-        });
-        await this.statusHistory.record(order.id, 'pending', 'failed', 'system', {
-          reason: 'stripe_charge_failed',
-        });
-        await this.orderAudit.record({
-          orderId: order.id,
-          userId: user.id,
-          action: 'place_failed',
-          details: { reason: 'stripe_charge_failed', error: String(err) },
-        });
-        throw new InternalServerErrorException('Payment failed. Your card was not charged.');
-      }
-    } else {
-      // No connected account (or no payment method) — mock flow without real charge
-      this.log.warn(
-        `Skipping Stripe charge for order ${order.id}: no connected account or payment method`,
-      );
-    }
-
-    try {
-      const result = await this.adapter.placeOrder(
-        product,
-        {
-          name: dto.shippingName,
-          address1: dto.shippingAddress1,
-          address2: dto.shippingAddress2,
-          city: dto.shippingCity,
-          state: dto.shippingState,
-          zip: dto.shippingZip,
-        },
-        stripePaymentIntentId || order.id,
-      );
-
-      const updatedOrder = await this.prisma.order.update({
-        where: { id: order.id },
-        data: {
-          status: 'ordered',
-          retailerOrderId: result.retailerOrderId,
-          confirmationNumber: result.confirmationNumber,
-          estimatedDeliveryDate: new Date(result.estimatedDeliveryDate),
-        },
-      });
-
-      await this.statusHistory.record(order.id, 'pending', 'ordered', 'system', {
-        retailerOrderId: result.retailerOrderId,
-      });
-
-      if (dto.giftRecordId) {
-        try {
-          await this.prisma.giftRecord.update({
-            where: { id: dto.giftRecordId, userId: user.id },
-            data: { source: 'ordered' },
-          });
-        } catch (err) {
-          this.log.warn(`GiftRecord source update failed (non-critical): ${err}`);
-        }
-      }
-
-      await this.orderAudit.record({
-        orderId: order.id,
-        userId: user.id,
-        action: 'place',
-        details: {
-          retailerOrderId: result.retailerOrderId,
-          priceCents: product.priceCents,
-        },
-      });
-
-      return updatedOrder;
-    } catch (adapterErr) {
-      if (adapterErr instanceof RetailerOrderError || adapterErr instanceof InternalServerErrorException) {
-        // If it's already an ISE from the Stripe path re-throw directly
-        if (adapterErr instanceof InternalServerErrorException) {
-          throw adapterErr;
-        }
-      }
-
-      // Retailer failed — refund if we charged
-      if (stripePaymentIntentId) {
-        try {
-          await this.stripeConnect.refund(stripePaymentIntentId, order.id);
-          await this.orderAudit.record({
-            orderId: order.id,
-            userId: user.id,
-            action: 'refund',
-            details: { reason: 'retailer_failed_after_charge' },
-          });
-        } catch (refundErr) {
-          this.log.error(`CRITICAL: Refund failed for order ${order.id}: ${refundErr}`);
-          await this.orderAudit.record({
-            orderId: order.id,
-            userId: user.id,
-            action: 'refund_failed',
-            details: { paymentIntentId: stripePaymentIntentId, error: String(refundErr) },
-          });
-        }
-      }
-
-      // Mark order as failed
-      await this.prisma.order.update({
-        where: { id: order.id },
-        data: { status: 'failed' },
-      });
-      await this.statusHistory.record(order.id, 'pending', 'failed', 'system', {
-        reason: 'retailer_failed',
-      });
-      await this.orderAudit.record({
-        orderId: order.id,
-        userId: user.id,
-        action: 'place_failed',
-        details: {
-          reason: 'retailer_failed',
-          error: String(adapterErr),
-          ...(adapterErr instanceof RetailerOrderError
-            ? { errorCode: adapterErr.code }
-            : {}),
-        },
-      });
-      throw new InternalServerErrorException(
-        'Order placement failed. Your card has been refunded.',
-      );
-    }
-  }
-
-  async cancel(userId: string, orderId: string, reason?: string) {
-    const order = await this.prisma.order.findFirst({
-      where: { id: orderId, userId },
-    });
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-
-    if (
-      !order.placedAt ||
-      Date.now() - order.placedAt.getTime() >= 2 * 60 * 60 * 1000
-    ) {
-      throw new BadRequestException(
-        'Cancel window has closed. Order cannot be cancelled.',
-      );
-    }
-
-    if (!['pending', 'ordered'].includes(order.status)) {
-      throw new BadRequestException(
-        'Order cannot be cancelled in its current state.',
-      );
-    }
-
-    // Refund via Stripe if payment was made
-    if (order.stripePaymentIntentId) {
-      try {
-        await this.stripeConnect.refund(order.stripePaymentIntentId, order.id);
-        await this.orderAudit.record({
-          orderId: order.id,
-          userId,
-          action: 'refund',
-          details: { paymentIntentId: order.stripePaymentIntentId },
-        });
-      } catch (refundErr) {
-        this.log.error(`Refund failed for order ${order.id}: ${refundErr}`);
-        await this.orderAudit.record({
-          orderId: order.id,
-          userId,
-          action: 'refund_failed',
-          details: {
-            paymentIntentId: order.stripePaymentIntentId,
-            error: String(refundErr),
-          },
-        });
-        throw new BadRequestException('Refund failed. Please contact support.');
-      }
-    }
-
-    try {
-      await this.adapter.cancelOrder(order.retailerOrderId || order.id);
-    } catch (err) {
-      await this.orderAudit.record({
-        orderId: order.id,
-        userId,
-        action: 'cancel_failed',
-        details: {
-          errorMessage: err instanceof Error ? err.message : String(err),
-        },
-      });
-      throw new BadRequestException(
-        err instanceof Error ? err.message : 'Cancel failed',
-      );
-    }
-
-    const updatedOrder = await this.prisma.order.update({
-      where: { id: order.id },
-      data: {
-        status: 'cancelled',
-        cancelledAt: new Date(),
-        cancelReason: reason ?? null,
-      },
-    });
-
-    await this.statusHistory.record(
+    await this.auditService.recordWithFrameworks(
       order.id,
-      order.status as OrderStatus,
-      'cancelled',
-      'system',
-      { reason: reason ?? null },
+      'created',
+      `user-${userId}`,
+      ['GDPR', 'CCPA', 'GLBA'],
+      { totalCents, retailerOrderId: retailerResult.retailerOrderId },
     );
 
-    if (order.giftRecordId) {
-      try {
-        await this.prisma.giftRecord.update({
-          where: { id: order.giftRecordId },
-          data: { source: 'suggestion' },
-        });
-      } catch (err) {
-        this.log.warn(`GiftRecord source revert failed (non-critical): ${err}`);
-      }
-    }
-
-    await this.orderAudit.record({
-      orderId: order.id,
-      userId,
-      action: 'cancel',
-      details: { reason: reason ?? null },
-    });
-
-    return updatedOrder;
+    return order;
   }
 
-  async list(userId: string, query: ListOrdersDto) {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+  async list(userId: string, dto: ListOrdersDto) {
+    const page = dto.page ?? 1;
+    const limit = dto.limit ?? 20;
+    const skip = (page - 1) * limit;
 
-    const where: { userId: string; status?: OrderStatus } = { userId };
-    if (query.status) {
-      where.status = query.status as OrderStatus;
-    }
-
-    const sortField = query.sortBy ?? 'createdAt';
-    const sortDir = query.sortOrder ?? 'desc';
-
-    const [total, orders] = await Promise.all([
-      this.prisma.order.count({ where }),
+    const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
-        where,
-        skip: (page - 1) * limit,
+        where: { userId },
+        orderBy: { placedAt: 'desc' },
+        skip,
         take: limit,
-        orderBy: { [sortField]: sortDir },
-        include: { person: { select: { name: true } } },
       }),
+      this.prisma.order.count({ where: { userId } }),
     ]);
 
-    return { data: orders, meta: { page, limit, total } };
+    return { orders, total, page, limit };
   }
 
-  async getById(userId: string, orderId: string) {
-    const order = await this.prisma.order.findFirst({
-      where: { id: orderId, userId },
-      include: {
-        person: { select: { name: true } },
-        giftRecord: { select: { id: true, title: true, source: true } },
-      },
-    });
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-
-    const cancelWindowSecondsLeft = order.placedAt
-      ? Math.max(
-          0,
-          Math.floor(
-            (order.placedAt.getTime() + 2 * 60 * 60 * 1000 - Date.now()) / 1000,
-          ),
-        )
-      : 0;
-
-    return { ...order, cancelWindowSecondsLeft };
-  }
-
-  async getTimeline(userId: string, orderId: string) {
+  async get(userId: string, orderId: string) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
     });
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-    return this.statusHistory.getTimeline(orderId);
+    if (!order) throw new NotFoundException('Order not found');
+    return order;
   }
 
-  async markManuallyPurchased(userId: string, orderId: string) {
+  @ApplicableFrameworks(['GDPR', 'CCPA', 'GLBA'])
+  async cancel(userId: string, orderId: string, _dto?: CancelOrderDto) {
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, userId, status: 'failed' },
+      where: { id: orderId, userId },
     });
-    if (!order) {
-      throw new NotFoundException('Order not found or not in failed state');
-    }
+    if (!order) throw new NotFoundException('Order not found');
 
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: 'ordered', placedAt: new Date() },
-    });
-
-    await this.orderAudit.record({
-      orderId,
-      userId,
-      action: 'place',
-      details: { channel: 'manual_fallback', source: 'user' },
-    });
-
-    return { success: true };
-  }
-
-  async transitionStatus(
-    orderId: string,
-    toStatus: OrderStatus,
-    source: StatusChangeSource = 'system',
-    extra?: {
-      trackingNumber?: string;
-      trackingUrl?: string;
-      carrierName?: string;
-      metadata?: Record<string, unknown>;
-    },
-  ) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-    });
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-
-    const VALID_TRANSITIONS: Record<string, string[]> = {
-      pending: ['ordered', 'cancelled', 'failed'],
-      ordered: ['processing', 'cancelled', 'failed'],
-      processing: ['shipped', 'cancelled', 'failed'],
-      shipped: ['delivered', 'failed'],
-      delivered: [],
-      cancelled: [],
-      failed: [],
-    };
-
-    if (!VALID_TRANSITIONS[order.status]?.includes(toStatus)) {
-      this.log.warn(
-        `Invalid transition ${order.status} → ${toStatus} for order ${orderId}`,
+    const cancellableStatuses = ['ordered', 'confirmed'];
+    if (!cancellableStatuses.includes(order.status)) {
+      throw new BadRequestException(
+        `Order with status "${order.status}" cannot be cancelled`,
       );
-      return order;
     }
 
-    const updateData: Record<string, unknown> = { status: toStatus };
-    if (extra?.trackingNumber) updateData.trackingNumber = extra.trackingNumber;
-    if (extra?.trackingUrl) updateData.trackingUrl = extra.trackingUrl;
-    if (extra?.carrierName) updateData.carrierName = extra.carrierName;
-    if (toStatus === 'delivered') updateData.deliveredAt = new Date();
+    const placedAt = order.placedAt ? new Date(order.placedAt).getTime() : 0;
+    const elapsed = Date.now() - placedAt;
+    if (elapsed > CANCEL_WINDOW_MS) {
+      throw new BadRequestException(
+        'Cancel window has closed (2 hours after placement)',
+      );
+    }
+
+    // Attempt retailer cancellation
+    if (order.retailerOrderId) {
+      await this.retailer.cancelOrder(order.retailerOrderId);
+    }
+
+    // Refund if payment was captured
+    if (order.stripePaymentIntentId) {
+      await this.stripeConnect.refund(order.stripePaymentIntentId);
+    }
+
+    const previousStatus = order.status;
 
     const updated = await this.prisma.order.update({
       where: { id: orderId },
-      data: updateData,
+      data: { status: 'cancelled' },
     });
 
-    await this.statusHistory.record(
+    await this.statusHistory.record(orderId, previousStatus, 'cancelled', 'user');
+
+    await this.auditService.recordWithFrameworks(
       orderId,
-      order.status as OrderStatus,
-      toStatus,
-      source,
-      extra?.metadata,
+      'cancelled',
+      `user-${userId}`,
+      ['GDPR', 'CCPA', 'GLBA'],
+      { previousStatus: order.status },
+    );
+
+    return updated;
+  }
+
+  async updateStatus(
+    orderId: string,
+    newStatus: string,
+    changedBy: string,
+  ) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+
+    const previousStatus = order.status;
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: newStatus },
+    });
+
+    await this.statusHistory.record(orderId, previousStatus, newStatus, changedBy);
+
+    await this.auditService.record(
+      orderId,
+      'status_changed',
+      changedBy,
+      { previousStatus, newStatus },
+    );
+
+    return updated;
+  }
+
+  async adminUpdateStatus(
+    orderId: string,
+    newStatus: string,
+  ) {
+    return this.updateStatus(orderId, newStatus, 'system');
+  }
+
+  async getWithAudit(userId: string, orderId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId },
+      include: {
+        auditEntries: {
+          orderBy: { createdAt: 'asc' },
+        },
+        statusHistory: {
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    return order;
+  }
+
+  async markShipped(orderId: string, trackingNumber?: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+
+    const previousStatus = order.status;
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: 'shipped',
+        ...(trackingNumber ? { trackingNumber } : {}),
+      },
+    });
+
+    await this.statusHistory.record(orderId, previousStatus, 'shipped', 'system');
+
+    await this.auditService.record(
+      orderId,
+      'status_changed',
+      'system',
+      { previousStatus, newStatus: 'shipped' },
+    );
+
+    return updated;
+  }
+
+  async markDelivered(orderId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+
+    const previousStatus = order.status;
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'delivered' },
+    });
+
+    await this.statusHistory.record(orderId, previousStatus, 'delivered', 'system');
+
+    await this.auditService.record(
+      orderId,
+      'status_changed',
+      'system',
+      { previousStatus, newStatus: 'delivered' },
     );
 
     return updated;

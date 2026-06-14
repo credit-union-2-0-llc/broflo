@@ -1,70 +1,63 @@
-import { Injectable, Logger } from '@nestjs/common';
-
-export interface OrderAuditEntry {
-  orderId: string;
-  userId: string;
-  action:
-    | 'preview'
-    | 'place'
-    | 'place_failed'
-    | 'cancel'
-    | 'cancel_failed'
-    | 'refund'
-    | 'refund_failed';
-  details: Record<string, unknown>;
-}
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { isValidFramework } from '../../compliance/frameworks.config';
 
 @Injectable()
 export class OrderAuditService {
-  private readonly log = new Logger(OrderAuditService.name);
-  private readonly opsUrl: string | null;
-  private readonly opsApiKey: string | null;
+  constructor(private readonly prisma: PrismaService) {}
 
-  constructor() {
-    this.opsUrl = process.env.OPS_PLATFORM_URL || null;
-    this.opsApiKey = process.env.OPS_PLATFORM_API_KEY || null;
+  async record(
+    orderId: string,
+    action: string,
+    changedBy: string,
+    meta?: Record<string, unknown>,
+  ): Promise<void> {
+    await this.prisma.orderAuditEntry.create({
+      data: {
+        orderId,
+        action,
+        changedBy,
+        meta: meta ?? null,
+      },
+    });
   }
 
-  async record(entry: OrderAuditEntry): Promise<void> {
-    const payload = {
-      serviceId: 'broflo-api',
-      userId: entry.userId,
-      action: entry.action,
-      resource: `order/${entry.orderId}`,
-      metadata: {
-        orderId: entry.orderId,
-        ...entry.details,
-      },
-    };
-
-    // Always log locally for immediate observability
-    this.log.log(
-      JSON.stringify({
-        audit: 'order',
-        ...payload,
-        timestamp: new Date().toISOString(),
-      }),
-    );
-
-    // POST to OPS-Platform (required by cu2-standards)
-    if (this.opsUrl && this.opsApiKey) {
-      try {
-        await fetch(`${this.opsUrl}/api/audit/log`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': this.opsApiKey,
-          },
-          body: JSON.stringify(payload),
-        });
-      } catch (err) {
-        // OPS-Platform POST failed — log warning but do not block the order flow
-        this.log.warn(`OPS-Platform audit POST failed: ${err}`);
+  /**
+   * Framework-aware audit record variant.
+   * Records which regulatory frameworks governed the PII transaction.
+   * Validates all framework names before writing to the DB to ensure
+   * immutable, well-formed audit entries.
+   *
+   * @param orderId    - The order being audited
+   * @param action     - The action taken (e.g., 'created', 'status_changed')
+   * @param changedBy  - Actor identifier ('system' or 'user-{id}')
+   * @param frameworks - Array of applicable framework names (GDPR, CCPA, GLBA, HIPAA)
+   * @param meta       - Optional additional metadata
+   */
+  async recordWithFrameworks(
+    orderId: string,
+    action: string,
+    changedBy: string,
+    frameworks: string[],
+    meta?: Record<string, unknown>,
+  ): Promise<void> {
+    // Validate at record time — final safety check before DB write
+    for (const fw of frameworks) {
+      if (!isValidFramework(fw)) {
+        throw new Error(
+          `Invalid framework in audit record: "${fw}". Valid frameworks: GDPR, CCPA, GLBA, HIPAA`,
+        );
       }
-    } else {
-      this.log.warn(
-        'OPS_PLATFORM_URL or OPS_PLATFORM_API_KEY not set — audit event logged locally only',
-      );
     }
+
+    await this.prisma.orderAuditEntry.create({
+      data: {
+        orderId,
+        action,
+        changedBy,
+        frameworkTags: frameworks,
+        meta: meta ?? null,
+      },
+    });
   }
 }

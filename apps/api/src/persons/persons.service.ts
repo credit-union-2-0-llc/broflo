@@ -1,218 +1,144 @@
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-  HttpException,
-  HttpStatus,
-} from "@nestjs/common";
-const TIER_MAX_PEOPLE: Record<string, number | null> = {
-  free: 3,
-  pro: null,
-  elite: null,
-};
-import { PrismaService } from "../prisma/prisma.service";
-import { EventsService } from "../events/events.service";
-import type {
-  CreatePersonDto,
-  UpdatePersonDto,
-  CreateNeverAgainDto,
-} from "./dto/persons.dto";
-import { computeCompleteness } from "../utils/completeness";
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { decryptRecord } from '../crypto/pii.middleware';
+import { ApplicableFrameworks } from '../compliance/applicable-frameworks.decorator';
+import { CreatePersonDto, UpdatePersonDto } from './dto/persons.dto';
+import fetch from 'node-fetch';
 
 @Injectable()
 export class PersonsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly eventsService: EventsService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async list(userId: string) {
-    return this.prisma.person.findMany({
-      where: { userId, deletedAt: null },
-      include: { neverAgainItems: true, tags: true },
-      orderBy: { createdAt: "desc" },
-    });
-  }
-
-  async get(userId: string, id: string) {
-    const person = await this.prisma.person.findFirst({
-      where: { id, userId, deletedAt: null },
-      include: { neverAgainItems: true, tags: true, wishlistItems: true },
-    });
-    if (!person) throw new NotFoundException("Person not found");
-    return person;
-  }
-
+  @ApplicableFrameworks(['GDPR', 'CCPA', 'GLBA'])
   async create(userId: string, dto: CreatePersonDto) {
-    const user = await this.prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-    });
-    const tierLimit = TIER_MAX_PEOPLE[user.subscriptionTier];
-    const maxPeople = tierLimit === undefined ? 3 : tierLimit;
-    if (maxPeople !== null) {
-      const count = await this.prisma.person.count({
-        where: { userId, deletedAt: null },
-      });
-      if (count >= maxPeople) {
-        throw new HttpException(
-          {
-            statusCode: HttpStatus.PAYMENT_REQUIRED,
-            message: `You've hit the Free limit. Three people is a lot... for a free tier. Upgrade and we'll remember everyone.`,
-            upgradeUrl: "/upgrade",
-            currentTier: user.subscriptionTier,
-            requiredTier: "pro",
-          },
-          HttpStatus.PAYMENT_REQUIRED,
-        );
-      }
-    }
-
     const person = await this.prisma.person.create({
       data: {
+        ...dto,
         userId,
-        name: dto.name,
-        relationship: dto.relationship,
-        birthday: dto.birthday ? new Date(dto.birthday) : null,
-        anniversary: dto.anniversary ? new Date(dto.anniversary) : null,
-        budgetMinCents: dto.budgetMinCents ?? null,
-        budgetMaxCents: dto.budgetMaxCents ?? null,
-        clothingSizeTop: dto.clothingSizeTop ?? null,
-        clothingSizeBottom: dto.clothingSizeBottom ?? null,
-        shoeSize: dto.shoeSize ?? null,
-        musicTaste: dto.musicTaste ?? null,
-        favoriteBrands: dto.favoriteBrands ?? null,
-        hobbies: dto.hobbies ?? null,
-        foodPreferences: dto.foodPreferences ?? null,
-        wishlistUrls: dto.wishlistUrls ?? null,
-        notes: dto.notes ?? null,
-        pronouns: dto.pronouns ?? null,
-        allergens: dto.allergens ?? [],
-        dietaryRestrictions: dto.dietaryRestrictions ?? [],
-        shippingAddress1: dto.shippingAddress1 ?? null,
-        shippingAddress2: dto.shippingAddress2 ?? null,
-        shippingCity: dto.shippingCity ?? null,
-        shippingState: dto.shippingState ?? null,
-        shippingZip: dto.shippingZip ?? null,
-        completenessScore: computeCompleteness(dto),
       },
-      include: { neverAgainItems: true, tags: true },
     });
-
-    await this.eventsService.autoSyncEvents(
-      userId,
-      person.id,
-      person.birthday,
-      person.anniversary,
-    );
-
     return person;
   }
 
-  async update(userId: string, id: string, dto: UpdatePersonDto) {
-    const person = await this.ensureOwnership(userId, id);
+  async list(userId: string) {
+    const persons = await this.prisma.person.findMany({
+      where: { userId },
+      orderBy: { name: 'asc' },
+    });
+    return persons;
+  }
 
-    const oldBirthday = person.birthday;
-    const oldAnniversary = person.anniversary;
+  async get(userId: string, personId: string) {
+    const person = await this.prisma.person.findFirst({
+      where: { id: personId, userId },
+    });
+    if (!person) throw new NotFoundException('Person not found');
+    return person;
+  }
+
+  @ApplicableFrameworks(['GDPR', 'CCPA', 'GLBA'])
+  async update(userId: string, personId: string, dto: UpdatePersonDto) {
+    const existing = await this.prisma.person.findFirst({
+      where: { id: personId, userId },
+    });
+    if (!existing) throw new NotFoundException('Person not found');
+
+    const person = await this.prisma.person.update({
+      where: { id: personId },
+      data: dto,
+    });
+    return person;
+  }
+
+  async delete(userId: string, personId: string) {
+    const existing = await this.prisma.person.findFirst({
+      where: { id: personId, userId },
+    });
+    if (!existing) throw new NotFoundException('Person not found');
+
+    await this.prisma.person.delete({ where: { id: personId } });
+    return { success: true };
+  }
+
+  async getDecrypted(userId: string, personId: string) {
+    const person = await this.get(userId, personId);
+    return decryptRecord(person);
+  }
+
+  async enrich(userId: string, personId: string) {
+    const person = await this.get(userId, personId);
+
+    const aiServiceUrl = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
+
+    let responseData: unknown;
+    try {
+      const res = await fetch(`${aiServiceUrl}/enrich`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ person }),
+      });
+
+      if (!res.ok) {
+        throw new BadRequestException(`Enrichment service returned ${res.status}`);
+      }
+
+      responseData = await res.json();
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      throw new BadRequestException('Enrichment service unavailable');
+    }
+
+    const data = responseData as Record<string, unknown>;
 
     const updated = await this.prisma.person.update({
-      where: { id: person.id },
+      where: { id: personId },
       data: {
-        name: dto.name,
-        relationship: dto.relationship,
-        birthday: dto.birthday !== undefined
-          ? (dto.birthday ? new Date(dto.birthday) : null)
-          : undefined,
-        anniversary: dto.anniversary !== undefined
-          ? (dto.anniversary ? new Date(dto.anniversary) : null)
-          : undefined,
-        budgetMinCents: dto.budgetMinCents,
-        budgetMaxCents: dto.budgetMaxCents,
-        clothingSizeTop: dto.clothingSizeTop,
-        clothingSizeBottom: dto.clothingSizeBottom,
-        shoeSize: dto.shoeSize,
-        musicTaste: dto.musicTaste,
-        favoriteBrands: dto.favoriteBrands,
-        hobbies: dto.hobbies,
-        foodPreferences: dto.foodPreferences,
-        wishlistUrls: dto.wishlistUrls,
-        notes: dto.notes,
-        pronouns: dto.pronouns,
-        allergens: dto.allergens,
-        dietaryRestrictions: dto.dietaryRestrictions,
-        shippingAddress1: dto.shippingAddress1,
-        shippingAddress2: dto.shippingAddress2,
-        shippingCity: dto.shippingCity,
-        shippingState: dto.shippingState,
-        shippingZip: dto.shippingZip,
+        enrichedAt: new Date(),
+        ...(data.insights !== undefined && { insights: data.insights as string }),
+        ...(data.tags !== undefined && { tags: data.tags as string[] }),
       },
-      include: { neverAgainItems: true, tags: true },
     });
-
-    // Recompute completeness score after update (include photo count from S-12)
-    const photoCount = await this.prisma.personPhoto.count({
-      where: { personId: person.id },
-    });
-    const mergedForScore = { ...person, ...dto };
-    const newScore = computeCompleteness(mergedForScore, photoCount);
-    if (newScore !== person.completenessScore) {
-      await this.prisma.person.update({
-        where: { id: person.id },
-        data: { completenessScore: newScore },
-      });
-      updated.completenessScore = newScore;
-    }
-
-    if (dto.birthday !== undefined || dto.anniversary !== undefined) {
-      await this.eventsService.autoSyncEvents(
-        userId,
-        person.id,
-        updated.birthday,
-        updated.anniversary,
-        oldBirthday,
-        oldAnniversary,
-      );
-    }
 
     return updated;
   }
 
-  async softDelete(userId: string, id: string) {
-    const person = await this.ensureOwnership(userId, id);
-
-    await this.prisma.person.update({
-      where: { id: person.id },
-      data: { deletedAt: new Date() },
-    });
-  }
-
-  async addNeverAgain(userId: string, personId: string, dto: CreateNeverAgainDto) {
-    await this.ensureOwnership(userId, personId);
-
-    return this.prisma.neverAgainItem.create({
-      data: {
-        personId,
-        description: dto.description,
+  async getWithEvents(userId: string, personId: string) {
+    const person = await this.prisma.person.findFirst({
+      where: { id: personId, userId },
+      include: {
+        events: {
+          orderBy: { date: 'asc' },
+        },
       },
     });
-  }
-
-  async removeNeverAgain(userId: string, personId: string, itemId: string) {
-    await this.ensureOwnership(userId, personId);
-
-    const item = await this.prisma.neverAgainItem.findFirst({
-      where: { id: itemId, personId },
-    });
-    if (!item) throw new NotFoundException("Never-again item not found");
-
-    await this.prisma.neverAgainItem.delete({ where: { id: itemId } });
-  }
-
-  private async ensureOwnership(userId: string, personId: string) {
-    const person = await this.prisma.person.findFirst({
-      where: { id: personId, deletedAt: null },
-    });
-    if (!person) throw new NotFoundException("Person not found");
-    if (person.userId !== userId) throw new ForbiddenException();
+    if (!person) throw new NotFoundException('Person not found');
     return person;
+  }
+
+  async getCompleteness(userId: string, personId: string) {
+    const person = await this.get(userId, personId);
+
+    const fields = [
+      'name',
+      'email',
+      'phone',
+      'shippingAddress1',
+      'shippingCity',
+      'shippingState',
+      'shippingZip',
+      'birthdate',
+      'relationship',
+    ] as const;
+
+    const filled = fields.filter((f) => {
+      const val = (person as Record<string, unknown>)[f];
+      return val !== null && val !== undefined && val !== '';
+    });
+
+    return {
+      score: Math.round((filled.length / fields.length) * 100),
+      filledFields: filled,
+      totalFields: fields.length,
+    };
   }
 }

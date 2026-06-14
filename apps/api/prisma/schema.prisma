@@ -432,12 +432,29 @@ model Order {
   person        Person               @relation(fields: [personId], references: [id], onDelete: Cascade)
   event         Event?               @relation(fields: [eventId], references: [id], onDelete: SetNull)
   giftRecord    GiftRecord?          @relation(fields: [giftRecordId], references: [id], onDelete: SetNull)
+  auditEntries  OrderAuditEntry[]
   statusHistory OrderStatusHistory[]
   agentJob      AgentJob?
 
   @@index([userId, status, placedAt], map: "idx_orders_user_status")
   @@index([personId, placedAt], map: "idx_orders_person_placed")
   @@map("orders")
+}
+
+model OrderAuditEntry {
+  id            String   @id @default(cuid())
+  orderId       String   @map("order_id")
+  action        String
+  changedBy     String   @map("changed_by")
+  frameworkTags String[] @default([]) @map("framework_tags")
+  meta          Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt], map: "idx_order_audit_entries_order")
+  @@map("order_audit_entries")
 }
 
 model OrderStatusHistory {

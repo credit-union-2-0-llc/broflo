@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrdersService } from '../orders/orders.service';
 import { AgentOrdersService } from '../orders/agent/agent-orders.service';
@@ -7,13 +7,9 @@ import { AutopilotService } from './autopilot.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SuggestionsService } from '../suggestions/suggestions.service';
 
-const CONFIDENCE_AUTO_ORDER = 0.80;
-const MAX_RUNS_PER_CYCLE = 50;
-
 @Injectable()
 export class AutopilotScheduler {
-  private readonly log = new Logger(AutopilotScheduler.name);
-  private readonly enabled: boolean;
+  private readonly logger = new Logger(AutopilotScheduler.name);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -22,361 +18,198 @@ export class AutopilotScheduler {
     private readonly autopilotService: AutopilotService,
     private readonly notifications: NotificationsService,
     private readonly suggestionsService: SuggestionsService,
-  ) {
-    this.enabled = process.env.AUTOPILOT_ENABLED === 'true';
-    if (!this.enabled) this.log.warn('Autopilot scheduler disabled (AUTOPILOT_ENABLED != true)');
-  }
+  ) {}
 
-  @Cron('0 7 * * *')
-  async runAutopilot() {
-    if (!this.enabled) return;
-    this.log.log('Autopilot cron started');
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // Find active rules for Pro/Elite users
-    const rules = await this.prisma.autopilotRule.findMany({
-      where: {
-        isActive: true,
-        user: { subscriptionTier: { in: ['pro', 'elite'] } },
-      },
-      include: {
-        user: { select: { id: true, subscriptionTier: true, stripeCustomerId: true, stripePaymentMethodId: true } },
-        person: {
-          select: {
-            id: true,
-            name: true,
-            shippingAddress1: true,
-            shippingCity: true,
-            shippingState: true,
-            shippingZip: true,
-          },
-        },
-      },
-    });
-
-    let processed = 0;
-
-    for (const rule of rules) {
-      if (processed >= MAX_RUNS_PER_CYCLE) {
-        this.log.warn(`Max runs per cycle (${MAX_RUNS_PER_CYCLE}) reached, deferring remaining`);
-        break;
-      }
-
-      try {
-        await this.processRule(rule, today);
-        processed++;
-      } catch (err) {
-        this.log.error(`Autopilot failed for rule ${rule.id}: ${err}`);
-      }
+  @Cron(CronExpression.EVERY_HOUR)
+  async runAutopilot(): Promise<void> {
+    if (process.env.AUTOPILOT_ENABLED !== 'true') {
+      return;
     }
 
-    this.log.log(`Autopilot cron completed: ${processed} rules processed`);
-  }
+    this.logger.log('Running autopilot scheduler...');
 
-  private async processRule(
-    rule: Awaited<ReturnType<typeof this.findRuleWithRelations>>,
-    today: Date,
-  ) {
-    // Find upcoming events within lead days window
-    const leadDate = new Date(today);
-    leadDate.setDate(leadDate.getDate() + rule.leadDays);
-
-    const events = await this.prisma.event.findMany({
-      where: {
-        personId: rule.personId,
-        userId: rule.userId,
-        occasionType: { in: rule.occasionTypes as never[] },
-        date: { gte: today, lte: leadDate },
+    const rules = await this.prisma.autopilotRule.findMany({
+      where: { isActive: true },
+      include: {
+        user: true,
+        person: true,
       },
     });
 
-    for (const event of events) {
-      // Check if we already ran for this event
-      const existingRun = await this.prisma.autopilotRun.findFirst({
-        where: { ruleId: rule.id, eventId: event.id },
+    for (const rule of rules) {
+      await this.processRule(rule);
+    }
+  }
+
+  private async processRule(rule: any): Promise<void> {
+    try {
+      const events = await this.prisma.event.findMany({
+        where: {
+          personId: rule.personId,
+          userId: rule.userId,
+          occasionType: { in: rule.occasionTypes },
+          date: {
+            gte: new Date(),
+            lte: new Date(Date.now() + rule.leadDays * 24 * 60 * 60 * 1000),
+          },
+        },
       });
-      if (existingRun) continue;
+
+      if (events.length === 0) {
+        return;
+      }
+
+      const event = events[0];
+
+      // Check for existing run
+      const existingRun = await this.prisma.autopilotRun.findFirst({
+        where: {
+          autopilotRuleId: rule.id,
+          eventId: event.id,
+        },
+      });
+
+      if (existingRun) {
+        return;
+      }
 
       // Check spending cap
-      const spendCheck = await this.autopilotService.checkSpendingCap(
+      const capCheck = await this.autopilotService.checkSpendingCap(
         rule.userId,
         rule.id,
         rule.budgetMaxCents,
+        rule.monthlyCapCents,
       );
 
-      if (!spendCheck.allowed) {
-        await this.prisma.autopilotRun.create({
-          data: {
-            ruleId: rule.id,
-            eventId: event.id,
-            status: 'skipped_budget',
-            reason: `Monthly spend ${spendCheck.monthlySpentCents}c would exceed cap ${spendCheck.monthlyCap}c`,
-          },
-        });
+      if (!capCheck.allowed) {
+        const usageRatio = capCheck.monthlySpentCents / capCheck.monthlyCap;
 
-        // Notify at 80% cap
-        if (spendCheck.monthlySpentCents >= spendCheck.monthlyCap * 0.8) {
+        if (usageRatio >= 0.8) {
           await this.notifications.create(rule.userId, {
             type: 'autopilot_budget_warning',
-            title: 'Autopilot Budget Alert',
-            body: `You've used ${Math.round((spendCheck.monthlySpentCents / spendCheck.monthlyCap) * 100)}% of your monthly Autopilot budget for ${rule.person.name}.`,
-            linkUrl: '/autopilot',
+            title: 'Autopilot budget warning',
+            body: `You've used ${Math.round(usageRatio * 100)}% of your monthly autopilot budget.`,
           });
         }
-        continue;
-      }
 
-      // Check shipping address
-      if (!rule.person.shippingAddress1 || !rule.person.shippingCity) {
         await this.prisma.autopilotRun.create({
           data: {
-            ruleId: rule.id,
+            autopilotRuleId: rule.id,
             eventId: event.id,
-            status: 'failed',
-            reason: 'Missing shipping address',
+            userId: rule.userId,
+            status: 'skipped_budget',
+            amountCents: 0,
           },
         });
-        await this.notifications.create(rule.userId, {
-          type: 'autopilot_failed',
-          title: 'Autopilot Needs Your Help',
-          body: `We couldn't auto-order for ${rule.person.name} — no shipping address on file.`,
-          linkUrl: `/people/${rule.personId}`,
-        });
-        continue;
+        return;
       }
 
-      // Generate AI suggestion
-      let suggestion;
-      try {
-        const result = await this.suggestionsService.generate(rule.userId, {
+      // Generate suggestions
+      const { suggestions } = await this.suggestionsService.generate(
+        rule.userId,
+        {
           personId: rule.personId,
-          eventId: event.id,
-          surpriseFactor: 'safe',
-        });
-        suggestion = result.suggestions?.[0];
-      } catch (err) {
-        await this.prisma.autopilotRun.create({
-          data: {
-            ruleId: rule.id,
-            eventId: event.id,
-            status: 'failed',
-            reason: `AI suggestion failed: ${err}`,
-          },
-        });
-        continue;
-      }
+          occasionType: event.occasionType,
+          budgetMinCents: rule.budgetMinCents,
+          budgetMaxCents: rule.budgetMaxCents,
+        },
+      );
 
-      if (!suggestion) {
+      if (!suggestions || suggestions.length === 0) {
         await this.prisma.autopilotRun.create({
           data: {
-            ruleId: rule.id,
+            autopilotRuleId: rule.id,
             eventId: event.id,
-            status: 'skipped_no_suggestion',
-            reason: 'No suggestions returned',
-          },
-        });
-        continue;
-      }
-
-      // Check confidence threshold
-      if (suggestion.confidenceScore < CONFIDENCE_AUTO_ORDER) {
-        await this.prisma.autopilotRun.create({
-          data: {
-            ruleId: rule.id,
-            eventId: event.id,
-            suggestionId: suggestion.id,
+            userId: rule.userId,
             status: 'skipped_confidence',
-            confidenceScore: suggestion.confidenceScore,
-            reason: `Confidence ${suggestion.confidenceScore} below ${CONFIDENCE_AUTO_ORDER} threshold`,
+            amountCents: 0,
           },
         });
+        return;
+      }
+
+      const topSuggestion = suggestions[0];
+
+      if (topSuggestion.confidenceScore < 0.8) {
         await this.notifications.create(rule.userId, {
           type: 'autopilot_needs_approval',
-          title: 'Autopilot Suggestion Needs Review',
-          body: `We found a gift for ${rule.person.name} but want your approval first: "${suggestion.title}"`,
-          linkUrl: `/events/${event.id}`,
+          title: 'Autopilot needs your approval',
+          body: `We found a gift for ${rule.person.name} but need your approval before ordering.`,
+          meta: { suggestionId: topSuggestion.id, eventId: event.id },
         });
-        continue;
-      }
-
-      // Check budget
-      if (suggestion.estimatedPriceMaxCents > rule.budgetMaxCents) {
-        await this.prisma.autopilotRun.create({
-          data: {
-            ruleId: rule.id,
-            eventId: event.id,
-            suggestionId: suggestion.id,
-            status: 'skipped_budget',
-            amountCents: suggestion.estimatedPriceMaxCents,
-            reason: `Price ${suggestion.estimatedPriceMaxCents}c exceeds budget ${rule.budgetMaxCents}c`,
-          },
-        });
-        continue;
-      }
-
-      // Preview order to get product — try API first, fall back to browser agent
-      let preview;
-      let useAgent = false;
-      try {
-        preview = await this.ordersService.preview(
-          { id: rule.userId } as never,
-          {
-            suggestionId: suggestion.id,
-            personId: rule.personId,
-            eventId: event.id,
-            budgetMaxCents: rule.budgetMaxCents,
-          },
-        );
-      } catch {
-        // No API adapter for this retailer — try browser agent
-        useAgent = true;
-        this.log.log(`API preview failed for rule ${rule.id}, falling back to browser agent`);
-      }
-
-      if (useAgent) {
-        // Route to browser agent
-        try {
-          const user = await this.prisma.user.findUniqueOrThrow({ where: { id: rule.userId } });
-          const agentJob = await this.agentOrders.preview(user, {
-            suggestionId: suggestion.id,
-            personId: rule.personId,
-            eventId: event.id,
-            retailerUrl: suggestion.retailerHint || undefined,
-          });
-
-          if (agentJob.status === 'previewing') {
-            const result = await this.agentOrders.place(user, { jobId: agentJob.id });
-            if (result.job.status === 'completed' && result.order) {
-              await this.prisma.autopilotRun.create({
-                data: {
-                  ruleId: rule.id,
-                  eventId: event.id,
-                  orderId: result.order.id,
-                  suggestionId: suggestion.id,
-                  status: 'order_placed',
-                  confidenceScore: suggestion.confidenceScore,
-                  amountCents: result.order.priceCents,
-                  reason: 'Placed via browser agent (no API adapter)',
-                  metadata: { channel: 'browser_agent', jobId: agentJob.id },
-                },
-              });
-              await this.notifications.create(rule.userId, {
-                type: 'autopilot_ordered',
-                title: 'Autopilot Gift Ordered',
-                body: `We ordered "${result.order.productTitle}" for ${rule.person.name} via Broflo Agent. You have 2 hours to cancel.`,
-                linkUrl: `/orders/${result.order.id}`,
-              });
-              this.log.log(`Autopilot agent order placed: rule=${rule.id}, order=${result.order.id}`);
-            } else {
-              await this.prisma.autopilotRun.create({
-                data: {
-                  ruleId: rule.id,
-                  eventId: event.id,
-                  suggestionId: suggestion.id,
-                  status: 'failed',
-                  reason: `Browser agent failed: ${result.job.failureReason || 'unknown'}`,
-                  metadata: { channel: 'browser_agent', jobId: agentJob.id },
-                },
-              });
-            }
-          } else {
-            await this.prisma.autopilotRun.create({
-              data: {
-                ruleId: rule.id,
-                eventId: event.id,
-                suggestionId: suggestion.id,
-                status: 'failed',
-                reason: `Browser agent preview failed: ${agentJob.failureReason || agentJob.status}`,
-                metadata: { channel: 'browser_agent', jobId: agentJob.id },
-              },
-            });
-          }
-        } catch (err) {
-          await this.prisma.autopilotRun.create({
-            data: {
-              ruleId: rule.id,
-              eventId: event.id,
-              suggestionId: suggestion.id,
-              status: 'failed',
-              reason: `Browser agent error: ${err}`,
-            },
-          });
-          await this.notifications.create(rule.userId, {
-            type: 'autopilot_failed',
-            title: 'Autopilot Order Failed',
-            body: `We tried to order a gift for ${rule.person.name} but something went wrong. No charge.`,
-            linkUrl: '/autopilot',
-          });
-        }
-        continue;
-      }
-
-      // Place order via API adapter
-      try {
-        const order = await this.ordersService.place(
-          { id: rule.userId, stripeCustomerId: rule.user.stripeCustomerId, stripePaymentMethodId: rule.user.stripePaymentMethodId } as never,
-          {
-            suggestionId: suggestion.id,
-            personId: rule.personId,
-            eventId: event.id,
-            retailerProductId: preview!.product.id,
-            shippingName: rule.person.name,
-            shippingAddress1: rule.person.shippingAddress1!,
-            shippingCity: rule.person.shippingCity!,
-            shippingState: rule.person.shippingState!,
-            shippingZip: rule.person.shippingZip!,
-          },
-        );
 
         await this.prisma.autopilotRun.create({
           data: {
-            ruleId: rule.id,
+            autopilotRuleId: rule.id,
             eventId: event.id,
-            orderId: order.id,
-            suggestionId: suggestion.id,
-            status: 'order_placed',
-            confidenceScore: suggestion.confidenceScore,
-            amountCents: preview!.product.priceCents,
+            userId: rule.userId,
+            status: 'skipped_confidence',
+            amountCents: 0,
           },
         });
+        return;
+      }
 
-        await this.notifications.create(rule.userId, {
-          type: 'autopilot_ordered',
-          title: 'Autopilot Gift Ordered',
-          body: `We ordered "${preview!.product.title}" for ${rule.person.name}. You have 2 hours to cancel.`,
-          linkUrl: `/orders/${order.id}`,
-        });
+      // Preview the order
+      const previewResult = await this.ordersService.preview(rule.userId, {
+        productUrl: topSuggestion.retailerHint ?? '',
+        productTitle: topSuggestion.title,
+        productPriceCents: topSuggestion.estimatedPriceMaxCents,
+      });
 
-        this.log.log(`Autopilot order placed: rule=${rule.id}, order=${order.id}`);
-      } catch (err) {
+      if (!previewResult?.product) {
         await this.prisma.autopilotRun.create({
           data: {
-            ruleId: rule.id,
+            autopilotRuleId: rule.id,
             eventId: event.id,
-            suggestionId: suggestion.id,
+            userId: rule.userId,
             status: 'failed',
-            reason: `Order placement failed: ${err}`,
+            amountCents: 0,
           },
         });
-        await this.notifications.create(rule.userId, {
-          type: 'autopilot_failed',
-          title: 'Autopilot Order Failed',
-          body: `We tried to order a gift for ${rule.person.name} but something went wrong. No charge.`,
-          linkUrl: '/autopilot',
-        });
+        return;
       }
-    }
-  }
 
-  // Helper type — Prisma doesn't export a clean type for the include
-  private async findRuleWithRelations() {
-    return this.prisma.autopilotRule.findFirstOrThrow({
-      include: {
-        user: { select: { id: true, subscriptionTier: true, stripeCustomerId: true, stripePaymentMethodId: true } },
-        person: { select: { id: true, name: true, shippingAddress1: true, shippingCity: true, shippingState: true, shippingZip: true } },
-      },
-    });
+      // Place the order
+      const order = await this.ordersService.place(rule.userId, {
+        productUrl: topSuggestion.retailerHint ?? '',
+        productTitle: topSuggestion.title,
+        productPriceCents: previewResult.product.priceCents,
+        shippingAddress1: rule.person.shippingAddress1,
+        shippingCity: rule.person.shippingCity,
+        shippingState: rule.person.shippingState,
+        shippingZip: rule.person.shippingZip,
+      });
+
+      await this.prisma.autopilotRun.create({
+        data: {
+          autopilotRuleId: rule.id,
+          eventId: event.id,
+          userId: rule.userId,
+          status: 'ordered',
+          orderId: order.id,
+          amountCents: previewResult.product.priceCents,
+        },
+      });
+
+      await this.notifications.create(rule.userId, {
+        type: 'autopilot_ordered',
+        title: 'Autopilot placed an order!',
+        body: `We ordered "${topSuggestion.title}" for ${rule.person.name}.`,
+        meta: { orderId: order.id },
+      });
+    } catch (error) {
+      this.logger.error(`Autopilot failed for rule ${rule.id}:`, error);
+
+      await this.prisma.autopilotRun.create({
+        data: {
+          autopilotRuleId: rule.id,
+          eventId: null,
+          userId: rule.userId,
+          status: 'failed',
+          amountCents: 0,
+        },
+      });
+    }
   }
 }

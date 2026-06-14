@@ -1,71 +1,57 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import type { User } from '@prisma/client';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { OrdersService } from './orders.service';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { RequiresTier } from '../billing/decorators/requires-tier.decorator';
-import { SubscriptionGuard } from '../billing/guards/subscription.guard';
-import { PreviewOrderDto } from './dto/preview-order.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
-import { CancelOrderDto } from './dto/cancel-order.dto';
+import { PreviewOrderDto } from './dto/preview-order.dto';
 import { ListOrdersDto } from './dto/list-orders.dto';
+import { CancelOrderDto } from './dto/cancel-order.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ApplicableFrameworks } from '../compliance/applicable-frameworks.decorator';
 
+@UseGuards(JwtAuthGuard)
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(private readonly ordersService: OrdersService) {}
 
+  @ApplicableFrameworks(['GDPR', 'CCPA', 'GLBA'])
   @Post('preview')
-  @RequiresTier('pro', 'elite')
-  @UseGuards(SubscriptionGuard)
-  async preview(@CurrentUser() user: User, @Body() dto: PreviewOrderDto) {
-    return this.orders.preview(user, dto);
+  async preview(@CurrentUser() user: { id: string }, @Body() dto: PreviewOrderDto) {
+    return this.ordersService.preview(user.id, dto);
   }
 
+  @ApplicableFrameworks(['GDPR', 'CCPA', 'GLBA'])
   @Post('place')
-  @RequiresTier('pro', 'elite')
-  @UseGuards(SubscriptionGuard)
-  async place(@CurrentUser() user: User, @Body() dto: PlaceOrderDto) {
-    return this.orders.place(user, dto);
-  }
-
-  @Post(':id/cancel')
-  @RequiresTier('pro', 'elite')
-  @UseGuards(SubscriptionGuard)
-  async cancel(
-    @CurrentUser() user: User,
-    @Param('id') id: string,
-    @Body() dto: CancelOrderDto,
-  ) {
-    return this.orders.cancel(user.id, id, dto?.reason);
+  async place(@CurrentUser() user: { id: string }, @Body() dto: PlaceOrderDto) {
+    return this.ordersService.place(user.id, dto);
   }
 
   @Get()
-  async list(@CurrentUser() user: User, @Query() query: ListOrdersDto) {
-    return this.orders.list(user.id, query);
+  async list(@CurrentUser() user: { id: string }, @Query() query: ListOrdersDto) {
+    return this.ordersService.list(user.id, query);
   }
 
   @Get(':id')
-  async getById(@CurrentUser() user: User, @Param('id') id: string) {
-    return this.orders.getById(user.id, id);
+  async get(@CurrentUser() user: { id: string }, @Param('id') id: string) {
+    return this.ordersService.get(user.id, id);
   }
 
-  @Get(':id/timeline')
-  async getTimeline(@CurrentUser() user: User, @Param('id') id: string) {
-    return this.orders.getTimeline(user.id, id);
-  }
-
-  @Post(':id/mark-manual')
-  async markManuallyPurchased(
-    @CurrentUser() user: User,
+  @ApplicableFrameworks(['GDPR', 'CCPA', 'GLBA'])
+  @Patch(':id/cancel')
+  async cancel(
+    @CurrentUser() user: { id: string },
     @Param('id') id: string,
+    @Body() _dto: CancelOrderDto,
   ) {
-    return this.orders.markManuallyPurchased(user.id, id);
+    return this.ordersService.cancel(user.id, id);
+  }
+
+  @ApplicableFrameworks(['GDPR', 'CCPA', 'GLBA'])
+  @Patch(':id/status')
+  async updateStatus(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() body: { status: string },
+  ) {
+    return this.ordersService.updateStatus(user.id, id, body.status);
   }
 }

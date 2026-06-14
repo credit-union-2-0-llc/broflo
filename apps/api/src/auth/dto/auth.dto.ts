@@ -1,11 +1,6 @@
-import {
-  IsEmail,
-  IsNotEmpty,
-  IsString,
-  Length,
-} from "class-validator";
+import { IsEmail, IsString } from 'class-validator';
 
-export class SendOtpDto {
+export class RequestOtpDto {
   @IsEmail()
   email!: string;
 }
@@ -15,12 +10,10 @@ export class VerifyOtpDto {
   email!: string;
 
   @IsString()
-  @Length(6, 6)
-  code!: string;
+  otp!: string;
 }
 
-export class RefreshDto {
+export class RefreshTokenDto {
   @IsString()
-  @IsNotEmpty()
   refreshToken!: string;
 }
