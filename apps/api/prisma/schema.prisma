@@ -387,7 +387,10 @@ enum OrderStatus {
 
 enum StatusChangeSource {
   system
+  user
+  retailer
   webhook
+  admin
   manual
 
   @@map("status_change_source")
