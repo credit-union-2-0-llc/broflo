@@ -16,6 +16,9 @@ name: Resolve migrations as already-applied (one-time)
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   resolve:
     runs-on: ubuntu-latest
