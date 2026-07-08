@@ -40,6 +40,19 @@ packages/shared   — Shared types, utils, brand voice copy
 docs/             — Slice specs and project docs
 ```
 
+## Azure Ownership — route changes to the right place
+
+Broflo's Azure footprint spans **two** resource groups with two different owners. Editing the wrong one silently fails (pool resources revert on the next IaC deploy). Route by which RG the resource lives in:
+
+- **App stack — `rg-broflo` (edit directly, you have Contributor):**
+  `broflo-db`, `broflo-api`, `broflo-web`, `broflo-redis`, `cae-broflo`, `broflo-ai`, storage, certs, app secrets in `cu2-apps-kv`. Change these directly with `az` / the portal / this repo's deploy.
+
+- **Shared consumer-prod pool — `rg-cu2-consumer-prod` (IaC-managed, do NOT edit directly):**
+  `kv-cu2-pool-broflo` (holds `pii-cmk-broflo`), `mi-pool-broflo`, `nsg-app-broflo`, and the `broflo` schema on the shared `postgres-cu2-pool` server. These are defined in Infrastructure-as-Code in **`credit-union-2-0-llc/cu2-platform`** (`pool-tenants/broflo.json` + `bicep/consumer-prod.bicep` / `pool-server.bicep` / `pool-tenant-kv.bicep`). **Portal/CLI edits here are reverted on the next deploy.**
+  To change them: open a PR against `cu2-platform`; merge to main auto-applies via the `deploy-consumer-prod.yml` pipeline (which runs with the deployment identity — you do not need direct Azure access to `rg-cu2-consumer-prod`).
+
+> Rule of thumb: **app data/config → `rg-broflo` directly. Pool KV / identity / network / PII CMK → cu2-platform PR.** If unsure which RG a resource is in: `az resource show --ids <id> --query resourceGroup`.
+
 ## Key Rules
 
 - **Broflo is NOT a store** — purchasing agent only, subscription revenue only
