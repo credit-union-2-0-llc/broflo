@@ -1,15 +1,16 @@
 import { auth } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
-import type { UpcomingEvent } from "@/lib/api";
+import type { UpcomingEvent, GiftRecord } from "@/lib/api";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Gift as GiftIcon } from "lucide-react";
 import { EventDetailActions } from "./event-detail-actions";
 import { SuggestionsView } from "@/components/suggestions/suggestions-view";
+import { StarRating } from "@/components/gifts/star-rating";
 
 function initials(name: string) {
   return name
@@ -69,6 +70,16 @@ export default async function EventDetailPage({
 
   const event = events.find((e) => e.id === id);
   if (!event) notFound();
+
+  // S-5 shipped after this page was first built — it was never wired up to
+  // actually show gifts scoped to this event, just left as a placeholder.
+  let eventGifts: GiftRecord[] = [];
+  try {
+    const giftsRes = await api.getPersonGifts(session.accessToken, event.personId, { limit: 100 });
+    eventGifts = giftsRes.data.filter((g) => g.eventId === event.id);
+  } catch {
+    // Non-critical — the rest of the page still renders without gift history.
+  }
 
   const budgetStr =
     event.budgetMinCents || event.budgetMaxCents
@@ -163,15 +174,48 @@ export default async function EventDetailPage({
           tier={(session.user as Record<string, unknown>)?.subscriptionTier as "free" | "pro" | "elite" ?? "free"}
         />
 
-        {/* Past Gifts — placeholder for S-5 */}
+        {/* Past Gifts — S-5 Gift History, scoped to this event */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">Past Gifts for This Event</CardTitle>
+            <Link
+              href={`/people/${event.personId}`}
+              className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+            >
+              View all history for {event.personName} →
+            </Link>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground italic">
-              No gift history yet. (Gift History activates in S-5)
-            </p>
+            {eventGifts.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">
+                No gifts logged for this event yet.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {eventGifts
+                  .sort((a, b) => new Date(b.givenAt).getTime() - new Date(a.givenAt).getTime())
+                  .map((gift) => (
+                    <li
+                      key={gift.id}
+                      className="flex items-start justify-between gap-3 border-b border-border pb-3 last:border-none last:pb-0"
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <GiftIcon className="mt-0.5 h-4 w-4 text-muted-foreground shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium">{gift.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(gift.givenAt)}
+                            {dollars(gift.priceCents) ? ` · ${dollars(gift.priceCents)}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                      {gift.rating !== null && (
+                        <StarRating value={gift.rating} readonly size="sm" />
+                      )}
+                    </li>
+                  ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
       </div>
