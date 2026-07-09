@@ -168,6 +168,7 @@ export default function LoginPage() {
             <Input
               id="email"
               type="email"
+              autoComplete="email"
               placeholder="you@example.com"
               {...emailForm.register("email")}
             />
