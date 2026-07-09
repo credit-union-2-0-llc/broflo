@@ -86,6 +86,8 @@ export default function LoginPage() {
   }
 
   if (step === "code") {
+    const codeRegister = codeForm.register("code");
+
     return (
       <Card>
         <CardHeader className="text-center">
@@ -99,6 +101,14 @@ export default function LoginPage() {
             {error && (
               <p className="text-sm text-destructive text-center">{error}</p>
             )}
+            {/*
+              Without a dedicated username field, Chrome/Safari sometimes guess
+              that the visible OTP input is the "username" field left over from
+              the previous step and autofill it with the saved email instead.
+              A hidden field with autoComplete="username" gives them the
+              correct target so they leave the code input alone.
+            */}
+            <input type="hidden" autoComplete="username" value={email} readOnly />
             <div className="space-y-2">
               <Label htmlFor="code">6-digit code</Label>
               <Input
@@ -109,9 +119,13 @@ export default function LoginPage() {
                 maxLength={6}
                 placeholder="000000"
                 className="text-center text-2xl tracking-[0.3em] font-mono"
-                {...codeForm.register("code")}
+                {...codeRegister}
+                onChange={(e) => {
+                  e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
+                  codeRegister.onChange(e);
+                }}
                 ref={(e) => {
-                  codeForm.register("code").ref(e);
+                  codeRegister.ref(e);
                   codeInputRef.current = e;
                 }}
               />
