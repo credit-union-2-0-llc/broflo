@@ -34,7 +34,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     tier: "pro",
     name: "Pro",
     priceMonthly: 9.99,
-    priceAnnual: 99,
+    priceAnnual: 108,
     limits: {
       maxPeople: null,
       autoExecute: true,
@@ -48,7 +48,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     tier: "elite",
     name: "Elite",
     priceMonthly: 24.99,
-    priceAnnual: 249,
+    priceAnnual: 270,
     limits: {
       maxPeople: null,
       autoExecute: true,
