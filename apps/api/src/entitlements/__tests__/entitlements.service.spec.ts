@@ -149,6 +149,12 @@ describe("EntitlementsService", () => {
       mockPlanLookup(ELITE_PLAN);
       expect(await service.getIntLimit("elite", "serviceCreditCents")).toBe(2499);
     });
+
+    it("fails closed: uses the caller's fallback (not unlimited) when the plan/limit isn't found", async () => {
+      prisma.plan.findUnique.mockResolvedValue(null);
+      expect(await service.getIntLimit("unknown-tier", "maxPeople")).toBeNull();
+      expect(await service.getIntLimit("unknown-tier", "maxPeople", 3)).toBe(3);
+    });
   });
 
   describe("isFeatureEnabled — matches today's inline tier checks", () => {

@@ -5,13 +5,9 @@ import {
   HttpException,
   HttpStatus,
 } from "@nestjs/common";
-const TIER_MAX_PEOPLE: Record<string, number | null> = {
-  free: 3,
-  pro: null,
-  elite: null,
-};
 import { PrismaService } from "../prisma/prisma.service";
 import { EventsService } from "../events/events.service";
+import { EntitlementsService } from "../entitlements/entitlements.service";
 import type {
   CreatePersonDto,
   UpdatePersonDto,
@@ -24,6 +20,7 @@ export class PersonsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventsService: EventsService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async list(userId: string) {
@@ -47,8 +44,9 @@ export class PersonsService {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
     });
-    const tierLimit = TIER_MAX_PEOPLE[user.subscriptionTier];
-    const maxPeople = tierLimit === undefined ? 3 : tierLimit;
+    // Fails closed: if entitlements data is missing (e.g. DB not seeded yet),
+    // default to the Free cap rather than silently becoming unlimited.
+    const maxPeople = await this.entitlements.getIntLimit(user.subscriptionTier, "maxPeople", 3);
     if (maxPeople !== null) {
       const count = await this.prisma.person.count({
         where: { userId, deletedAt: null },
