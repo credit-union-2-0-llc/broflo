@@ -592,7 +592,15 @@ export const api = {
       stripeSubscriptionId: string | null;
       stripeCustomerId: string | null;
       hasPaymentMethod: boolean;
+      devTierOverrideEnabled: boolean;
     }>("/billing/subscription", { token }),
+
+  devSetTier: (token: string, tier: "free" | "pro" | "elite") =>
+    apiFetch<{ subscriptionTier: string }>("/billing/dev-set-tier", {
+      method: "POST",
+      body: JSON.stringify({ tier }),
+      token,
+    }),
 
   // Orders (S-7)
   previewOrder: (token: string, data: { suggestionId: string; personId: string; eventId: string; budgetMaxCents?: number }) =>

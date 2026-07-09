@@ -1,19 +1,22 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { CreditCard, ExternalLink } from "lucide-react";
+import { CreditCard, ExternalLink, FlaskConical } from "lucide-react";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { VOICE } from "@broflo/shared";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -35,12 +38,37 @@ function BillingContent() {
   const searchParams = useSearchParams();
   const success = searchParams.get("success");
   const tier = session?.user?.subscriptionTier || "free";
+  const [devOverrideEnabled, setDevOverrideEnabled] = useState(false);
+  const [switching, setSwitching] = useState<string | null>(null);
 
   useEffect(() => {
     if (success) {
       update();
     }
   }, [success, update]);
+
+  useEffect(() => {
+    if (!session?.accessToken) return;
+    api
+      .getSubscription(session.accessToken)
+      .then((sub) => setDevOverrideEnabled(sub.devTierOverrideEnabled))
+      .catch(() => {});
+  }, [session?.accessToken]);
+
+  async function handleDevSwitch(newTier: "free" | "pro" | "elite") {
+    if (!session?.accessToken) return;
+    setSwitching(newTier);
+    try {
+      await api.devSetTier(session.accessToken, newTier);
+      await update();
+      toast.success(`Switched to ${newTier}.`);
+    } catch {
+      toast.error("Failed to switch tier.");
+    } finally {
+      setSwitching(null);
+    }
+  }
+
   const isPaid = tier !== "free";
 
   return (
@@ -102,6 +130,33 @@ function BillingContent() {
           )}
         </CardContent>
       </Card>
+
+      {devOverrideEnabled && (
+        <Card className="mt-4 border-dashed">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FlaskConical className="h-4 w-4" />
+              Testing — switch plans without Stripe
+            </CardTitle>
+            <CardDescription>
+              Stripe isn&apos;t connected yet. This flips your own tier directly so you can test paywalled features.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex gap-2">
+            {(["free", "pro", "elite"] as const).map((t) => (
+              <Button
+                key={t}
+                variant={tier === t ? "default" : "outline"}
+                size="sm"
+                disabled={!!switching || tier === t}
+                onClick={() => handleDevSwitch(t)}
+              >
+                {switching === t ? "Switching..." : t.charAt(0).toUpperCase() + t.slice(1)}
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
