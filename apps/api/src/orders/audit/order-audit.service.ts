@@ -10,7 +10,9 @@ export interface OrderAuditEntry {
     | 'cancel'
     | 'cancel_failed'
     | 'refund'
-    | 'refund_failed';
+    | 'refund_failed'
+    | 'manual_order_created'
+    | 'tracking_updated';
   details: Record<string, unknown>;
 }
 

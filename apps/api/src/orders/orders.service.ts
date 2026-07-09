@@ -16,6 +16,8 @@ import { StripeConnectService } from './stripe-connect.service';
 import { PreviewOrderDto } from './dto/preview-order.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
 import { ListOrdersDto } from './dto/list-orders.dto';
+import { CreateManualOrderDto } from './dto/create-manual-order.dto';
+import { UpdateTrackingDto } from './dto/update-tracking.dto';
 
 @Injectable()
 export class OrdersService {
@@ -457,6 +459,131 @@ export class OrdersService {
     });
 
     return { success: true };
+  }
+
+  /**
+   * Creates a trackable Order for a gift bought entirely outside Broflo —
+   * no adapter/agent involvement, retailerKey is a literal 'manual' sentinel.
+   * Reuses every bit of existing Order UI (TrackingCard, StatusTimeline,
+   * orders list/detail) as-is, since this is just an Order row with a
+   * different retailerKey. Backfills shipping fields from the linked
+   * Person's own address (those fields are required on Order, but not
+   * meaningful for a purchase Broflo never shipped) — the order detail
+   * page's "Recipient" card only renders when shippingAddress1 is set, so
+   * a person with no address on file just doesn't get that card.
+   */
+  async createManualOrder(userId: string, dto: CreateManualOrderDto) {
+    const person = await this.prisma.person.findFirst({
+      where: { id: dto.personId, userId, deletedAt: null },
+    });
+    if (!person) throw new NotFoundException('Person not found');
+
+    if (dto.giftRecordId) {
+      const gift = await this.prisma.giftRecord.findFirst({
+        where: { id: dto.giftRecordId, userId },
+      });
+      if (!gift) throw new NotFoundException('Gift record not found');
+    }
+
+    const status = dto.status ?? 'ordered';
+
+    const order = await this.prisma.order.create({
+      data: {
+        userId,
+        personId: dto.personId,
+        eventId: dto.eventId ?? null,
+        giftRecordId: dto.giftRecordId ?? null,
+        retailerKey: 'manual',
+        retailerProductId: 'manual',
+        productTitle: dto.productTitle,
+        priceCents: dto.priceCents ?? 0,
+        status,
+        trackingNumber: dto.trackingNumber ?? null,
+        trackingUrl: dto.trackingUrl ?? null,
+        carrierName: dto.carrierName ?? null,
+        shippingName: person.name,
+        shippingAddress1: person.shippingAddress1 ?? '',
+        shippingAddress2: person.shippingAddress2 ?? null,
+        shippingCity: person.shippingCity ?? '',
+        shippingState: person.shippingState ?? '',
+        shippingZip: person.shippingZip ?? '',
+        placedAt: new Date(),
+        deliveredAt: status === 'delivered' ? new Date() : null,
+      },
+    });
+
+    await this.statusHistory.record(order.id, null, status, 'manual', {
+      channel: 'manual_entry',
+    });
+
+    if (dto.giftRecordId) {
+      try {
+        await this.prisma.giftRecord.update({
+          where: { id: dto.giftRecordId, userId },
+          data: { source: 'ordered' },
+        });
+      } catch (err) {
+        this.log.warn(`GiftRecord source update failed (non-critical): ${err}`);
+      }
+    }
+
+    await this.orderAudit.record({
+      orderId: order.id,
+      userId,
+      action: 'manual_order_created',
+      details: { productTitle: dto.productTitle, priceCents: dto.priceCents },
+    });
+
+    return order;
+  }
+
+  /**
+   * Attaches/updates tracking info on an existing order — for orders placed
+   * outside Broflo's own retailer adapters, where nothing will ever poll a
+   * real carrier automatically. Deliberately bypasses transitionStatus's
+   * strict adjacent-state validation (same reasoning as
+   * markManuallyPurchased above) since a manual update is a legitimate
+   * out-of-band correction, not a system-driven transition — e.g. jumping
+   * straight from 'ordered' to 'delivered' because the user is recording
+   * something that already happened is a normal case here.
+   */
+  async updateTracking(userId: string, orderId: string, dto: UpdateTrackingDto) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+
+    const statusChanging = !!dto.status && dto.status !== order.status;
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        trackingNumber: dto.trackingNumber,
+        trackingUrl: dto.trackingUrl ?? undefined,
+        carrierName: dto.carrierName ?? undefined,
+        ...(statusChanging
+          ? {
+              status: dto.status,
+              deliveredAt: dto.status === 'delivered' && !order.deliveredAt ? new Date() : undefined,
+            }
+          : {}),
+      },
+    });
+
+    if (statusChanging) {
+      await this.statusHistory.record(orderId, order.status, dto.status!, 'manual', {
+        trackingNumber: dto.trackingNumber,
+      });
+    }
+
+    await this.orderAudit.record({
+      orderId,
+      userId,
+      action: 'tracking_updated',
+      details: { trackingNumber: dto.trackingNumber, carrierName: dto.carrierName },
+    });
+
+    return updated;
   }
 
   async transitionStatus(

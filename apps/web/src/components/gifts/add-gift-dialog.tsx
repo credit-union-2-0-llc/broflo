@@ -49,11 +49,15 @@ export function AddGiftDialog({
   const [eventId, setEventId] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [addTracking, setAddTracking] = useState(false);
+  const [trackingNumber, setTrackingNumber] = useState("");
+  const [carrierName, setCarrierName] = useState("");
 
   function validate(): boolean {
     const e: Record<string, string> = {};
     if (!title.trim()) e.title = "What did you give them?";
     if (!givenAt) e.givenAt = "When did you give it?";
+    if (addTracking && !trackingNumber.trim()) e.trackingNumber = "Enter a tracking number, or uncheck this";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -72,6 +76,25 @@ export function AddGiftDialog({
         eventId: eventId || undefined,
         givenAt,
       });
+
+      if (addTracking && trackingNumber.trim()) {
+        try {
+          await api.createManualOrder(token, {
+            personId,
+            productTitle: title.trim(),
+            giftRecordId: result.giftRecord.id,
+            priceCents,
+            trackingNumber: trackingNumber.trim(),
+            carrierName: carrierName.trim() || undefined,
+            status: "shipped",
+          });
+        } catch {
+          // Gift was already logged successfully — tracking is a bonus, don't
+          // block or roll back the gift record over it.
+          toast.error("Gift logged, but tracking couldn't be added. Add it later from Orders.");
+        }
+      }
+
       toast.success(VOICE.gifts.recorded);
       onCreated(result);
       onOpenChange(false);
@@ -81,6 +104,9 @@ export function AddGiftDialog({
       setPriceDollars("");
       setGivenAt("");
       setEventId("");
+      setAddTracking(false);
+      setTrackingNumber("");
+      setCarrierName("");
     } catch {
       toast.error("Failed to log gift. Try again.");
     } finally {
@@ -185,6 +211,42 @@ export function AddGiftDialog({
               maxLength={500}
               placeholder="Made from vacation photos"
             />
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={addTracking}
+                onChange={(e) => setAddTracking(e.target.checked)}
+              />
+              I already ordered this — add tracking
+            </label>
+            {addTracking && (
+              <div className="grid grid-cols-2 gap-3 mt-2">
+                <div>
+                  <Label htmlFor="tracking-number">Tracking Number</Label>
+                  <Input
+                    id="tracking-number"
+                    value={trackingNumber}
+                    onChange={(e) => setTrackingNumber(e.target.value)}
+                    placeholder="1Z999AA10123456784"
+                  />
+                  {errors.trackingNumber && (
+                    <p className="text-xs text-destructive mt-1">{errors.trackingNumber}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="carrier-name">Carrier (optional)</Label>
+                  <Input
+                    id="carrier-name"
+                    value={carrierName}
+                    onChange={(e) => setCarrierName(e.target.value)}
+                    placeholder="UPS, USPS, FedEx..."
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-2">

@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
   Param,
   Query,
@@ -16,6 +17,8 @@ import { PreviewOrderDto } from './dto/preview-order.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
 import { CancelOrderDto } from './dto/cancel-order.dto';
 import { ListOrdersDto } from './dto/list-orders.dto';
+import { CreateManualOrderDto } from './dto/create-manual-order.dto';
+import { UpdateTrackingDto } from './dto/update-tracking.dto';
 
 @Controller('orders')
 export class OrdersController {
@@ -67,5 +70,19 @@ export class OrdersController {
     @Param('id') id: string,
   ) {
     return this.orders.markManuallyPurchased(user.id, id);
+  }
+
+  @Post('manual')
+  async createManual(@CurrentUser() user: User, @Body() dto: CreateManualOrderDto) {
+    return this.orders.createManualOrder(user.id, dto);
+  }
+
+  @Patch(':id/tracking')
+  async updateTracking(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: UpdateTrackingDto,
+  ) {
+    return this.orders.updateTracking(user.id, id, dto);
   }
 }

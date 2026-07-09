@@ -12,6 +12,7 @@ import type { OrderDetailResponse, OrderStatusHistoryEntry } from "@/lib/api";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { StatusTimeline } from "@/components/orders/StatusTimeline";
 import { TrackingCard } from "@/components/orders/TrackingCard";
+import { AddTrackingDialog } from "@/components/orders/AddTrackingDialog";
 import { CancelCountdown } from "@/components/orders/cancel-countdown";
 import { AgentSessionLog } from "@/components/orders/agent-session-log";
 import { Badge } from "@/components/ui/badge";
@@ -31,33 +32,36 @@ export default function OrderDetailPage() {
     if (sessionStatus === "unauthenticated") router.push("/login");
   }, [sessionStatus, router]);
 
-  useEffect(() => {
-    async function load() {
-      if (!session?.accessToken || !params.id) return;
-      try {
-        const [orderData, timelineData] = await Promise.all([
-          api.getOrder(session.accessToken, params.id),
-          api.getOrderTimeline(session.accessToken, params.id),
-        ]);
-        setOrder(orderData);
-        setTimeline(timelineData);
-        // Load agent steps if this is a browser-agent order
-        if (orderData.retailerKey === "browser-agent" && orderData.id) {
-          try {
-            const steps = await api.agentGetSteps(session.accessToken, orderData.id);
-            setAgentSteps(steps);
-          } catch {
-            // Agent steps may not be available — non-blocking
-          }
+  async function loadOrder() {
+    if (!session?.accessToken || !params.id) return;
+    try {
+      const [orderData, timelineData] = await Promise.all([
+        api.getOrder(session.accessToken, params.id),
+        api.getOrderTimeline(session.accessToken, params.id),
+      ]);
+      setOrder(orderData);
+      setTimeline(timelineData);
+      // Load agent steps if this is a browser-agent order
+      if (orderData.retailerKey === "browser-agent" && orderData.id) {
+        try {
+          const steps = await api.agentGetSteps(session.accessToken, orderData.id);
+          setAgentSteps(steps);
+        } catch {
+          // Agent steps may not be available — non-blocking
         }
-      } catch {
-        router.push("/orders");
-      } finally {
-        setLoading(false);
       }
+    } catch {
+      router.push("/orders");
+    } finally {
+      setLoading(false);
     }
-    load();
-  }, [session?.accessToken, params.id, router]);
+  }
+
+  useEffect(() => {
+    if (sessionStatus === "unauthenticated") return;
+    loadOrder();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.accessToken, params.id]);
 
   function formatPrice(cents: number) {
     return `$${(cents / 100).toFixed(2)}`;
@@ -148,6 +152,18 @@ export default function OrderDetailPage() {
             trackingUrl={order.trackingUrl}
             carrierName={order.carrierName}
           />
+          {session?.accessToken && !["cancelled", "failed"].includes(order.status) && (
+            <div className="flex justify-end">
+              <AddTrackingDialog
+                orderId={order.id}
+                token={session.accessToken}
+                currentTrackingNumber={order.trackingNumber}
+                currentCarrierName={order.carrierName}
+                currentStatus={order.status}
+                onSaved={loadOrder}
+              />
+            </div>
+          )}
 
           {/* Agent Session Log */}
           {order.retailerKey === "browser-agent" && agentSteps.length > 0 && (
@@ -202,22 +218,26 @@ export default function OrderDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Recipient */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Recipient</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="font-medium">{order.person?.name ?? order.shippingName}</p>
-              <p className="text-sm text-muted-foreground">
-                {order.shippingAddress1}
-                {order.shippingAddress2 && `, ${order.shippingAddress2}`}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {order.shippingCity}, {order.shippingState} {order.shippingZip}
-              </p>
-            </CardContent>
-          </Card>
+          {/* Recipient — manual orders backfill this from the person's own
+              address, which may not be on file, so only show the card when
+              there's an actual address to display. */}
+          {order.shippingAddress1 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Recipient</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="font-medium">{order.person?.name ?? order.shippingName}</p>
+                <p className="text-sm text-muted-foreground">
+                  {order.shippingAddress1}
+                  {order.shippingAddress2 && `, ${order.shippingAddress2}`}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {order.shippingCity}, {order.shippingState} {order.shippingZip}
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
