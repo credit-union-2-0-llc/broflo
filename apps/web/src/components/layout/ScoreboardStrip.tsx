@@ -1,6 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { api } from "@/lib/api";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 const stats = [
   { label: "Broflo Score", sub: "lifetime", color: "var(--amber)", key: "score" },
@@ -18,11 +21,39 @@ export function ScoreboardStrip() {
   const { data: session } = useSession();
   const user = session?.user;
 
+  const [assetCount, setAssetCount] = useState<number | null>(null);
+  const [codeRedCount, setCodeRedCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const token = session?.accessToken;
+    if (!token) return;
+
+    api
+      .listPersons(token)
+      .then((people) => setAssetCount(people.length))
+      .catch(() => {});
+
+    api
+      .getUpcomingEvents(token, { limit: 100 })
+      .then((res) => {
+        // Same red-alert threshold already used for event urgency badges
+        // elsewhere in the app (see urgencyClass in events pages) — not a
+        // new definition, just reusing the existing one for consistency.
+        const urgent = res.data.filter((e) => e.daysUntil <= 1).length;
+        setCodeRedCount(urgent);
+      })
+      .catch(() => {});
+  }, [session?.accessToken]);
+
   const statValues: Record<string, string> = {
     score: String(user?.brofloScore ?? 0),
-    codeRed: "0",
+    codeRed: codeRedCount === null ? "—" : String(codeRedCount),
+    // Mission Rate (on-time gift-giving %) has no backing data yet — no
+    // endpoint exists to compute it without an inefficient N+1 fetch of
+    // every person's full gift history client-side. Left as an honest
+    // "no data" placeholder rather than a fabricated number.
     missionRate: "—",
-    assets: "0",
+    assets: assetCount === null ? "—" : String(assetCount),
   };
 
   const mobileStats = stats.filter((s) => s.key === "score" || s.key === "codeRed");
@@ -100,6 +131,7 @@ export function ScoreboardStrip() {
 
         {/* User cell */}
         <div className="flex items-center gap-3 px-5">
+          <NotificationBell />
           <div
             className="flex h-[38px] w-[38px] items-center justify-center shrink-0"
             style={{
@@ -194,8 +226,9 @@ export function ScoreboardStrip() {
         ))}
 
         <div
-          className="flex items-center justify-center px-3"
+          className="flex items-center gap-1 justify-center px-3"
         >
+          <NotificationBell />
           <div
             className="flex h-[32px] w-[32px] items-center justify-center"
             style={{
