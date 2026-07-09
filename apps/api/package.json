@@ -81,6 +81,9 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "transformIgnorePatterns": [
+      "node_modules/\\.pnpm/(?!(resend|svix|uuid)@)"
+    ],
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],

@@ -3,10 +3,12 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { BadRequestException, InternalServerErrorException } from "@nestjs/common";
 import { BillingService } from "../billing.service";
 import { PrismaService } from "../../prisma/prisma.service";
+import { EmailService } from "../../email/email.service";
 
 describe("BillingService", () => {
   let service: BillingService;
   let prisma: { user: { findFirst: jest.Mock; update: jest.Mock } };
+  let email: { sendPaymentFailedEmail: jest.Mock };
 
   beforeEach(async () => {
     process.env.STRIPE_SECRET_KEY = "sk_test_fake";
@@ -22,11 +24,15 @@ describe("BillingService", () => {
         update: jest.fn().mockResolvedValue({}),
       },
     };
+    email = {
+      sendPaymentFailedEmail: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BillingService,
         { provide: PrismaService, useValue: prisma },
+        { provide: EmailService, useValue: email },
       ],
     }).compile();
 
@@ -100,12 +106,31 @@ describe("BillingService", () => {
   });
 
   describe("handlePaymentFailed", () => {
-    it("downgrades user to free on payment failure", async () => {
+    it("downgrades user to free and sends a payment-failed email", async () => {
       prisma.user.findFirst.mockResolvedValue({
         id: "user-1",
+        email: "user1@example.com",
         stripeCustomerId: "cus_123",
         subscriptionTier: "pro",
       });
+
+      await (service as any).handlePaymentFailed({ customer: "cus_123" });
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: { subscriptionTier: "free" },
+      });
+      expect(email.sendPaymentFailedEmail).toHaveBeenCalledWith("user1@example.com");
+    });
+
+    it("still downgrades the user even if the email send fails", async () => {
+      prisma.user.findFirst.mockResolvedValue({
+        id: "user-1",
+        email: "user1@example.com",
+        stripeCustomerId: "cus_123",
+        subscriptionTier: "pro",
+      });
+      email.sendPaymentFailedEmail.mockRejectedValue(new Error("Resend is down"));
 
       await (service as any).handlePaymentFailed({ customer: "cus_123" });
 
@@ -119,6 +144,7 @@ describe("BillingService", () => {
       prisma.user.findFirst.mockResolvedValue(null);
       await (service as any).handlePaymentFailed({ customer: "cus_unknown" });
       expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(email.sendPaymentFailedEmail).not.toHaveBeenCalled();
     });
 
     it("silently returns when no customer ID", async () => {
