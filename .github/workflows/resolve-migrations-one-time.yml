@@ -1,0 +1,60 @@
+name: Resolve migrations as already-applied (one-time)
+
+# One-off helper for PR #10 — production already has the events/orders/
+# autopilot/notifications tables (created via `prisma db push` at some
+# point without a matching migration ever being committed). This marks
+# the 4 newly-added migration files as already-applied in production's
+# _prisma_migrations tracking table, WITHOUT re-running their SQL, so the
+# normal deploy-api.yml pipeline's `prisma migrate deploy` step doesn't
+# try to CREATE TABLE against tables that already exist and fail.
+#
+# Safe to run more than once — `migrate resolve --applied` on an
+# already-resolved migration is a no-op.
+#
+# Delete this workflow file once PR #10 is merged and deployed cleanly.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/missing-migration-history
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Resolve each new migration as already-applied
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          for migration in \
+            20260410100000_s3_event_radar \
+            20260411000000_s7_s8_orders \
+            20260411100000_s9_autopilot_notifications \
+            20260412210000_gift_source_ordered
+          do
+            echo "Resolving $migration as applied..."
+            pnpm exec prisma migrate resolve --applied "$migration"
+          done
+
+      - name: Confirm migration status
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm exec prisma migrate status
