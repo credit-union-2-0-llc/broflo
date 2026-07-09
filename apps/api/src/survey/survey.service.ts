@@ -2,15 +2,19 @@ import {
   BadRequestException,
   ForbiddenException,
   GoneException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import { randomBytes } from "crypto";
+import type { User } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { EmailService } from "../email/email.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PersonsService } from "../persons/persons.service";
+import { EntitlementsService } from "../entitlements/entitlements.service";
 import type { UpdatePersonDto } from "../persons/dto/persons.dto";
 import { SURVEY_FIELD_KEYS, type SendSurveyDto, type SubmitSurveyDto, type ReviewSurveyResponseDto } from "./dto/survey.dto";
 
@@ -24,6 +28,7 @@ export class SurveyService {
     private readonly email: EmailService,
     private readonly notifications: NotificationsService,
     private readonly persons: PersonsService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   private async ensureOwnership(userId: string, personId: string) {
@@ -35,8 +40,21 @@ export class SurveyService {
     return person;
   }
 
-  async sendSurvey(userId: string, personId: string, dto: SendSurveyDto) {
-    const person = await this.ensureOwnership(userId, personId);
+  async sendSurvey(user: User, personId: string, dto: SendSurveyDto) {
+    if (!(await this.entitlements.isFeatureEnabled(user.subscriptionTier, "recipientSurvey"))) {
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.PAYMENT_REQUIRED,
+          message: "Recipient surveys are a Pro feature. Upgrade to let people fill in their own details.",
+          upgradeUrl: "/upgrade",
+          currentTier: user.subscriptionTier,
+          requiredTier: "pro",
+        },
+        HttpStatus.PAYMENT_REQUIRED,
+      );
+    }
+
+    const person = await this.ensureOwnership(user.id, personId);
 
     const recipientEmail = dto.recipientEmail || person.recipientEmail;
     if (!recipientEmail) {
@@ -64,12 +82,12 @@ export class SurveyService {
 
     const token = randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + SURVEY_TTL_DAYS * 24 * 60 * 60 * 1000);
+    const fields = dto.fields && dto.fields.length > 0 ? dto.fields : [...SURVEY_FIELD_KEYS];
 
     await this.prisma.personSurveyLink.create({
-      data: { personId, token, expiresAt },
+      data: { personId, token, expiresAt, fields },
     });
 
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     const giverName = user.name || user.email.split("@")[0];
     const recipientFirstName = person.name.split(" ")[0];
 
@@ -91,20 +109,25 @@ export class SurveyService {
 
   async getPublicSurvey(token: string) {
     const link = await this.getValidLink(token);
+    const fields = link.fields.length > 0 ? link.fields : [...SURVEY_FIELD_KEYS];
     return {
       personFirstName: link.person.name.split(" ")[0],
-      fields: SURVEY_FIELD_KEYS,
+      fields,
     };
   }
 
   async submitSurvey(token: string, dto: SubmitSurveyDto) {
     const link = await this.getValidLink(token);
+    const allowedFields = new Set(link.fields.length > 0 ? link.fields : SURVEY_FIELD_KEYS);
+    const answers = Object.fromEntries(
+      Object.entries(dto).filter(([key]) => allowedFields.has(key)),
+    );
 
     await this.prisma.personSurveyResponse.create({
       data: {
         personId: link.personId,
         surveyLinkId: link.id,
-        answers: dto as never,
+        answers: answers as never,
         status: "pending",
       },
     });

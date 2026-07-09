@@ -16,10 +16,36 @@ const DIETARY_OPTIONS = ["vegan", "vegetarian", "pescatarian", "kosher", "halal"
 // optional fields — deliberately excludes shipping address. A recipient
 // filling in their own home address through a novelty link is more risk
 // than value; that's a separate, explicit ask if the giver needs it.
+export const SURVEY_FIELD_KEYS = [
+  "birthday",
+  "anniversary",
+  "budgetMinCents",
+  "budgetMaxCents",
+  "clothingSizeTop",
+  "clothingSizeBottom",
+  "shoeSize",
+  "musicTaste",
+  "favoriteBrands",
+  "hobbies",
+  "foodPreferences",
+  "wishlistUrls",
+  "notes",
+  "pronouns",
+  "allergens",
+  "dietaryRestrictions",
+] as const;
+
 export class SendSurveyDto {
   @IsOptional()
   @IsEmail()
   recipientEmail?: string;
+
+  // Which questions to actually ask this time — omit to ask everything.
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @IsIn(SURVEY_FIELD_KEYS, { each: true })
+  fields?: string[];
 }
 
 export class SubmitSurveyDto {
@@ -103,25 +129,6 @@ export class SubmitSurveyDto {
   @IsIn(DIETARY_OPTIONS, { each: true })
   dietaryRestrictions?: string[];
 }
-
-export const SURVEY_FIELD_KEYS = [
-  "birthday",
-  "anniversary",
-  "budgetMinCents",
-  "budgetMaxCents",
-  "clothingSizeTop",
-  "clothingSizeBottom",
-  "shoeSize",
-  "musicTaste",
-  "favoriteBrands",
-  "hobbies",
-  "foodPreferences",
-  "wishlistUrls",
-  "notes",
-  "pronouns",
-  "allergens",
-  "dietaryRestrictions",
-] as const;
 
 export class ReviewSurveyResponseDto {
   @IsOptional()

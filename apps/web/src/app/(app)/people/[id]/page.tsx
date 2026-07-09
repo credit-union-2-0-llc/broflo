@@ -134,6 +134,7 @@ export default async function PersonDetailPage({
               personId={person.id}
               personName={person.name}
               recipientEmail={person.recipientEmail}
+              tier={(session.user as Record<string, unknown>)?.subscriptionTier as string ?? "free"}
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
