@@ -24,6 +24,7 @@ import { EnrichmentModule } from "./enrichment/enrichment.module";
 import { StorageModule } from "./storage/storage.module";
 import { PhotosModule } from "./photos/photos.module";
 import { TestingModule } from "./testing/testing.module";
+import { EntitlementsModule } from "./entitlements/entitlements.module";
 
 const TEST_HATCH_ENABLED = process.env.E2E_TEST_HATCH_ENABLED === "1";
 
@@ -56,6 +57,7 @@ const TEST_HATCH_ENABLED = process.env.E2E_TEST_HATCH_ENABLED === "1";
     EnrichmentModule,
     StorageModule,
     PhotosModule,
+    EntitlementsModule,
     ...(TEST_HATCH_ENABLED ? [TestingModule] : []),
   ],
   controllers: [HealthController],
