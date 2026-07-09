@@ -97,6 +97,19 @@ export class EntitlementsService {
     return !!limit.boolValue;
   }
 
+  /**
+   * For call sites that filter a DB query by tier (e.g. `subscriptionTier:
+   * { in: [...] }`) rather than checking one user at a time — returns the
+   * plan keys where a boolean feature is enabled, so that `in` list can stay
+   * dynamic instead of a hardcoded ['pro', 'elite'].
+   */
+  async getEnabledTierKeys(featureKey: string): Promise<string[]> {
+    const plans = await this.getAllPlans();
+    return plans
+      .filter((p) => p.limits.find((l) => l.featureKey === featureKey)?.boolValue)
+      .map((p) => p.key);
+  }
+
   async getStringLimit(tierKey: string, featureKey: string): Promise<string | null> {
     const plan = await this.getPlan(tierKey);
     const limit = this.findLimit(plan, featureKey);

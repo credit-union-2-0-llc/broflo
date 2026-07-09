@@ -2,18 +2,17 @@ import { Injectable, Logger } from '@nestjs/common';
 import Stripe from 'stripe';
 import type { User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-
-const TIER_PRICES_CENTS: Record<string, number> = {
-  pro: 999,
-  elite: 2499,
-};
+import { EntitlementsService } from '../../entitlements/entitlements.service';
 
 @Injectable()
 export class ServiceCreditService {
   private readonly log = new Logger(ServiceCreditService.name);
   private stripeClient: InstanceType<typeof Stripe> | null = null;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly entitlements: EntitlementsService,
+  ) {
     if (!process.env.STRIPE_SECRET_KEY) {
       this.log.warn('STRIPE_SECRET_KEY not set — service credits disabled');
     }
@@ -36,7 +35,7 @@ export class ServiceCreditService {
    */
   async issueCredit(user: User, agentJobId: string, reason: string): Promise<boolean> {
     const billingCycleKey = this._currentCycleKey();
-    const amountCents = TIER_PRICES_CENTS[user.subscriptionTier] || 0;
+    const amountCents = await this.entitlements.getIntLimit(user.subscriptionTier, 'serviceCreditCents', 0) ?? 0;
 
     if (!amountCents) {
       this.log.debug('No credit for free tier user %s', user.id);

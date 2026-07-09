@@ -6,6 +6,7 @@ import { AgentOrdersService } from '../orders/agent/agent-orders.service';
 import { AutopilotService } from './autopilot.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SuggestionsService } from '../suggestions/suggestions.service';
+import { EntitlementsService } from '../entitlements/entitlements.service';
 
 const CONFIDENCE_AUTO_ORDER = 0.80;
 const MAX_RUNS_PER_CYCLE = 50;
@@ -22,6 +23,7 @@ export class AutopilotScheduler {
     private readonly autopilotService: AutopilotService,
     private readonly notifications: NotificationsService,
     private readonly suggestionsService: SuggestionsService,
+    private readonly entitlements: EntitlementsService,
   ) {
     this.enabled = process.env.AUTOPILOT_ENABLED === 'true';
     if (!this.enabled) this.log.warn('Autopilot scheduler disabled (AUTOPILOT_ENABLED != true)');
@@ -35,11 +37,12 @@ export class AutopilotScheduler {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Find active rules for Pro/Elite users
+    // Find active rules for users whose tier has autopilot enabled
+    const autopilotTierKeys = await this.entitlements.getEnabledTierKeys('autopilotEnabled');
     const rules = await this.prisma.autopilotRule.findMany({
       where: {
         isActive: true,
-        user: { subscriptionTier: { in: ['pro', 'elite'] } },
+        user: { subscriptionTier: { in: autopilotTierKeys } },
       },
       include: {
         user: { select: { id: true, subscriptionTier: true, stripeCustomerId: true, stripePaymentMethodId: true } },

@@ -6,6 +6,7 @@ import { AgentOrdersService } from "../../orders/agent/agent-orders.service";
 import { AutopilotService } from "../autopilot.service";
 import { NotificationsService } from "../../notifications/notifications.service";
 import { SuggestionsService } from "../../suggestions/suggestions.service";
+import { EntitlementsService } from "../../entitlements/entitlements.service";
 
 const makeRule = (overrides = {}) => ({
   id: "rule-1",
@@ -61,6 +62,7 @@ describe("AutopilotScheduler", () => {
   let autopilotService: Record<string, jest.Mock>;
   let notifications: Record<string, jest.Mock>;
   let suggestionsService: Record<string, jest.Mock>;
+  let entitlements: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     process.env.AUTOPILOT_ENABLED = 'true';
@@ -88,6 +90,9 @@ describe("AutopilotScheduler", () => {
     suggestionsService = {
       generate: jest.fn().mockResolvedValue({ suggestions: [makeSuggestion()] }),
     };
+    entitlements = {
+      getEnabledTierKeys: jest.fn().mockResolvedValue(["pro", "elite"]),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -98,6 +103,7 @@ describe("AutopilotScheduler", () => {
         { provide: AutopilotService, useValue: autopilotService },
         { provide: NotificationsService, useValue: notifications },
         { provide: SuggestionsService, useValue: suggestionsService },
+        { provide: EntitlementsService, useValue: entitlements },
       ],
     }).compile();
 
