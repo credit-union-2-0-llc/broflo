@@ -55,6 +55,8 @@ const PRO_PLAN = buildPlan({
 
 const ELITE_PLAN = buildPlan({
   key: "elite",
+  stripePriceIdMonthly: "price_elite_monthly",
+  stripePriceIdAnnual: "price_elite_annual",
   limits: [
     { id: "15", planId: "plan-elite", featureKey: "photoLimitPerPerson", type: "INTEGER", boolValue: null, intValue: null, isUnlimited: true, stringValue: null, description: null, updatedAt: new Date(), updatedBy: null },
     { id: "16", planId: "plan-elite", featureKey: "maxRerollRequests", type: "INTEGER", boolValue: null, intValue: null, isUnlimited: true, stringValue: null, description: null, updatedAt: new Date(), updatedBy: null },
@@ -193,6 +195,12 @@ describe("EntitlementsService", () => {
     it("maps an annual price ID to its plan key", async () => {
       prisma.plan.findMany.mockResolvedValue([FREE_PLAN, PRO_PLAN, ELITE_PLAN]);
       expect(await service.tierFromPriceId("price_pro_annual")).toBe("pro");
+    });
+
+    it("maps elite monthly and annual price IDs to elite", async () => {
+      prisma.plan.findMany.mockResolvedValue([FREE_PLAN, PRO_PLAN, ELITE_PLAN]);
+      expect(await service.tierFromPriceId("price_elite_monthly")).toBe("elite");
+      expect(await service.tierFromPriceId("price_elite_annual")).toBe("elite");
     });
 
     it("returns free for an undefined price ID", async () => {

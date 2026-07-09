@@ -7,6 +7,7 @@ import {
 import Stripe from "stripe";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailService } from "../email/email.service";
+import { EntitlementsService } from "../entitlements/entitlements.service";
 import type { User } from "@prisma/client";
 
 type StripeInstance = InstanceType<typeof Stripe>;
@@ -19,6 +20,7 @@ export class BillingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
+    private readonly entitlements: EntitlementsService,
   ) {
     if (!process.env.STRIPE_SECRET_KEY) {
       this.log.warn("STRIPE_SECRET_KEY not set — billing disabled");
@@ -161,7 +163,7 @@ export class BillingService {
       { expand: ["default_payment_method"] },
     );
 
-    const tier = this.tierFromPriceId(
+    const tier = await this.entitlements.tierFromPriceId(
       subscription.items.data[0]?.price?.id,
     );
 
@@ -191,7 +193,7 @@ export class BillingService {
     if (!userId) return;
 
     const items = sub.items as { data: Array<{ price?: { id: string } }> };
-    const tier = this.tierFromPriceId(items?.data[0]?.price?.id);
+    const tier = await this.entitlements.tierFromPriceId(items?.data[0]?.price?.id);
 
     const expanded = await this.stripe.subscriptions.retrieve(
       sub.id as string,
@@ -261,18 +263,4 @@ export class BillingService {
     }
   }
 
-  private tierFromPriceId(priceId: string | undefined): string {
-    if (!priceId) return "free";
-
-    const proMonthly = process.env.STRIPE_PRO_MONTHLY_PRICE_ID;
-    const proAnnual = process.env.STRIPE_PRO_ANNUAL_PRICE_ID;
-    const eliteMonthly = process.env.STRIPE_ELITE_MONTHLY_PRICE_ID;
-    const eliteAnnual = process.env.STRIPE_ELITE_ANNUAL_PRICE_ID;
-
-    if (priceId === proMonthly || priceId === proAnnual) return "pro";
-    if (priceId === eliteMonthly || priceId === eliteAnnual) return "elite";
-
-    this.log.warn(`Unknown price ID: ${priceId} — defaulting to pro`);
-    return "pro";
-  }
 }
