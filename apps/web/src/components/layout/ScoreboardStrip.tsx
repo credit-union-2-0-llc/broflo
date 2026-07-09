@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { api } from "@/lib/api";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 const stats = [
   { label: "Broflo Score", sub: "lifetime", color: "var(--amber)", key: "score" },
@@ -130,6 +131,7 @@ export function ScoreboardStrip() {
 
         {/* User cell */}
         <div className="flex items-center gap-3 px-5">
+          <NotificationBell />
           <div
             className="flex h-[38px] w-[38px] items-center justify-center shrink-0"
             style={{
@@ -224,8 +226,9 @@ export function ScoreboardStrip() {
         ))}
 
         <div
-          className="flex items-center justify-center px-3"
+          className="flex items-center gap-1 justify-center px-3"
         >
+          <NotificationBell />
           <div
             className="flex h-[32px] w-[32px] items-center justify-center"
             style={{
