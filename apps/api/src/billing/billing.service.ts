@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import Stripe from "stripe";
 import { PrismaService } from "../prisma/prisma.service";
+import { EmailService } from "../email/email.service";
 import type { User } from "@prisma/client";
 
 type StripeInstance = InstanceType<typeof Stripe>;
@@ -15,7 +16,10 @@ export class BillingService {
   private stripeClient: StripeInstance | null = null;
   private readonly log = new Logger(BillingService.name);
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly email: EmailService,
+  ) {
     if (!process.env.STRIPE_SECRET_KEY) {
       this.log.warn("STRIPE_SECRET_KEY not set — billing disabled");
     }
@@ -248,7 +252,13 @@ export class BillingService {
     });
 
     this.log.warn(`User ${user.id} payment failed → downgraded to free`);
-    // TODO: Send notification email via Resend
+    try {
+      await this.email.sendPaymentFailedEmail(user.email);
+    } catch (err) {
+      // Downgrade already happened — a failed notification shouldn't
+      // roll that back or fail the webhook (Stripe would just retry it).
+      this.log.error(`Failed to send payment-failed email to ${user.email}`, err);
+    }
   }
 
   private tierFromPriceId(priceId: string | undefined): string {
