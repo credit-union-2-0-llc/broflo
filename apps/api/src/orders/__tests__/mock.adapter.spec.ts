@@ -1,7 +1,31 @@
 import { MockAdapter } from '../adapters/mock/mock.adapter';
 import { RetailerOrderError } from '../adapters/retailer.adapter';
+import type { RetailerProduct, ShippingAddress } from '../adapters/retailer.adapter';
 
 jest.setTimeout(10000);
+
+// placeOrder has a genuine, intentional 5% random failure rate (per D-07).
+// Tests that just need a successful placement to exercise other behavior
+// (not testing the failure path itself) retry past it rather than being
+// flaky — each attempt is independently ~95% likely to succeed, so the
+// odds of exhausting 10 retries are astronomically lower than the ~5%
+// per-run flakiness this replaces. Pinning specific Math.random() call
+// indices instead is fragile — see git history on this file for why.
+async function placeOrderRetryingSimulatedFailures(
+  adapter: MockAdapter,
+  product: RetailerProduct,
+  shippingAddress: ShippingAddress,
+  stripePaymentIntentId: string,
+) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      return await adapter.placeOrder(product, shippingAddress, stripePaymentIntentId);
+    } catch (err) {
+      if (!(err instanceof RetailerOrderError) || err.code !== 'MOCK_FAILURE') throw err;
+    }
+  }
+  throw new Error('placeOrder kept hitting the simulated 5% failure rate 10 times in a row');
+}
 
 describe('MockAdapter', () => {
   let adapter: MockAdapter;
@@ -67,7 +91,6 @@ describe('MockAdapter', () => {
 
   describe('placeOrder', () => {
     it('returns an OrderResult with retailerOrderId starting with MOCK-', async () => {
-      const product = await adapter.getProduct('mock-001');
       const shippingAddress = {
         name: 'Jane Doe',
         address1: '123 Main St',
@@ -75,7 +98,14 @@ describe('MockAdapter', () => {
         state: 'OR',
         zip: '97201',
       };
-      const result = await adapter.placeOrder(product, shippingAddress, 'pi_test_123');
+      const product = await adapter.getProduct('mock-001');
+      const result = await placeOrderRetryingSimulatedFailures(
+        adapter,
+        product,
+        shippingAddress,
+        'pi_test_123',
+      );
+
       expect(result.retailerOrderId).toMatch(/^MOCK-\d+$/);
       expect(result.confirmationNumber).toMatch(/^CONF-[A-Z0-9]{6}$/);
       expect(result.actualPriceCents).toBe(product.priceCents);
@@ -92,7 +122,12 @@ describe('MockAdapter', () => {
         state: 'OR',
         zip: '97201',
       };
-      const orderResult = await adapter.placeOrder(product, shippingAddress, 'pi_test_456');
+      const orderResult = await placeOrderRetryingSimulatedFailures(
+        adapter,
+        product,
+        shippingAddress,
+        'pi_test_456',
+      );
       const cancelResult = await adapter.cancelOrder(orderResult.retailerOrderId);
       expect(cancelResult.success).toBe(true);
     });
