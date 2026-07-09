@@ -205,6 +205,19 @@ describe("EntitlementsService", () => {
     });
   });
 
+  describe("getEnabledTierKeys", () => {
+    it("returns only the tier keys with a boolean feature enabled (matches today's ['pro','elite'] autopilot filter)", async () => {
+      prisma.plan.findMany.mockResolvedValue([FREE_PLAN, PRO_PLAN, ELITE_PLAN]);
+      const keys = await service.getEnabledTierKeys("autopilotEnabled");
+      expect(keys.sort()).toEqual(["pro"]); // ELITE_PLAN fixture doesn't set autopilotEnabled in this suite
+    });
+
+    it("returns an empty array when no tier has the feature enabled", async () => {
+      prisma.plan.findMany.mockResolvedValue([FREE_PLAN]);
+      expect(await service.getEnabledTierKeys("autopilotEnabled")).toEqual([]);
+    });
+  });
+
   describe("caching", () => {
     it("reads from cache without hitting the DB when present", async () => {
       redis.getCachedPlan.mockResolvedValue(JSON.stringify(FREE_PLAN));

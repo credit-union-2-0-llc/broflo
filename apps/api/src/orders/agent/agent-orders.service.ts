@@ -12,6 +12,7 @@ import { RetailerProfileService } from './retailer-profile.service';
 import { ServiceCreditService } from './service-credit.service';
 import { OrderAuditService } from '../audit/order-audit.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { EntitlementsService } from '../../entitlements/entitlements.service';
 import { AgentPreviewDto, AgentPlaceDto } from './dto/agent-order.dto';
 import { randomUUID } from 'crypto';
 
@@ -27,10 +28,11 @@ export class AgentOrdersService {
     private readonly serviceCredit: ServiceCreditService,
     private readonly orderAudit: OrderAuditService,
     private readonly notifications: NotificationsService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async preview(user: User, dto: AgentPreviewDto) {
-    this._requireTier(user);
+    await this._requireTier(user);
     await this._checkConcurrencyLimit(user.id);
 
     const suggestion = await this.prisma.giftSuggestion.findFirst({
@@ -146,7 +148,7 @@ export class AgentOrdersService {
   }
 
   async place(user: User, dto: AgentPlaceDto) {
-    this._requireTier(user);
+    await this._requireTier(user);
 
     const job = await this.prisma.agentJob.findFirst({
       where: { id: dto.jobId, userId: user.id, status: 'previewing' },
@@ -337,8 +339,8 @@ export class AgentOrdersService {
     });
   }
 
-  private _requireTier(user: User) {
-    if (!['pro', 'elite'].includes(user.subscriptionTier)) {
+  private async _requireTier(user: User) {
+    if (!(await this.entitlements.isFeatureEnabled(user.subscriptionTier, 'agentPurchasing'))) {
       throw new ForbiddenException('Browser agent orders require a Pro or Elite subscription.');
     }
   }

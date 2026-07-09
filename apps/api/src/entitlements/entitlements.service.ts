@@ -65,16 +65,26 @@ export class EntitlementsService {
     return plan?.limits.find((l) => l.featureKey === featureKey);
   }
 
-  /** Returns null for "unlimited" — callers should treat null as no cap. */
-  async getIntLimit(tierKey: string, featureKey: string): Promise<number | null> {
+  /**
+   * Returns null for "unlimited". `notFoundFallback` is what's returned when
+   * the plan or feature key can't be found at all (e.g. the DB hasn't been
+   * seeded yet) — defaults to null, but callers gating a paid limit (like
+   * maxPeople) should pass an explicit restrictive fallback so missing data
+   * fails closed instead of silently becoming "unlimited".
+   */
+  async getIntLimit(
+    tierKey: string,
+    featureKey: string,
+    notFoundFallback: number | null = null,
+  ): Promise<number | null> {
     const plan = await this.getPlan(tierKey);
     const limit = this.findLimit(plan, featureKey);
     if (!limit) {
       this.log.warn(`No PlanLimit found for tier=${tierKey} featureKey=${featureKey}`);
-      return null;
+      return notFoundFallback;
     }
     if (limit.isUnlimited) return null;
-    return limit.intValue ?? null;
+    return limit.intValue ?? notFoundFallback;
   }
 
   async isFeatureEnabled(tierKey: string, featureKey: string): Promise<boolean> {
@@ -85,6 +95,19 @@ export class EntitlementsService {
       return false;
     }
     return !!limit.boolValue;
+  }
+
+  /**
+   * For call sites that filter a DB query by tier (e.g. `subscriptionTier:
+   * { in: [...] }`) rather than checking one user at a time — returns the
+   * plan keys where a boolean feature is enabled, so that `in` list can stay
+   * dynamic instead of a hardcoded ['pro', 'elite'].
+   */
+  async getEnabledTierKeys(featureKey: string): Promise<string[]> {
+    const plans = await this.getAllPlans();
+    return plans
+      .filter((p) => p.limits.find((l) => l.featureKey === featureKey)?.boolValue)
+      .map((p) => p.key);
   }
 
   async getStringLimit(tierKey: string, featureKey: string): Promise<string | null> {
