@@ -2,6 +2,7 @@ import {
   Injectable,
   Logger,
   BadRequestException,
+  ForbiddenException,
   InternalServerErrorException,
 } from "@nestjs/common";
 import Stripe from "stripe";
@@ -97,7 +98,26 @@ export class BillingService {
       stripeSubscriptionId: user.stripeSubscriptionId,
       stripeCustomerId: user.stripeCustomerId,
       hasPaymentMethod: !!user.stripePaymentMethodId,
+      devTierOverrideEnabled: process.env.ALLOW_DEV_TIER_OVERRIDE === "true",
     };
+  }
+
+  // Lets a user flip their own tier without going through Stripe checkout —
+  // for testing tier-gated features before Stripe is wired up. Off by
+  // default; only touches the caller's own account. Remove once real
+  // checkout is live.
+  async devSetTier(user: User, tier: "free" | "pro" | "elite") {
+    if (process.env.ALLOW_DEV_TIER_OVERRIDE !== "true") {
+      throw new ForbiddenException("Dev tier override is not enabled.");
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { subscriptionTier: tier },
+    });
+
+    this.log.warn(`Dev tier override: user ${user.id} → ${tier}`);
+    return { subscriptionTier: tier };
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

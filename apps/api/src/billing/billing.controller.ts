@@ -10,12 +10,18 @@ import {
   HttpStatus,
   BadRequestException,
 } from "@nestjs/common";
+import { IsIn } from "class-validator";
 import type { Request } from "express";
 import type { User } from "@prisma/client";
 import { BillingService } from "./billing.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Public } from "../auth/decorators/public.decorator";
 import { SkipThrottle } from "@nestjs/throttler";
+
+class DevSetTierDto {
+  @IsIn(["free", "pro", "elite"])
+  tier!: "free" | "pro" | "elite";
+}
 
 @Controller("billing")
 export class BillingController {
@@ -40,6 +46,11 @@ export class BillingController {
   @Get("subscription")
   async getSubscription(@CurrentUser() user: User) {
     return this.billing.getSubscription(user);
+  }
+
+  @Post("dev-set-tier")
+  async devSetTier(@CurrentUser() user: User, @Body() body: DevSetTierDto) {
+    return this.billing.devSetTier(user, body.tier);
   }
 
   @Public()

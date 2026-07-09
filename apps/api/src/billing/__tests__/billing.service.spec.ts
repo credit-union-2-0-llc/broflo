@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Test, TestingModule } from "@nestjs/testing";
-import { BadRequestException, InternalServerErrorException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, InternalServerErrorException } from "@nestjs/common";
 import { BillingService } from "../billing.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EmailService } from "../../email/email.service";
@@ -325,6 +325,7 @@ describe("BillingService", () => {
         stripeSubscriptionId: "sub_123",
         stripeCustomerId: "cus_123",
         hasPaymentMethod: true,
+        devTierOverrideEnabled: false,
       });
     });
 
@@ -338,6 +339,34 @@ describe("BillingService", () => {
 
       const result = await service.getSubscription(user);
       expect(result.hasPaymentMethod).toBe(false);
+    });
+  });
+
+  describe("devSetTier", () => {
+    const ORIGINAL_ENV = process.env.ALLOW_DEV_TIER_OVERRIDE;
+
+    afterEach(() => {
+      if (ORIGINAL_ENV === undefined) delete process.env.ALLOW_DEV_TIER_OVERRIDE;
+      else process.env.ALLOW_DEV_TIER_OVERRIDE = ORIGINAL_ENV;
+    });
+
+    it("throws when the override flag is not enabled", async () => {
+      delete process.env.ALLOW_DEV_TIER_OVERRIDE;
+      const user = { id: "user-1" } as any;
+      await expect(service.devSetTier(user, "pro")).rejects.toThrow(ForbiddenException);
+    });
+
+    it("updates only the caller's own subscriptionTier when enabled", async () => {
+      process.env.ALLOW_DEV_TIER_OVERRIDE = "true";
+      const user = { id: "user-1" } as any;
+
+      const result = await service.devSetTier(user, "elite");
+
+      expect(result).toEqual({ subscriptionTier: "elite" });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: { subscriptionTier: "elite" },
+      });
     });
   });
 
