@@ -200,6 +200,25 @@ export class RedisService implements OnModuleDestroy {
     return { allowed, remaining: Math.max(0, limit - current) };
   }
 
+  // --- Recipient survey send rate limit (1 per person per 24h) ---
+
+  private readonly SURVEY_SEND_RATE_LIMIT_SECONDS = 86400;
+
+  async checkSurveySendRateLimit(personId: string): Promise<{ allowed: boolean }> {
+    const key = `survey-send-rate:${personId}`;
+
+    if (!this.isConnected) {
+      const raw = this.memGet(key);
+      if (raw) return { allowed: false };
+      this.memSet(key, "1", this.SURVEY_SEND_RATE_LIMIT_SECONDS);
+      return { allowed: true };
+    }
+
+    const client = this.getClient();
+    const set = await client.set(key, "1", "EX", this.SURVEY_SEND_RATE_LIMIT_SECONDS, "NX");
+    return { allowed: set === "OK" };
+  }
+
   // --- Entitlements cache (60s TTL, explicitly invalidated on admin write) ---
 
   private readonly ENTITLEMENTS_TTL_SECONDS = 60;
