@@ -645,6 +645,35 @@ export const api = {
   getOrderTimeline: (token: string, orderId: string) =>
     apiFetch<OrderStatusHistoryEntry[]>(`/orders/${orderId}/timeline`, { token }),
 
+  createManualOrder: (token: string, data: {
+    personId: string;
+    productTitle: string;
+    giftRecordId?: string;
+    eventId?: string;
+    priceCents?: number;
+    trackingNumber?: string;
+    trackingUrl?: string;
+    carrierName?: string;
+    status?: "ordered" | "processing" | "shipped" | "delivered";
+  }) =>
+    apiFetch<Order>("/orders/manual", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  updateOrderTracking: (token: string, orderId: string, data: {
+    trackingNumber: string;
+    trackingUrl?: string;
+    carrierName?: string;
+    status?: "ordered" | "processing" | "shipped" | "delivered";
+  }) =>
+    apiFetch<Order>(`/orders/${orderId}/tracking`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+      token,
+    }),
+
   // Autopilot (S-9)
   listRules: (token: string) =>
     apiFetch<AutopilotRule[]>("/autopilot/rules", { token }),
