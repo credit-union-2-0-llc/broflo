@@ -29,15 +29,6 @@ const codeSchema = z.object({
 type EmailForm = z.infer<typeof emailSchema>;
 type CodeForm = z.infer<typeof codeSchema>;
 
-function emailFingerprint(email: string): string {
-  let hash = 0;
-  for (let i = 0; i < email.length; i++) {
-    hash = (hash << 5) - hash + email.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash).toString(16).padStart(6, "0").slice(0, 6);
-}
-
 export default function LoginPage() {
   const router = useRouter();
   const [step, setStep] = useState<"email" | "code">("email");
@@ -100,7 +91,7 @@ export default function LoginPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">broflo.</CardTitle>
           <CardDescription>
-            We sent a code · <span className="font-mono">#{emailFingerprint(email)}</span>
+            We sent a code to <span className="font-medium text-foreground">{email}</span>
           </CardDescription>
         </CardHeader>
         <CardContent>
