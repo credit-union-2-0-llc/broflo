@@ -83,6 +83,7 @@ model Person {
   dietaryRestrictions String[] @default([]) @map("dietary_restrictions")
   dossierInsight    String?   @map("dossier_insight") @db.VarChar(2000)
   completenessScore Int       @default(0) @map("completeness_score")
+  recipientEmail    String?   @map("recipient_email")
 
   user             User      @relation(fields: [userId], references: [id])
   neverAgainItems  NeverAgainItem[]
@@ -94,9 +95,44 @@ model Person {
   tags             PersonTag[]
   wishlistItems    WishlistItem[]
   photos           PersonPhoto[]
+  surveyLinks      PersonSurveyLink[]
+  surveyResponses  PersonSurveyResponse[]
 
   @@index([userId, deletedAt])
   @@map("persons")
+}
+
+// --- Recipient self-report survey ---
+
+model PersonSurveyLink {
+  id          String    @id @default(uuid())
+  personId    String    @map("person_id")
+  token       String    @unique
+  createdAt   DateTime  @default(now()) @map("created_at")
+  expiresAt   DateTime  @map("expires_at")
+  respondedAt DateTime? @map("responded_at")
+
+  person    Person                 @relation(fields: [personId], references: [id], onDelete: Cascade)
+  responses PersonSurveyResponse[]
+
+  @@index([personId], map: "idx_survey_links_person")
+  @@map("person_survey_links")
+}
+
+model PersonSurveyResponse {
+  id           String    @id @default(uuid())
+  personId     String    @map("person_id")
+  surveyLinkId String    @map("survey_link_id")
+  answers      Json
+  status       String    @default("pending")
+  reviewedAt   DateTime? @map("reviewed_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  person     Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
+  surveyLink PersonSurveyLink @relation(fields: [surveyLinkId], references: [id], onDelete: Cascade)
+
+  @@index([personId, status], map: "idx_survey_responses_person_status")
+  @@map("person_survey_responses")
 }
 
 // --- S-12: Photo Dossier Enrichment ---
