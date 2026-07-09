@@ -1,0 +1,11 @@
+name: Gateway Bypass Lint
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: credit-union-2-0-llc/cu2-action-gateway-lint@v1.0.1
