@@ -15,7 +15,7 @@ export function ThreatRoster({ events }: ThreatRosterProps) {
   return (
     <div>
       <SectionHeader
-        title="Threat Board"
+        title="Upcoming Events"
         count={events.length}
         countLabel="events"
         actionLabel="Add Event +"

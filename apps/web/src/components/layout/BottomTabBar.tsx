@@ -11,9 +11,9 @@ import {
 } from "lucide-react";
 
 const tabs = [
-  { href: "/dashboard", label: "Radar", icon: LayoutDashboard },
-  { href: "/people", label: "Assets", icon: Users },
-  { href: "/events", label: "Brain", icon: Calendar },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/people", label: "People", icon: Users },
+  { href: "/events", label: "Events", icon: Calendar },
   { href: "/orders", label: "Orders", icon: Package },
   { href: "/profile", label: "Score", icon: Trophy },
 ] as const;

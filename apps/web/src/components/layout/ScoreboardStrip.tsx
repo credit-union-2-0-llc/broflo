@@ -1,15 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { api } from "@/lib/api";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 const stats = [
   { label: "Broflo Score", sub: "lifetime", color: "var(--amber)", key: "score" },
-  { label: "Code Red", sub: "this month", color: "var(--red)", key: "codeRed" },
-  { label: "Mission Rate", sub: "on-time %", color: "var(--green-bright)", key: "missionRate" },
-  { label: "Active Assets", sub: "people", color: "var(--blue)", key: "assets" },
+  { label: "Due Soon", sub: "next 24h", color: "var(--red)", key: "dueSoon" },
+  { label: "People", sub: "tracked", color: "var(--blue)", key: "people" },
 ] as const;
 
 function initials(name: string | null | undefined) {
@@ -17,46 +14,22 @@ function initials(name: string | null | undefined) {
   return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 }
 
-export function ScoreboardStrip() {
+interface ScoreboardStripProps {
+  peopleCount: number;
+  dueSoonCount: number;
+}
+
+export function ScoreboardStrip({ peopleCount, dueSoonCount }: ScoreboardStripProps) {
   const { data: session } = useSession();
   const user = session?.user;
 
-  const [assetCount, setAssetCount] = useState<number | null>(null);
-  const [codeRedCount, setCodeRedCount] = useState<number | null>(null);
-
-  useEffect(() => {
-    const token = session?.accessToken;
-    if (!token) return;
-
-    api
-      .listPersons(token)
-      .then((people) => setAssetCount(people.length))
-      .catch(() => {});
-
-    api
-      .getUpcomingEvents(token, { limit: 100 })
-      .then((res) => {
-        // Same red-alert threshold already used for event urgency badges
-        // elsewhere in the app (see urgencyClass in events pages) — not a
-        // new definition, just reusing the existing one for consistency.
-        const urgent = res.data.filter((e) => e.daysUntil <= 1).length;
-        setCodeRedCount(urgent);
-      })
-      .catch(() => {});
-  }, [session?.accessToken]);
-
   const statValues: Record<string, string> = {
     score: String(user?.brofloScore ?? 0),
-    codeRed: codeRedCount === null ? "—" : String(codeRedCount),
-    // Mission Rate (on-time gift-giving %) has no backing data yet — no
-    // endpoint exists to compute it without an inefficient N+1 fetch of
-    // every person's full gift history client-side. Left as an honest
-    // "no data" placeholder rather than a fabricated number.
-    missionRate: "—",
-    assets: assetCount === null ? "—" : String(assetCount),
+    dueSoon: String(dueSoonCount),
+    people: String(peopleCount),
   };
 
-  const mobileStats = stats.filter((s) => s.key === "score" || s.key === "codeRed");
+  const mobileStats = stats.filter((s) => s.key === "score" || s.key === "dueSoon");
 
   return (
     <header
@@ -66,7 +39,7 @@ export function ScoreboardStrip() {
       {/* Desktop: full strip */}
       <div
         className="hidden lg:grid"
-        style={{ gridTemplateColumns: "auto 1fr 1fr 1fr 1fr auto" }}
+        style={{ gridTemplateColumns: "auto 1fr 1fr 1fr auto" }}
       >
         {/* Logo cell */}
         <div
@@ -176,7 +149,7 @@ export function ScoreboardStrip() {
         </div>
       </div>
 
-      {/* Mobile: collapsed strip — Score + Code Red only */}
+      {/* Mobile: collapsed strip — Score + Due Soon only */}
       <div
         className="lg:hidden grid items-center"
         style={{ gridTemplateColumns: "auto 1fr 1fr auto" }}

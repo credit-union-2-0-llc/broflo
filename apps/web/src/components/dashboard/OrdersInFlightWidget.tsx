@@ -12,14 +12,17 @@ import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 
 interface OrdersInFlightWidgetProps {
   token: string;
+  initialOrders?: Array<Order & { person: { name: string } }>;
+  initialTotal?: number;
 }
 
-export function OrdersInFlightWidget({ token }: OrdersInFlightWidgetProps) {
-  const [orders, setOrders] = useState<Array<Order & { person: { name: string } }>>([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
+export function OrdersInFlightWidget({ token, initialOrders, initialTotal }: OrdersInFlightWidgetProps) {
+  const [orders, setOrders] = useState<Array<Order & { person: { name: string } }>>(initialOrders ?? []);
+  const [loading, setLoading] = useState(initialOrders === undefined);
+  const [total, setTotal] = useState(initialTotal ?? 0);
 
   useEffect(() => {
+    if (initialOrders !== undefined) return;
     async function load() {
       try {
         const [ordered, processing, shipped] = await Promise.all([
@@ -37,7 +40,7 @@ export function OrdersInFlightWidget({ token }: OrdersInFlightWidgetProps) {
       }
     }
     load();
-  }, [token]);
+  }, [token, initialOrders]);
 
   const nextDelivery = orders
     .filter((o) => o.estimatedDeliveryDate)
