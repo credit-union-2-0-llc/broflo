@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
+import { EntitlementsService } from "../entitlements/entitlements.service";
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
 const AI_SERVICE_KEY = process.env.AI_SERVICE_KEY;
@@ -53,6 +54,7 @@ export class EnrichmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   // --- Ownership helper ---
@@ -282,7 +284,7 @@ export class EnrichmentService {
       where: { id: userId },
     });
 
-    if (user.subscriptionTier !== "elite") {
+    if (!(await this.entitlements.isFeatureEnabled(user.subscriptionTier, "eliteDossierInsights"))) {
       throw new HttpException(
         {
           statusCode: HttpStatus.PAYMENT_REQUIRED,
