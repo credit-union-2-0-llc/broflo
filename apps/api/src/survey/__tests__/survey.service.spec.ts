@@ -1,11 +1,13 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { BadRequestException, ForbiddenException, GoneException, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, GoneException, HttpException, NotFoundException } from "@nestjs/common";
+import type { User } from "@prisma/client";
 import { SurveyService } from "../survey.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RedisService } from "../../redis/redis.service";
 import { EmailService } from "../../email/email.service";
 import { NotificationsService } from "../../notifications/notifications.service";
 import { PersonsService } from "../../persons/persons.service";
+import { EntitlementsService } from "../../entitlements/entitlements.service";
 
 describe("SurveyService", () => {
   let service: SurveyService;
@@ -19,8 +21,10 @@ describe("SurveyService", () => {
   let email: { sendSurveyInvite: jest.Mock };
   let notifications: { create: jest.Mock };
   let persons: { update: jest.Mock };
+  let entitlements: { isFeatureEnabled: jest.Mock };
 
   const PERSON = { id: "person-1", userId: "user-1", name: "Alice Smith", recipientEmail: null };
+  const USER = { id: "user-1", name: "Jasper", email: "jasper@example.com", subscriptionTier: "pro" } as User;
 
   beforeEach(async () => {
     prisma = {
@@ -49,6 +53,7 @@ describe("SurveyService", () => {
     email = { sendSurveyInvite: jest.fn().mockResolvedValue(undefined) };
     notifications = { create: jest.fn().mockResolvedValue({}) };
     persons = { update: jest.fn().mockResolvedValue({}) };
+    entitlements = { isFeatureEnabled: jest.fn().mockResolvedValue(true) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -58,6 +63,7 @@ describe("SurveyService", () => {
         { provide: EmailService, useValue: email },
         { provide: NotificationsService, useValue: notifications },
         { provide: PersonsService, useValue: persons },
+        { provide: EntitlementsService, useValue: entitlements },
       ],
     }).compile();
 
@@ -66,12 +72,12 @@ describe("SurveyService", () => {
 
   describe("sendSurvey", () => {
     it("throws when the person has no recipient email and none is provided", async () => {
-      await expect(service.sendSurvey("user-1", "person-1", {})).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.sendSurvey(USER, "person-1", {})).rejects.toBeInstanceOf(BadRequestException);
       expect(email.sendSurveyInvite).not.toHaveBeenCalled();
     });
 
     it("sends using a provided recipientEmail and persists it on the person", async () => {
-      await service.sendSurvey("user-1", "person-1", { recipientEmail: "alice@example.com" });
+      await service.sendSurvey(USER, "person-1", { recipientEmail: "alice@example.com" });
 
       expect(prisma.person.update).toHaveBeenCalledWith({
         where: { id: "person-1" },
@@ -88,22 +94,44 @@ describe("SurveyService", () => {
     it("throws when a survey was already sent recently (rate limited)", async () => {
       redis.checkSurveySendRateLimit.mockResolvedValue({ allowed: false });
       await expect(
-        service.sendSurvey("user-1", "person-1", { recipientEmail: "alice@example.com" }),
+        service.sendSurvey(USER, "person-1", { recipientEmail: "alice@example.com" }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it("denies sending for a person owned by someone else", async () => {
       prisma.person.findFirst.mockResolvedValue({ ...PERSON, userId: "someone-else" });
       await expect(
-        service.sendSurvey("user-1", "person-1", { recipientEmail: "alice@example.com" }),
+        service.sendSurvey(USER, "person-1", { recipientEmail: "alice@example.com" }),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it("supersedes any still-active prior link", async () => {
-      await service.sendSurvey("user-1", "person-1", { recipientEmail: "alice@example.com" });
+      await service.sendSurvey(USER, "person-1", { recipientEmail: "alice@example.com" });
       expect(prisma.personSurveyLink.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: expect.objectContaining({ personId: "person-1", respondedAt: null }) }),
       );
+    });
+
+    it("rejects a Free-tier user before touching ownership or rate limits", async () => {
+      entitlements.isFeatureEnabled.mockResolvedValue(false);
+      const freeUser = { ...USER, subscriptionTier: "free" } as User;
+
+      await expect(
+        service.sendSurvey(freeUser, "person-1", { recipientEmail: "alice@example.com" }),
+      ).rejects.toBeInstanceOf(HttpException);
+      expect(prisma.person.findFirst).not.toHaveBeenCalled();
+      expect(email.sendSurveyInvite).not.toHaveBeenCalled();
+    });
+
+    it("persists only the selected fields on the link, defaulting to all when none are chosen", async () => {
+      await service.sendSurvey(USER, "person-1", { recipientEmail: "alice@example.com", fields: ["hobbies", "shoeSize"] });
+      expect(prisma.personSurveyLink.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ fields: ["hobbies", "shoeSize"] }) }),
+      );
+
+      await service.sendSurvey(USER, "person-1", { recipientEmail: "alice@example.com" });
+      const lastCall = prisma.personSurveyLink.create.mock.calls.at(-1)?.[0];
+      expect(lastCall.data.fields.length).toBeGreaterThan(1);
     });
   });
 
@@ -119,6 +147,7 @@ describe("SurveyService", () => {
         personId: "person-1",
         respondedAt: new Date(),
         expiresAt: new Date(Date.now() + 86400000),
+        fields: [],
         person: { name: "Alice Smith" },
       });
       await expect(service.getPublicSurvey("used-token")).rejects.toBeInstanceOf(GoneException);
@@ -130,17 +159,19 @@ describe("SurveyService", () => {
         personId: "person-1",
         respondedAt: null,
         expiresAt: new Date(Date.now() - 1000),
+        fields: [],
         person: { name: "Alice Smith" },
       });
       await expect(service.getPublicSurvey("expired-token")).rejects.toBeInstanceOf(GoneException);
     });
 
-    it("returns the person's first name and field spec for a valid token", async () => {
+    it("returns the person's first name and every field when the link has no stored selection", async () => {
       prisma.personSurveyLink.findUnique.mockResolvedValue({
         id: "link-1",
         personId: "person-1",
         respondedAt: null,
         expiresAt: new Date(Date.now() + 86400000),
+        fields: [],
         person: { name: "Alice Smith" },
       });
       const result = await service.getPublicSurvey("valid-token");
@@ -149,12 +180,26 @@ describe("SurveyService", () => {
       expect(result.fields).not.toContain("shippingAddress1");
     });
 
+    it("returns only the sender's selected fields when the link has a stored selection", async () => {
+      prisma.personSurveyLink.findUnique.mockResolvedValue({
+        id: "link-1",
+        personId: "person-1",
+        respondedAt: null,
+        expiresAt: new Date(Date.now() + 86400000),
+        fields: ["hobbies", "shoeSize"],
+        person: { name: "Alice Smith" },
+      });
+      const result = await service.getPublicSurvey("valid-token");
+      expect(result.fields).toEqual(["hobbies", "shoeSize"]);
+    });
+
     it("submitSurvey creates a pending response and notifies the owner", async () => {
       prisma.personSurveyLink.findUnique.mockResolvedValue({
         id: "link-1",
         personId: "person-1",
         respondedAt: null,
         expiresAt: new Date(Date.now() + 86400000),
+        fields: [],
         person: { name: "Alice Smith" },
       });
 
@@ -175,12 +220,32 @@ describe("SurveyService", () => {
       );
     });
 
+    it("submitSurvey drops any answer outside the link's selected fields", async () => {
+      prisma.personSurveyLink.findUnique.mockResolvedValue({
+        id: "link-1",
+        personId: "person-1",
+        respondedAt: null,
+        expiresAt: new Date(Date.now() + 86400000),
+        fields: ["hobbies"],
+        person: { name: "Alice Smith" },
+      });
+
+      await service.submitSurvey("valid-token", { hobbies: "climbing", musicTaste: "jazz" });
+
+      expect(prisma.personSurveyResponse.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ answers: { hobbies: "climbing" } }),
+        }),
+      );
+    });
+
     it("submitSurvey rejects a second submission against the same (now-responded) token", async () => {
       prisma.personSurveyLink.findUnique.mockResolvedValue({
         id: "link-1",
         personId: "person-1",
         respondedAt: new Date(),
         expiresAt: new Date(Date.now() + 86400000),
+        fields: [],
         person: { name: "Alice Smith" },
       });
       await expect(service.submitSurvey("valid-token", { hobbies: "climbing" })).rejects.toBeInstanceOf(GoneException);

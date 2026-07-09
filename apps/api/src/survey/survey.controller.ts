@@ -14,7 +14,7 @@ export class SurveyController {
     @Param("personId") personId: string,
     @Body() dto: SendSurveyDto,
   ) {
-    return this.survey.sendSurvey(user.id, personId, dto);
+    return this.survey.sendSurvey(user, personId, dto);
   }
 
   @Get("responses")

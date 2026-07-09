@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
+import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
 import { toast } from "sonner";
 
 const FIELD_LABELS: Record<string, string> = {
@@ -38,21 +39,37 @@ function formatAnswer(value: unknown): string {
   return String(value);
 }
 
+const SURVEY_QUESTION_KEYS = Object.keys(FIELD_LABELS);
+
 interface SurveySectionProps {
   personId: string;
   personName: string;
   recipientEmail: string | null;
+  tier: string;
 }
 
-export function SurveySection({ personId, personName, recipientEmail }: SurveySectionProps) {
+export function SurveySection({ personId, personName, recipientEmail, tier }: SurveySectionProps) {
   const { data: session } = useSession();
   const [responses, setResponses] = useState<SurveyResponse[]>([]);
   const [loadingResponses, setLoadingResponses] = useState(true);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [emailInput, setEmailInput] = useState(recipientEmail ?? "");
+  const [questionsToSend, setQuestionsToSend] = useState<Set<string>>(new Set(SURVEY_QUESTION_KEYS));
   const [sending, setSending] = useState(false);
+  const [sendUpgradeMessage, setSendUpgradeMessage] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState<Record<string, boolean>>({});
   const [selectedFields, setSelectedFields] = useState<Record<string, Set<string>>>({});
+
+  const canSendSurvey = tier === "pro" || tier === "elite";
+
+  function toggleQuestion(field: string) {
+    setQuestionsToSend((prev) => {
+      const next = new Set(prev);
+      if (next.has(field)) next.delete(field);
+      else next.add(field);
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!session?.accessToken) return;
@@ -71,14 +88,24 @@ export function SurveySection({ personId, personName, recipientEmail }: SurveySe
   async function handleSend() {
     if (!session?.accessToken) return;
     setSending(true);
+    setSendUpgradeMessage(null);
     try {
-      await api.sendSurvey(session.accessToken, personId, emailInput.trim() || undefined);
+      await api.sendSurvey(
+        session.accessToken,
+        personId,
+        emailInput.trim() || undefined,
+        Array.from(questionsToSend),
+      );
       toast.success(`Survey sent to ${personName}.`);
       setSendDialogOpen(false);
     } catch (err) {
-      toast.error(
-        err instanceof ApiError ? err.message : "Failed to send survey. Try again.",
-      );
+      if (err instanceof ApiError && err.status === 402) {
+        setSendUpgradeMessage(err.message);
+      } else {
+        toast.error(
+          err instanceof ApiError ? err.message : "Failed to send survey. Try again.",
+        );
+      }
     } finally {
       setSending(false);
     }
@@ -169,27 +196,65 @@ export function SurveySection({ personId, personName, recipientEmail }: SurveySe
           <DialogHeader>
             <DialogTitle>Send a Survey to {personName}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              We&apos;ll email them a short, friendly form to fill in their own sizes and preferences. Nothing changes on their profile until you review and approve it.
-            </p>
-            <div>
-              <Label htmlFor="recipientEmail">Their email</Label>
-              <Input
-                id="recipientEmail"
-                type="email"
-                placeholder="them@example.com"
-                value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
-              />
+          {!canSendSurvey ? (
+            <div className="space-y-4">
+              <UpgradePrompt message="Recipient surveys are a Pro feature. Upgrade to let people fill in their own details." />
+              <div className="flex justify-end">
+                <Button variant="ghost" onClick={() => setSendDialogOpen(false)}>Close</Button>
+              </div>
             </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setSendDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleSend} disabled={sending || !emailInput.trim()}>
-                {sending ? "Sending..." : "Send"}
-              </Button>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                We&apos;ll email them a short, friendly form to fill in their own sizes and preferences. Nothing changes on their profile until you review and approve it.
+              </p>
+              {sendUpgradeMessage && <UpgradePrompt message={sendUpgradeMessage} />}
+              <div>
+                <Label htmlFor="recipientEmail">Their email</Label>
+                <Input
+                  id="recipientEmail"
+                  type="email"
+                  placeholder="them@example.com"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <Label>Which questions?</Label>
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground underline"
+                    onClick={() =>
+                      setQuestionsToSend((prev) =>
+                        prev.size === SURVEY_QUESTION_KEYS.length ? new Set() : new Set(SURVEY_QUESTION_KEYS),
+                      )
+                    }
+                  >
+                    {questionsToSend.size === SURVEY_QUESTION_KEYS.length ? "Clear all" : "Select all"}
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {SURVEY_QUESTION_KEYS.map((field) => (
+                    <label key={field} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={questionsToSend.has(field)}
+                        onChange={() => toggleQuestion(field)}
+                      />
+                      {FIELD_LABELS[field]}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => setSendDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleSend} disabled={sending || !emailInput.trim() || questionsToSend.size === 0}>
+                  {sending ? "Sending..." : "Send"}
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

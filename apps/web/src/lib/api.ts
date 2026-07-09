@@ -889,10 +889,13 @@ export const api = {
     ),
 
   // Recipient survey
-  sendSurvey: (token: string, personId: string, recipientEmail?: string) =>
+  sendSurvey: (token: string, personId: string, recipientEmail?: string, fields?: string[]) =>
     apiFetch<{ sent: true }>(`/persons/${personId}/survey`, {
       method: "POST",
-      body: JSON.stringify(recipientEmail ? { recipientEmail } : {}),
+      body: JSON.stringify({
+        ...(recipientEmail ? { recipientEmail } : {}),
+        ...(fields && fields.length > 0 ? { fields } : {}),
+      }),
       token,
     }),
 
