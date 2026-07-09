@@ -164,6 +164,11 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+      - name: Seed entitlement plans
+        run: pnpm --filter @broflo/api exec ts-node prisma/deploy-seed.ts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Build API
         run: pnpm build:api
 

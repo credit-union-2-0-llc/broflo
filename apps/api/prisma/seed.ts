@@ -1,6 +1,6 @@
 import { PrismaClient, PlanLimitType } from '@prisma/client';
 
-const prisma = new PrismaClient();
+export const prisma = new PrismaClient();
 
 type LimitSeed =
   | { type: 'BOOLEAN'; boolValue: boolean; description: string }
@@ -107,7 +107,7 @@ const PLAN_SEED: PlanSeed[] = [
   },
 ];
 
-async function seedPlans() {
+export async function seedPlans() {
   for (const planSeed of PLAN_SEED) {
     const plan = await prisma.plan.upsert({
       where: { key: planSeed.key },
@@ -218,9 +218,13 @@ async function main() {
   console.log('Seed complete.');
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+// Guarded so importing this file's exports (e.g. from deploy-seed.ts)
+// doesn't also trigger the full script as a side effect.
+if (require.main === module) {
+  main()
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    })
+    .finally(() => prisma.$disconnect());
+}
