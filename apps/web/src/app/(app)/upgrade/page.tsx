@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Check } from "lucide-react";
@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { VOICE, SUBSCRIPTION_PLANS } from "@broflo/shared";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -66,10 +68,34 @@ async function startCheckout(priceId: string, token: string) {
 }
 
 function UpgradeContent() {
-  const { data: session } = useSession();
+  const { data: session, update } = useSession();
   const searchParams = useSearchParams();
   const canceled = searchParams.get("canceled");
   const currentTier = session?.user?.subscriptionTier || "free";
+  const [devOverrideEnabled, setDevOverrideEnabled] = useState(false);
+  const [switching, setSwitching] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!session?.accessToken) return;
+    api
+      .getSubscription(session.accessToken)
+      .then((sub) => setDevOverrideEnabled(sub.devTierOverrideEnabled))
+      .catch(() => {});
+  }, [session?.accessToken]);
+
+  async function handleDevUnlock(tier: "pro" | "elite") {
+    if (!session?.accessToken) return;
+    setSwitching(tier);
+    try {
+      await api.devSetTier(session.accessToken, tier);
+      await update();
+      toast.success(`Unlocked ${tier} for testing.`);
+    } catch {
+      toast.error("Failed to unlock plan.");
+    } finally {
+      setSwitching(null);
+    }
+  }
 
   return (
     <div className="container max-w-5xl mx-auto py-6 px-4 sm:px-6 sm:py-8 md:px-8">
@@ -149,6 +175,18 @@ function UpgradeContent() {
                 ) : tier === "free" ? (
                   <Button variant="outline" className="w-full" disabled>
                     Included
+                  </Button>
+                ) : devOverrideEnabled ? (
+                  <Button
+                    className={cn(
+                      "w-full",
+                      isHighlighted &&
+                        "bg-amber hover:bg-amber-light text-white",
+                    )}
+                    disabled={switching === tier}
+                    onClick={() => handleDevUnlock(tier as "pro" | "elite")}
+                  >
+                    {switching === tier ? "Unlocking..." : `Get ${plan.name} (testing)`}
                   </Button>
                 ) : (
                   <>
