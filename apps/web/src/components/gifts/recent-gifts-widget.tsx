@@ -18,6 +18,7 @@ type RecentGift = GiftRecord & { personName: string; eventName: string | null };
 
 interface RecentGiftsWidgetProps {
   token: string;
+  initialGifts?: RecentGift[];
 }
 
 function GiftOrderBadge({ placedAt }: { placedAt: string }) {
@@ -26,19 +27,20 @@ function GiftOrderBadge({ placedAt }: { placedAt: string }) {
   return <OrderStatusBadge status="ordered" cancelCountdown={formatted} />;
 }
 
-export function RecentGiftsWidget({ token }: RecentGiftsWidgetProps) {
-  const [gifts, setGifts] = useState<RecentGift[]>([]);
-  const [loading, setLoading] = useState(true);
+export function RecentGiftsWidget({ token, initialGifts }: RecentGiftsWidgetProps) {
+  const [gifts, setGifts] = useState<RecentGift[]>(initialGifts ?? []);
+  const [loading, setLoading] = useState(initialGifts === undefined);
   const [feedbackGift, setFeedbackGift] = useState<RecentGift | null>(null);
   const [recentOrders, setRecentOrders] = useState<Map<string, { status: string; placedAt: string }>>(new Map());
 
   useEffect(() => {
+    if (initialGifts !== undefined) return;
     api
       .getRecentGifts(token)
       .then((res) => setGifts(res.gifts as RecentGift[]))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, initialGifts]);
 
   useEffect(() => {
     api

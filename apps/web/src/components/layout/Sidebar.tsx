@@ -18,9 +18,9 @@ const sections = [
   {
     label: "Operations",
     items: [
-      { href: "/dashboard", label: "Radar", icon: LayoutDashboard },
-      { href: "/people", label: "Assets", icon: Users },
-      { href: "/events", label: "Threat Board", icon: Calendar },
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/people", label: "People", icon: Users },
+      { href: "/events", label: "Events", icon: Calendar },
       { href: "/orders", label: "Orders", icon: Package },
     ],
   },
