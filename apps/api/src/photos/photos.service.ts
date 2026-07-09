@@ -10,6 +10,7 @@ import { Queue } from "bull";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
 import { RedisService } from "../redis/redis.service";
+import { EntitlementsService } from "../entitlements/entitlements.service";
 import type { PhotoCategory, User } from "@prisma/client";
 import type { PhotoAnalysisJobData } from "./photo-analysis.processor";
 import { computeCompleteness } from "../utils/completeness";
@@ -61,13 +62,6 @@ const ALLOWED_MIME_TYPES = new Set([
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
-// Tier photo limits per person
-const TIER_LIMITS: Record<string, number> = {
-  free: 1,
-  pro: 5,
-  elite: Infinity,
-};
-
 // Rate limits (env-configurable for testing; defaults = production values)
 const UPLOAD_RATE_LIMIT_PER_MIN = parseInt(process.env.PHOTO_UPLOAD_LIMIT_PER_MIN || "3", 10);
 const UPLOAD_RATE_LIMIT_PER_HOUR = parseInt(process.env.PHOTO_UPLOAD_LIMIT_PER_HOUR || "20", 10);
@@ -80,6 +74,7 @@ export class PhotosService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly redis: RedisService,
+    private readonly entitlements: EntitlementsService,
     @InjectQueue("photo-analysis") private readonly analysisQueue: Queue<PhotoAnalysisJobData>,
   ) {}
 
@@ -160,13 +155,14 @@ export class PhotosService {
       );
     }
 
-    // Tier quota check
+    // Tier quota check — fails closed to 1 (Free's cap) if entitlements
+    // data is missing, rather than silently allowing unlimited uploads.
     const tier = user.subscriptionTier;
-    const limit = TIER_LIMITS[tier] ?? 1;
+    const limit = await this.entitlements.getIntLimit(tier, "photoLimitPerPerson", 1);
     const existingCount = await this.prisma.personPhoto.count({
       where: { personId, userId: user.id },
     });
-    if (existingCount >= limit) {
+    if (limit !== null && existingCount >= limit) {
       throw new HttpException(
         {
           statusCode: HttpStatus.PAYMENT_REQUIRED,
@@ -228,7 +224,7 @@ export class PhotosService {
     await this.incrementRateLimit(user.id);
 
     // Queue analysis for Pro/Elite (Free = store only)
-    if (user.subscriptionTier !== "free") {
+    if (await this.entitlements.isFeatureEnabled(user.subscriptionTier, "photoAiAnalysis")) {
       const person = await this.prisma.person.findUnique({
         where: { id: personId },
         select: { name: true },
@@ -253,7 +249,7 @@ export class PhotosService {
     });
 
     // Elite only
-    if (user.subscriptionTier !== "elite") {
+    if (!(await this.entitlements.isFeatureEnabled(user.subscriptionTier, "photoReanalysis"))) {
       throw new HttpException(
         {
           statusCode: HttpStatus.PAYMENT_REQUIRED,
