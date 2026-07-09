@@ -858,4 +858,46 @@ export const api = {
       `/persons/${personId}/photos/${photoId}/reanalyze`,
       { method: "POST", token },
     ),
+
+  // Recipient survey
+  sendSurvey: (token: string, personId: string, recipientEmail?: string) =>
+    apiFetch<{ sent: true }>(`/persons/${personId}/survey`, {
+      method: "POST",
+      body: JSON.stringify(recipientEmail ? { recipientEmail } : {}),
+      token,
+    }),
+
+  getSurveyResponses: (token: string, personId: string) =>
+    apiFetch<SurveyResponse[]>(`/persons/${personId}/survey/responses`, { token }),
+
+  reviewSurveyResponse: (
+    token: string,
+    personId: string,
+    responseId: string,
+    body: { fields?: string[]; action?: "accept" | "dismiss" },
+  ) =>
+    apiFetch<{ status: string; appliedFields?: string[] }>(
+      `/persons/${personId}/survey/responses/${responseId}/review`,
+      { method: "POST", body: JSON.stringify(body), token },
+    ),
+
+  // Public — no auth, called from the /survey/[token] page
+  getPublicSurvey: (token: string) =>
+    apiFetch<{ personFirstName: string; fields: string[] }>(`/survey/${token}`),
+
+  submitSurvey: (token: string, answers: Record<string, unknown>) =>
+    apiFetch<{ received: true }>(`/survey/${token}/submit`, {
+      method: "POST",
+      body: JSON.stringify(answers),
+    }),
 };
+
+export interface SurveyResponse {
+  id: string;
+  personId: string;
+  surveyLinkId: string;
+  answers: Record<string, unknown>;
+  status: "pending" | "approved" | "dismissed";
+  reviewedAt: string | null;
+  createdAt: string;
+}

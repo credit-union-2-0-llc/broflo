@@ -35,6 +35,7 @@ export interface Person {
   dietaryRestrictions: string[];
   dossierInsight: string | null;
   completenessScore: number;
+  recipientEmail: string | null;
   shippingAddress1: string | null;
   shippingAddress2: string | null;
   shippingCity: string | null;

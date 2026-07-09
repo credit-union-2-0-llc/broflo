@@ -21,6 +21,7 @@ import { GiftHistorySection } from "@/components/gifts/gift-history-section";
 import { WishlistParser } from "@/components/wishlist-parser";
 import { InsightCard } from "@/components/insight-card";
 import { PhotoSection } from "@/components/photos";
+import { SurveySection } from "@/components/survey-section";
 
 function initials(name: string) {
   return name
@@ -126,6 +127,13 @@ export default async function PersonDetailPage({
               initialInsight={person.dossierInsight}
               completenessScore={person.completenessScore}
               tier={(session.user as Record<string, unknown>)?.subscriptionTier as string ?? "free"}
+            />
+
+            <Separator className="my-3" />
+            <SurveySection
+              personId={person.id}
+              personName={person.name}
+              recipientEmail={person.recipientEmail}
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
