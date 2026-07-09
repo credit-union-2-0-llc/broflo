@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
+import { EntitlementsService } from "../entitlements/entitlements.service";
 import { CreateGiftRecordDto, RecordFeedbackDto } from "./dto/gifts.dto";
 
 const LEVEL_THRESHOLDS = [
@@ -24,6 +25,7 @@ export class GiftsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   // --- GET /persons/:personId/gifts ---
@@ -43,10 +45,8 @@ export class GiftsService {
     const skip = (page - 1) * limit;
 
     // Year filter is Pro/Elite only
-    const yearFilter =
-      params.year && (tier === "pro" || tier === "elite")
-        ? params.year
-        : undefined;
+    const yearFilterEnabled = await this.entitlements.isFeatureEnabled(tier, "giftHistoryYearFilter");
+    const yearFilter = params.year && yearFilterEnabled ? params.year : undefined;
 
     const where: Record<string, unknown> = { personId, userId };
     if (yearFilter) {
@@ -67,10 +67,10 @@ export class GiftsService {
       this.prisma.giftRecord.count({ where }),
     ]);
 
-    // Compute aggregates for Pro/Elite
+    // Compute aggregates for Pro/Elite (same feature flag as the year filter above)
     let totalSpendCents: number | undefined;
     let averageRating: number | undefined;
-    if (tier === "pro" || tier === "elite") {
+    if (yearFilterEnabled) {
       const agg = await this.prisma.giftRecord.aggregate({
         where,
         _sum: { priceCents: true },

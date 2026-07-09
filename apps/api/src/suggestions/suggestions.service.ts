@@ -9,6 +9,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { ProductSearchService } from "./product-search.service";
+import { EntitlementsService } from "../entitlements/entitlements.service";
 import type {
   GenerateSuggestionsDto,
   SelectSuggestionDto,
@@ -19,13 +20,9 @@ const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
 const AI_SERVICE_KEY = process.env.AI_SERVICE_KEY;
 const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS || "60000", 10);
 
-const TIER_MAX_REQUESTS: Record<string, number> = {
-  free: 1,
-  pro: 3,
-  elite: 999999,
-};
-
-const TIER_COUNTS: Record<string, number> = { free: 3, pro: 5, elite: 5 };
+// Sentinel returned in API responses for "unlimited" re-rolls — matches the
+// exact literal value the removed TIER_MAX_REQUESTS.elite constant used.
+const UNLIMITED_REQUESTS_SENTINEL = 999999;
 
 @Injectable()
 export class SuggestionsService {
@@ -35,6 +32,7 @@ export class SuggestionsService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly productSearch: ProductSearchService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async generate(userId: string, dto: GenerateSuggestionsDto) {
@@ -70,8 +68,9 @@ export class SuggestionsService {
     if (!event) throw new NotFoundException("Event not found");
 
     // Tier gating (F-06)
-    const surpriseFactor = tier === "free" ? "safe" : (dto.surpriseFactor || "safe");
-    const guidanceText = tier === "free" ? undefined : dto.guidanceText;
+    const forceSafeSurprise = await this.entitlements.isFeatureEnabled(tier, "forceSafeSurprise");
+    const surpriseFactor = forceSafeSurprise ? "safe" : (dto.surpriseFactor || "safe");
+    const guidanceText = forceSafeSurprise ? undefined : dto.guidanceText;
 
     // Determine request index (re-roll count)
     const existingSets = await this.prisma.giftSuggestion.groupBy({
@@ -79,8 +78,8 @@ export class SuggestionsService {
       where: { eventId: dto.eventId, userId },
     });
     const requestIndex = existingSets.length;
-    const maxRequests = TIER_MAX_REQUESTS[tier] || 1;
-    if (requestIndex >= maxRequests) {
+    const maxRequests = await this.entitlements.getIntLimit(tier, "maxRerollRequests", 1);
+    if (maxRequests !== null && requestIndex >= maxRequests) {
       throw new ForbiddenException(
         tier === "free"
           ? "Want more options? Upgrade to Pro for up to 3 re-rolls."
@@ -132,7 +131,7 @@ export class SuggestionsService {
 
     // Gift history for Pro/Elite
     let giftHistory: { title: string; given_at: string; rating: number | null }[] = [];
-    if (tier !== "free") {
+    if (await this.entitlements.isFeatureEnabled(tier, "giftHistoryContext")) {
       const gifts = await this.prisma.giftRecord.findMany({
         where: { personId: dto.personId, userId },
         orderBy: { givenAt: "desc" },
@@ -152,7 +151,7 @@ export class SuggestionsService {
       select: { title: true, dismissalReason: true },
     });
 
-    const count = TIER_COUNTS[tier] || 3;
+    const count = await this.entitlements.getIntLimit(tier, "suggestionsPerRequest", 3) ?? 3;
 
     // Call FastAPI
     const controller = new AbortController();
@@ -302,7 +301,8 @@ export class SuggestionsService {
     });
 
     // Estimate cost and track spend (F-05)
-    const costPerMTokOut = tier === "free" ? 5 : 15; // Haiku vs Sonnet
+    const aiModel = await this.entitlements.getStringLimit(tier, "aiModel");
+    const costPerMTokOut = aiModel === "haiku" ? 5 : 15;
     const estimatedCostCents = Math.ceil(
       (aiResponse.output_tokens / 1_000_000) * costPerMTokOut * 100,
     );
@@ -425,7 +425,8 @@ export class SuggestionsService {
       select: { subscriptionTier: true },
     });
     const tier = user.subscriptionTier;
-    const maxRequests = TIER_MAX_REQUESTS[tier] || 1;
+    const maxRequestsLimit = await this.entitlements.getIntLimit(tier, "maxRerollRequests", 1);
+    const maxRequests = maxRequestsLimit ?? UNLIMITED_REQUESTS_SENTINEL;
 
     const sets = await this.prisma.giftSuggestion.groupBy({
       by: ["requestIndex", "surpriseFactor"],
