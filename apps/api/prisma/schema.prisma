@@ -19,6 +19,9 @@ model User {
   stripeSubscriptionId  String?   @unique @map("stripe_subscription_id")
   stripePaymentMethodId String?   @map("stripe_payment_method_id")
   brofloScore           Int       @default(0) @map("broflo_score")
+  isAdmin               Boolean   @default(false) @map("is_admin")
+  onboardingCompletedAt DateTime? @map("onboarding_completed_at")
+  pendingPlanKey        String?   @map("pending_plan_key")
   isActive         Boolean   @default(true) @map("is_active")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
@@ -715,6 +718,55 @@ model ServiceCredit {
   @@unique([userId, billingCycleKey], name: "uq_service_credit_user_cycle", map: "uq_service_credit_user_cycle")
   @@index([userId, createdAt], map: "idx_service_credits_user")
   @@map("service_credits")
+}
+
+// --- Entitlements: admin-editable plans + feature limits ---
+
+enum PlanLimitType {
+  BOOLEAN
+  INTEGER
+  CENTS
+  STRING
+
+  @@map("plan_limit_type")
+}
+
+model Plan {
+  id                   String   @id @default(uuid())
+  key                  String   @unique
+  name                 String
+  priceMonthlyCents    Int      @default(0) @map("price_monthly_cents")
+  priceAnnualCents     Int      @default(0) @map("price_annual_cents")
+  stripePriceIdMonthly String?  @map("stripe_price_id_monthly")
+  stripePriceIdAnnual  String?  @map("stripe_price_id_annual")
+  sortOrder            Int      @default(0) @map("sort_order")
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  limits PlanLimit[]
+
+  @@map("plans")
+}
+
+model PlanLimit {
+  id          String        @id @default(uuid())
+  planId      String        @map("plan_id")
+  featureKey  String        @map("feature_key")
+  type        PlanLimitType
+  boolValue   Boolean?      @map("bool_value")
+  intValue    Int?          @map("int_value")
+  isUnlimited Boolean       @default(false) @map("is_unlimited")
+  stringValue String?       @map("string_value")
+  description String?
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  updatedBy   String?       @map("updated_by")
+
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, featureKey], name: "uq_plan_limit_plan_feature", map: "uq_plan_limit_plan_feature")
+  @@index([featureKey], map: "idx_plan_limits_feature_key")
+  @@map("plan_limits")
 }
 
 model FailureReview {

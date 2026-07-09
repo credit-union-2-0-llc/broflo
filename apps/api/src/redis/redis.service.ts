@@ -200,6 +200,63 @@ export class RedisService implements OnModuleDestroy {
     return { allowed, remaining: Math.max(0, limit - current) };
   }
 
+  // --- Entitlements cache (60s TTL, explicitly invalidated on admin write) ---
+
+  private readonly ENTITLEMENTS_TTL_SECONDS = 60;
+
+  async getCachedPlan(tierKey: string): Promise<string | null> {
+    const key = `entitlements:plan:${tierKey}`;
+    if (!this.isConnected) return this.memGet(key);
+    return this.getClient().get(key);
+  }
+
+  async setCachedPlan(tierKey: string, json: string): Promise<void> {
+    const key = `entitlements:plan:${tierKey}`;
+    if (!this.isConnected) {
+      this.memSet(key, json, this.ENTITLEMENTS_TTL_SECONDS);
+      return;
+    }
+    await this.getClient().setex(key, this.ENTITLEMENTS_TTL_SECONDS, json);
+  }
+
+  async invalidatePlanCache(tierKey?: string): Promise<void> {
+    if (tierKey) {
+      const key = `entitlements:plan:${tierKey}`;
+      if (!this.isConnected) {
+        this.memCache.delete(key);
+        return;
+      }
+      await this.getClient().del(key);
+      return;
+    }
+    await this.invalidateByPattern('entitlements:plan:*');
+  }
+
+  async getCachedAllPlans(): Promise<string | null> {
+    const key = 'entitlements:all-plans';
+    if (!this.isConnected) return this.memGet(key);
+    return this.getClient().get(key);
+  }
+
+  async setCachedAllPlans(json: string): Promise<void> {
+    const key = 'entitlements:all-plans';
+    const ttlSeconds = 300;
+    if (!this.isConnected) {
+      this.memSet(key, json, ttlSeconds);
+      return;
+    }
+    await this.getClient().setex(key, ttlSeconds, json);
+  }
+
+  async invalidateAllPlansCache(): Promise<void> {
+    const key = 'entitlements:all-plans';
+    if (!this.isConnected) {
+      this.memCache.delete(key);
+      return;
+    }
+    await this.getClient().del(key);
+  }
+
   async onModuleDestroy(): Promise<void> {
     if (this.client) {
       await this.client.quit();
