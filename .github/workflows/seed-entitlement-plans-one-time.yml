@@ -1,0 +1,54 @@
+name: Seed entitlement plans + backfill admin flag (one-time)
+
+# One-off helper for the entitlements rollout (PR #17). Populates the
+# plans/plan_limits tables production doesn't have data in yet (the
+# schema landed via migration, but nothing seeds it automatically), and
+# backfills User.isAdmin from ADMIN_EMAILS so admin access carries over
+# before AdminGuard switches from the env allowlist to the DB flag.
+#
+# Safe to run more than once — seedPlans() upserts by Plan.key and
+# PlanLimit's (planId, featureKey) unique constraint; seedAdminsFromEnv()
+# only ever sets isAdmin=true, never revokes it.
+#
+# Delete this workflow file once it's been run successfully in production.
+
+on:
+  workflow_dispatch:
+    inputs:
+      admin_emails:
+        description: "Comma-separated admin emails to mark isAdmin=true (matches whatever ADMIN_EMAILS is set to on broflo-api today). Leave blank to skip the admin backfill."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm exec prisma generate
+
+      - name: Seed plans + admin backfill
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ADMIN_EMAILS: ${{ inputs.admin_emails }}
+        run: pnpm exec ts-node prisma/seed.ts
