@@ -45,12 +45,32 @@ const FEATURES: Record<string, string[]> = {
     "Priority AI processing",
     "Unlimited re-rolls",
   ],
+  family: [
+    "Everything in Elite",
+    "Up to 5 seats, one bill",
+    "Secret Santa organizer",
+    "Group gift chip-in",
+    "Shared family calendar",
+  ],
 };
 
 const TAGLINES: Record<string, string> = {
   free: VOICE.billing.freeTagline,
   pro: VOICE.billing.proTagline,
   elite: VOICE.billing.eliteTagline,
+  family: VOICE.billing.familyTagline,
+};
+
+const MONTHLY_PRICE_ID_ENV: Record<string, string | undefined> = {
+  pro: process.env.NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID,
+  elite: process.env.NEXT_PUBLIC_STRIPE_ELITE_MONTHLY_PRICE_ID,
+  family: process.env.NEXT_PUBLIC_STRIPE_FAMILY_MONTHLY_PRICE_ID,
+};
+
+const ANNUAL_PRICE_ID_ENV: Record<string, string | undefined> = {
+  pro: process.env.NEXT_PUBLIC_STRIPE_PRO_ANNUAL_PRICE_ID,
+  elite: process.env.NEXT_PUBLIC_STRIPE_ELITE_ANNUAL_PRICE_ID,
+  family: process.env.NEXT_PUBLIC_STRIPE_FAMILY_ANNUAL_PRICE_ID,
 };
 
 async function startCheckout(priceId: string, token: string) {
@@ -83,7 +103,7 @@ function UpgradeContent() {
       .catch(() => {});
   }, [session?.accessToken]);
 
-  async function handleDevUnlock(tier: "pro" | "elite") {
+  async function handleDevUnlock(tier: "pro" | "elite" | "family") {
     if (!session?.accessToken) return;
     setSwitching(tier);
     try {
@@ -113,8 +133,8 @@ function UpgradeContent() {
         )}
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
-        {(["free", "pro", "elite"] as const).map((tier) => {
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {(["free", "pro", "elite", "family"] as const).map((tier) => {
           const plan = SUBSCRIPTION_PLANS[tier];
           const isCurrent = currentTier === tier;
           const isHighlighted = tier === "pro";
@@ -184,7 +204,7 @@ function UpgradeContent() {
                         "bg-amber hover:bg-amber-light text-white",
                     )}
                     disabled={switching === tier}
-                    onClick={() => handleDevUnlock(tier as "pro" | "elite")}
+                    onClick={() => handleDevUnlock(tier as "pro" | "elite" | "family")}
                   >
                     {switching === tier ? "Unlocking..." : `Get ${plan.name} (testing)`}
                   </Button>
@@ -197,10 +217,7 @@ function UpgradeContent() {
                           "bg-amber hover:bg-amber-light text-white",
                       )}
                       onClick={() => {
-                        const priceId =
-                          tier === "pro"
-                            ? process.env.NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID
-                            : process.env.NEXT_PUBLIC_STRIPE_ELITE_MONTHLY_PRICE_ID;
+                        const priceId = MONTHLY_PRICE_ID_ENV[tier];
                         if (priceId && session?.accessToken) {
                           startCheckout(priceId, session.accessToken);
                         }
@@ -212,10 +229,7 @@ function UpgradeContent() {
                       variant="outline"
                       className="w-full"
                       onClick={() => {
-                        const priceId =
-                          tier === "pro"
-                            ? process.env.NEXT_PUBLIC_STRIPE_PRO_ANNUAL_PRICE_ID
-                            : process.env.NEXT_PUBLIC_STRIPE_ELITE_ANNUAL_PRICE_ID;
+                        const priceId = ANNUAL_PRICE_ID_ENV[tier];
                         if (priceId && session?.accessToken) {
                           startCheckout(priceId, session.accessToken);
                         }

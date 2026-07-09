@@ -58,4 +58,18 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       handwrittenNotes: true,
     },
   },
+  family: {
+    tier: "family",
+    name: "Family",
+    priceMonthly: 39.99,
+    priceAnnual: 432,
+    limits: {
+      maxPeople: null,
+      autoExecute: true,
+      autopilot: true,
+      gamification: true,
+      concierge: true,
+      handwrittenNotes: true,
+    },
+  },
 };

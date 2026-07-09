@@ -595,7 +595,7 @@ export const api = {
       devTierOverrideEnabled: boolean;
     }>("/billing/subscription", { token }),
 
-  devSetTier: (token: string, tier: "free" | "pro" | "elite") =>
+  devSetTier: (token: string, tier: "free" | "pro" | "elite" | "family") =>
     apiFetch<{ subscriptionTier: string }>("/billing/dev-set-tier", {
       method: "POST",
       body: JSON.stringify({ tier }),
@@ -930,7 +930,61 @@ export const api = {
       method: "POST",
       body: JSON.stringify(answers),
     }),
+
+  // Family plan
+  getMyFamily: (token: string) =>
+    apiFetch<FamilyStatus>("/family", { token }),
+
+  createFamilyGroup: (token: string, name?: string) =>
+    apiFetch<{ id: string; name: string | null }>("/family/group", {
+      method: "POST",
+      body: JSON.stringify(name ? { name } : {}),
+      token,
+    }),
+
+  inviteFamilyMember: (token: string, email: string) =>
+    apiFetch<{ sent: true }>("/family/invites", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+      token,
+    }),
+
+  removeFamilyMember: (token: string, memberUserId: string) =>
+    apiFetch<{ removed: true }>(`/family/members/${memberUserId}`, {
+      method: "DELETE",
+      token,
+    }),
+
+  leaveFamily: (token: string) =>
+    apiFetch<{ left: true }>("/family/leave", { method: "POST", token }),
+
+  // Public — no auth, called from the /family/join/[token] page
+  getFamilyInvitePreview: (token: string) =>
+    apiFetch<{ familyName: string; inviterFirstName: string; expiresAt: string }>(
+      `/family/invites/${token}`,
+    ),
+
+  acceptFamilyInvite: (token: string, inviteToken: string) =>
+    apiFetch<{ joined: true; familyName: string | null }>(
+      `/family/invites/${inviteToken}/accept`,
+      { method: "POST", token },
+    ),
 };
+
+export interface FamilyStatus {
+  role: "owner" | "member" | "none";
+  group?: {
+    id: string;
+    name: string | null;
+    seatsUsed: number;
+    seatsMax: number;
+    members: Array<{ userId: string; name: string | null; email: string; joinedAt: string }>;
+  };
+  ownerName?: string | null;
+  ownerEmail?: string;
+  familyName?: string | null;
+  joinedAt?: string;
+}
 
 export interface SurveyResponse {
   id: string;

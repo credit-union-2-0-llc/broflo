@@ -4,11 +4,13 @@ import { BadRequestException, ForbiddenException, InternalServerErrorException }
 import { BillingService } from "../billing.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EmailService } from "../../email/email.service";
+import { FamilyService } from "../../family/family.service";
 
 describe("BillingService", () => {
   let service: BillingService;
   let prisma: { user: { findFirst: jest.Mock; update: jest.Mock } };
   let email: { sendPaymentFailedEmail: jest.Mock };
+  let family: { cascadeDowngradeIfOwnerLostFamilyTier: jest.Mock };
 
   beforeEach(async () => {
     process.env.STRIPE_SECRET_KEY = "sk_test_fake";
@@ -27,12 +29,16 @@ describe("BillingService", () => {
     email = {
       sendPaymentFailedEmail: jest.fn().mockResolvedValue(undefined),
     };
+    family = {
+      cascadeDowngradeIfOwnerLostFamilyTier: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BillingService,
         { provide: PrismaService, useValue: prisma },
         { provide: EmailService, useValue: email },
+        { provide: FamilyService, useValue: family },
       ],
     }).compile();
 
@@ -97,6 +103,7 @@ describe("BillingService", () => {
           stripePaymentMethodId: null,
         },
       });
+      expect(family.cascadeDowngradeIfOwnerLostFamilyTier).toHaveBeenCalledWith("user-1");
     });
 
     it("silently returns when no brofloUserId in metadata", async () => {
@@ -121,6 +128,7 @@ describe("BillingService", () => {
         data: { subscriptionTier: "free" },
       });
       expect(email.sendPaymentFailedEmail).toHaveBeenCalledWith("user1@example.com");
+      expect(family.cascadeDowngradeIfOwnerLostFamilyTier).toHaveBeenCalledWith("user-1");
     });
 
     it("still downgrades the user even if the email send fails", async () => {
@@ -270,6 +278,7 @@ describe("BillingService", () => {
           stripePaymentMethodId: "pm_789",
         },
       });
+      expect(family.cascadeDowngradeIfOwnerLostFamilyTier).toHaveBeenCalledWith("user-1");
     });
 
     it("handles string payment method ID (not expanded)", async () => {
@@ -367,6 +376,7 @@ describe("BillingService", () => {
         where: { id: "user-1" },
         data: { subscriptionTier: "elite" },
       });
+      expect(family.cascadeDowngradeIfOwnerLostFamilyTier).toHaveBeenCalledWith("user-1");
     });
   });
 
