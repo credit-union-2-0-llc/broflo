@@ -3,8 +3,9 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { RELATIONSHIP_TYPES, ALLERGEN_OPTIONS, DIETARY_OPTIONS, PRONOUN_OPTIONS } from "@broflo/shared";
+import { RELATIONSHIP_TYPES, ALLERGEN_OPTIONS, DIETARY_OPTIONS, PRONOUN_OPTIONS, computeCompleteness } from "@broflo/shared";
 import type { Person, CreatePersonData } from "@broflo/shared";
+import { CompletenessRing } from "./completeness-ring";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -126,6 +127,28 @@ export function DossierForm({
 
   const pronouns = watch("pronouns");
 
+  const liveValues = watch();
+  const completeness = computeCompleteness({
+    hobbies: liveValues.hobbies,
+    favoriteBrands: liveValues.favoriteBrands,
+    budgetMinCents: liveValues.budgetMin ? liveValues.budgetMin * 100 : undefined,
+    budgetMaxCents: liveValues.budgetMax ? liveValues.budgetMax * 100 : undefined,
+    foodPreferences: liveValues.foodPreferences,
+    birthday: liveValues.birthday,
+    shippingAddress1: liveValues.shippingAddress1,
+    shippingCity: liveValues.shippingCity,
+    shippingState: liveValues.shippingState,
+    shippingZip: liveValues.shippingZip,
+    musicTaste: liveValues.musicTaste,
+    clothingSizeTop: liveValues.clothingSizeTop,
+    clothingSizeBottom: liveValues.clothingSizeBottom,
+    allergens: liveValues.allergens,
+    shoeSize: liveValues.shoeSize,
+    wishlistUrls: liveValues.wishlistUrls,
+    notes: liveValues.notes,
+    anniversary: liveValues.anniversary,
+  });
+
   async function onFormSubmit(values: FormValues) {
     const resolvedPronouns = values.pronouns === "custom"
       ? (values.customPronouns || undefined)
@@ -160,6 +183,15 @@ export function DossierForm({
 
   return (
     <form onSubmit={handleSubmit(onFormSubmit)}>
+      <div className="flex items-center gap-3 mb-4 rounded-lg border bg-muted/30 px-4 py-3">
+        <CompletenessRing score={completeness} />
+        <div>
+          <p className="text-sm font-medium">Profile strength</p>
+          <p className="text-xs text-muted-foreground">
+            Only name is required — everything else is optional, but the more you fill in, the better the gift suggestions.
+          </p>
+        </div>
+      </div>
       <Tabs defaultValue="basic" className="w-full">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="basic">Basic</TabsTrigger>
