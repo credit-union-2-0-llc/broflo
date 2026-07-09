@@ -55,7 +55,7 @@ function BillingContent() {
       .catch(() => {});
   }, [session?.accessToken]);
 
-  async function handleDevSwitch(newTier: "free" | "pro" | "elite") {
+  async function handleDevSwitch(newTier: "free" | "pro" | "elite" | "family") {
     if (!session?.accessToken) return;
     setSwitching(newTier);
     try {
@@ -143,7 +143,7 @@ function BillingContent() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex gap-2">
-            {(["free", "pro", "elite"] as const).map((t) => (
+            {(["free", "pro", "elite", "family"] as const).map((t) => (
               <Button
                 key={t}
                 variant={tier === t ? "default" : "outline"}

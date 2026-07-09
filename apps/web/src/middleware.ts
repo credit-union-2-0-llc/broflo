@@ -10,5 +10,8 @@ export const config = {
     "/orders/:path*",
     "/profile/:path*",
     "/upgrade/:path*",
+    // Bare "/family" only — NOT "/family/:path*", since /family/join/[token]
+    // must stay public (mirrors /survey/[token]'s deliberate exclusion).
+    "/family",
   ],
 };

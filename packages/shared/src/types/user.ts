@@ -1,4 +1,4 @@
-export type SubscriptionTier = "free" | "pro" | "elite";
+export type SubscriptionTier = "free" | "pro" | "elite" | "family";
 
 export interface BrofloUser {
   id: string;

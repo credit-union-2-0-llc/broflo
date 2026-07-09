@@ -88,4 +88,35 @@ export class EmailService {
       text: `${giverName} is putting together something great for you and could use your help. Tell them what you like: ${link}\n\nThis link expires in 14 days and can only be used once.`,
     });
   }
+
+  async sendFamilyInvite(
+    recipientEmail: string,
+    ownerName: string,
+    familyName: string,
+    token: string,
+  ): Promise<void> {
+    const link = `${process.env.WEB_URL || "https://broflo.ai"}/family-invite/${token}`;
+
+    if (!this.resend) {
+      this.log.debug(`DEV MODE — family invite for ${recipientEmail}: ${link}`);
+      return;
+    }
+
+    await this.resend.emails.send({
+      from: process.env.EMAIL_FROM || "Broflo <noreply@broflo.ai>",
+      to: recipientEmail,
+      subject: `${ownerName} added you to ${familyName} on Broflo`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #18181b;">You're invited to ${familyName}</h2>
+          <p>${ownerName} added you to their family plan on Broflo — you'll get full access to plan gifts for the people you care about, plus family features like Secret Santa and group gift pooling.</p>
+          <p><a href="${link}" style="color: #e8a422; font-weight: bold;">Join the family plan</a></p>
+          <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 24px 0;" />
+          <p style="color: #a1a1aa; font-size: 12px;">This invite expires in 14 days. If this wasn't meant for you, you can ignore it.</p>
+          <p style="color: #a1a1aa; font-size: 12px;">broflo. — You're busy. We remembered.</p>
+        </div>
+      `,
+      text: `${ownerName} added you to ${familyName} on Broflo. Join here: ${link}\n\nThis invite expires in 14 days.`,
+    });
+  }
 }

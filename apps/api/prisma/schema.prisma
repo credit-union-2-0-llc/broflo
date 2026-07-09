@@ -38,6 +38,8 @@ model User {
   agentJobs        AgentJob[]
   serviceCredits   ServiceCredit[]
   personPhotos     PersonPhoto[]
+  familyGroupOwned FamilyGroup?
+  familyMembership FamilyMembership?
 
   @@map("users")
 }
@@ -819,4 +821,48 @@ model FailureReview {
   @@index([resolvedAt, createdAt], map: "idx_failure_reviews_unresolved")
   @@index([retailerDomain], map: "idx_failure_reviews_retailer")
   @@map("failure_reviews")
+}
+
+// --- Family Plan (shared billing, separate personal data) ---
+
+model FamilyGroup {
+  id        String   @id @default(uuid())
+  ownerId   String   @unique @map("owner_id")
+  name      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  owner       User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  memberships FamilyMembership[]
+  invites     FamilyInvite[]
+
+  @@map("family_groups")
+}
+
+model FamilyMembership {
+  id            String   @id @default(uuid())
+  familyGroupId String   @map("family_group_id")
+  userId        String   @unique @map("user_id")
+  joinedAt      DateTime @default(now()) @map("joined_at")
+
+  familyGroup FamilyGroup @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([familyGroupId], map: "idx_family_memberships_group")
+  @@map("family_memberships")
+}
+
+model FamilyInvite {
+  id            String    @id @default(uuid())
+  familyGroupId String    @map("family_group_id")
+  email         String
+  token         String    @unique
+  status        String    @default("pending")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  expiresAt     DateTime  @map("expires_at")
+  acceptedAt    DateTime? @map("accepted_at")
+
+  familyGroup FamilyGroup @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+
+  @@index([familyGroupId], map: "idx_family_invites_group")
+  @@map("family_invites")
 }

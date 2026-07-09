@@ -283,6 +283,7 @@ export const VOICE = {
     upgradeCta: "Unlock the full Broflo",
     proTagline: "For people who actually have people.",
     eliteTagline: "For the person who has everything. Except time.",
+    familyTagline: "One plan, whole household. Gift-giving is a team sport.",
     freeTagline: "Dip your toes in. We won't judge. (Much.)",
     checkoutSuccess:
       "Welcome to the inner circle. Your gift game just leveled up.",

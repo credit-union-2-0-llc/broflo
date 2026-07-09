@@ -8,6 +8,7 @@ import {
 import Stripe from "stripe";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailService } from "../email/email.service";
+import { FamilyService } from "../family/family.service";
 import type { User } from "@prisma/client";
 
 type StripeInstance = InstanceType<typeof Stripe>;
@@ -20,6 +21,7 @@ export class BillingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
+    private readonly family: FamilyService,
   ) {
     if (!process.env.STRIPE_SECRET_KEY) {
       this.log.warn("STRIPE_SECRET_KEY not set — billing disabled");
@@ -106,7 +108,7 @@ export class BillingService {
   // for testing tier-gated features before Stripe is wired up. Off by
   // default; only touches the caller's own account. Remove once real
   // checkout is live.
-  async devSetTier(user: User, tier: "free" | "pro" | "elite") {
+  async devSetTier(user: User, tier: "free" | "pro" | "elite" | "family") {
     if (process.env.ALLOW_DEV_TIER_OVERRIDE !== "true") {
       throw new ForbiddenException("Dev tier override is not enabled.");
     }
@@ -115,6 +117,7 @@ export class BillingService {
       where: { id: user.id },
       data: { subscriptionTier: tier },
     });
+    await this.family.cascadeDowngradeIfOwnerLostFamilyTier(user.id);
 
     this.log.warn(`Dev tier override: user ${user.id} → ${tier}`);
     return { subscriptionTier: tier };
@@ -230,6 +233,7 @@ export class BillingService {
         stripePaymentMethodId: paymentMethodId,
       },
     });
+    await this.family.cascadeDowngradeIfOwnerLostFamilyTier(userId);
 
     this.log.log(`User ${userId} subscription updated → ${tier}`);
   }
@@ -249,6 +253,7 @@ export class BillingService {
         stripePaymentMethodId: null,
       },
     });
+    await this.family.cascadeDowngradeIfOwnerLostFamilyTier(userId);
 
     this.log.log(`User ${userId} subscription canceled → free`);
   }
@@ -270,6 +275,7 @@ export class BillingService {
       where: { id: user.id },
       data: { subscriptionTier: "free" },
     });
+    await this.family.cascadeDowngradeIfOwnerLostFamilyTier(user.id);
 
     this.log.warn(`User ${user.id} payment failed → downgraded to free`);
     try {

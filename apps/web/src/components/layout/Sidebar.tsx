@@ -12,6 +12,7 @@ import {
   Trophy,
   Settings,
   LogOut,
+  Heart,
 } from "lucide-react";
 
 const sections = [
@@ -34,6 +35,7 @@ const sections = [
   {
     label: "System",
     items: [
+      { href: "/family", label: "Family", icon: Heart },
       { href: "/billing", label: "Billing", icon: Settings },
     ],
   },

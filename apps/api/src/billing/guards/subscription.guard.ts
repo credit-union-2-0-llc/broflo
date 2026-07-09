@@ -15,6 +15,7 @@ const TIER_RANK: Record<string, number> = {
   free: 0,
   pro: 1,
   elite: 2,
+  family: 3,
 };
 
 @Injectable()

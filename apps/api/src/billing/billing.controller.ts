@@ -19,8 +19,8 @@ import { Public } from "../auth/decorators/public.decorator";
 import { SkipThrottle } from "@nestjs/throttler";
 
 class DevSetTierDto {
-  @IsIn(["free", "pro", "elite"])
-  tier!: "free" | "pro" | "elite";
+  @IsIn(["free", "pro", "elite", "family"])
+  tier!: "free" | "pro" | "elite" | "family";
 }
 
 @Controller("billing")
