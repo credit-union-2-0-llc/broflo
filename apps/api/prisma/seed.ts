@@ -56,7 +56,7 @@ const PLAN_SEED: PlanSeed[] = [
     key: 'pro',
     name: 'Pro',
     priceMonthlyCents: 999,
-    priceAnnualCents: 9900,
+    priceAnnualCents: 10800,
     sortOrder: 1,
     limits: {
       maxPeople: { type: 'INTEGER', isUnlimited: true, description: 'Max people a user can track' },
@@ -84,7 +84,7 @@ const PLAN_SEED: PlanSeed[] = [
     key: 'elite',
     name: 'Elite',
     priceMonthlyCents: 2499,
-    priceAnnualCents: 24900,
+    priceAnnualCents: 27000,
     sortOrder: 2,
     limits: {
       maxPeople: { type: 'INTEGER', isUnlimited: true, description: 'Max people a user can track' },
