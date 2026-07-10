@@ -60,6 +60,7 @@ export class OrdersService {
 
     return {
       product: bestMatch,
+      retailerKey: this.adapter.retailerKey,
       suggestion: {
         id: suggestion.id,
         title: suggestion.title,

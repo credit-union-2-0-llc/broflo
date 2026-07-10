@@ -13,14 +13,12 @@ export class StripeConnectService {
   private stripeClient: StripeInstance | null = null;
   private readonly log = new Logger(StripeConnectService.name);
   private readonly platformFeeBps: number;
-  private readonly mockRetailerAccountId: string;
 
   constructor() {
     if (!process.env.STRIPE_SECRET_KEY) {
       this.log.warn('STRIPE_SECRET_KEY not set — Connect charges disabled');
     }
     this.platformFeeBps = parseInt(process.env.STRIPE_PLATFORM_FEE_BPS || '500', 10); // 500 bps = 5%
-    this.mockRetailerAccountId = process.env.STRIPE_MOCK_RETAILER_ACCOUNT_ID || '';
   }
 
   private get stripe(): StripeInstance {
@@ -36,11 +34,18 @@ export class StripeConnectService {
 
   /**
    * Resolve the Stripe connected account ID for a given retailer key.
-   * For MVP, only 'mock' is supported and maps to the test connected account.
+   *
+   * The 'mock' retailer never actually buys or ships anything — it's a
+   * simulated catalog for demoing the order flow before real retailer
+   * integrations exist. Charging real money against a product that will
+   * never be fulfilled is never correct, in test mode or live mode, so this
+   * intentionally returns null unconditionally rather than reading
+   * STRIPE_MOCK_RETAILER_ACCOUNT_ID — a real charge for a mock order should
+   * be structurally impossible, not just environment-dependent.
    */
   getConnectedAccountId(retailerKey: string): string | null {
     if (retailerKey === 'mock') {
-      return this.mockRetailerAccountId || null;
+      return null;
     }
     // Future: look up retailer -> connected account mapping
     return null;
