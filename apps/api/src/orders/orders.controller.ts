@@ -19,10 +19,14 @@ import { CancelOrderDto } from './dto/cancel-order.dto';
 import { ListOrdersDto } from './dto/list-orders.dto';
 import { CreateManualOrderDto } from './dto/create-manual-order.dto';
 import { UpdateTrackingDto } from './dto/update-tracking.dto';
+import { CarrierTrackingService } from './carriers/carrier-tracking.service';
 
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly orders: OrdersService,
+    private readonly carrierTracking: CarrierTrackingService,
+  ) {}
 
   @Post('preview')
   @RequiresTier('pro', 'elite')
@@ -52,6 +56,15 @@ export class OrdersController {
   @Get()
   async list(@CurrentUser() user: User, @Query() query: ListOrdersDto) {
     return this.orders.list(user.id, query);
+  }
+
+  // Which carriers have live tracking configured server-side — the frontend
+  // uses this to decide whether to show a "live tracking" badge for an
+  // order's carrierKey, vs. nothing extra for a carrier with no credentials
+  // configured yet.
+  @Get('carriers/status')
+  async getCarrierStatus() {
+    return { configuredCarriers: this.carrierTracking.getConfiguredCarrierKeys() };
   }
 
   @Get(':id')

@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { OrderAuditService } from '../audit/order-audit.service';
 import { OrderStatusHistoryService } from '../order-status-history.service';
 import { StripeConnectService } from '../stripe-connect.service';
+import { CarrierDetectionService } from '../carriers/carrier-detection.service';
 
 describe('OrdersService - cancel window', () => {
   let service: OrdersService;
@@ -56,6 +57,7 @@ describe('OrdersService - cancel window', () => {
         { provide: OrderAuditService, useValue: { record: auditRecord } },
         { provide: OrderStatusHistoryService, useValue: statusHistory },
         { provide: StripeConnectService, useValue: stripeConnect },
+        CarrierDetectionService,
       ],
     }).compile();
 
@@ -216,7 +218,7 @@ describe('OrdersService - cancel window', () => {
 
       expect(prisma.order.update).toHaveBeenCalledWith({
         where: { id: orderId },
-        data: { trackingNumber: '1Z999', trackingUrl: undefined, carrierName: 'UPS' },
+        data: { trackingNumber: '1Z999', trackingUrl: undefined, carrierName: 'UPS', carrierKey: null },
       });
       expect(statusHistory.record).not.toHaveBeenCalled();
     });

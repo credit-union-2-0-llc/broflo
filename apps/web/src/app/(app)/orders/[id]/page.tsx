@@ -26,6 +26,7 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<OrderDetailResponse | null>(null);
   const [timeline, setTimeline] = useState<OrderStatusHistoryEntry[]>([]);
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
+  const [configuredCarriers, setConfiguredCarriers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,12 +36,14 @@ export default function OrderDetailPage() {
   async function loadOrder() {
     if (!session?.accessToken || !params.id) return;
     try {
-      const [orderData, timelineData] = await Promise.all([
+      const [orderData, timelineData, carrierStatus] = await Promise.all([
         api.getOrder(session.accessToken, params.id),
         api.getOrderTimeline(session.accessToken, params.id),
+        api.getCarrierStatus(session.accessToken).catch(() => ({ configuredCarriers: [] })),
       ]);
       setOrder(orderData);
       setTimeline(timelineData);
+      setConfiguredCarriers(carrierStatus.configuredCarriers);
       // Load agent steps if this is a browser-agent order
       if (orderData.retailerKey === "browser-agent" && orderData.id) {
         try {
@@ -151,6 +154,8 @@ export default function OrderDetailPage() {
             trackingNumber={order.trackingNumber}
             trackingUrl={order.trackingUrl}
             carrierName={order.carrierName}
+            carrierKey={order.carrierKey}
+            configuredCarriers={configuredCarriers}
           />
           {session?.accessToken && !["cancelled", "failed"].includes(order.status) && (
             <div className="flex justify-end">
