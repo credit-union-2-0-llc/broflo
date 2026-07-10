@@ -48,16 +48,6 @@ export class BillingController {
     return this.billing.getSubscription(user);
   }
 
-  // Temporary, unauthenticated diagnostic for the "testing card isn't
-  // showing" report — isolates whether the deployed process actually sees
-  // ALLOW_DEV_TIER_OVERRIDE=true without needing a logged-in session to
-  // check. Remove once that's root-caused.
-  @Public()
-  @Get("dev-override-status")
-  async devOverrideStatus() {
-    return { enabled: process.env.ALLOW_DEV_TIER_OVERRIDE === "true" };
-  }
-
   @Post("dev-set-tier")
   async devSetTier(@CurrentUser() user: User, @Body() body: DevSetTierDto) {
     return this.billing.devSetTier(user, body.tier);
