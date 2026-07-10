@@ -171,7 +171,7 @@ export default async function EventDetailPage({
           personId={event.personId}
           personName={event.personName}
           token={session.accessToken}
-          tier={(session.user as Record<string, unknown>)?.subscriptionTier as "free" | "pro" | "elite" ?? "free"}
+          tier={(session.user as Record<string, unknown>)?.subscriptionTier as "free" | "pro" | "elite" | "family" ?? "free"}
         />
 
         {/* Past Gifts — S-5 Gift History, scoped to this event */}

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
+import { tierAtLeast } from "@broflo/shared";
 import { toast } from "sonner";
 
 const FIELD_LABELS: Record<string, string> = {
@@ -60,7 +61,7 @@ export function SurveySection({ personId, personName, recipientEmail, tier }: Su
   const [reviewing, setReviewing] = useState<Record<string, boolean>>({});
   const [selectedFields, setSelectedFields] = useState<Record<string, Set<string>>>({});
 
-  const canSendSurvey = tier === "pro" || tier === "elite";
+  const canSendSurvey = tierAtLeast(tier, "pro");
 
   function toggleQuestion(field: string) {
     setQuestionsToSend((prev) => {

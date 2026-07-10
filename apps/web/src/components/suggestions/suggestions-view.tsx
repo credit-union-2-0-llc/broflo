@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Gift, RefreshCw, Shuffle, Lock, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { VOICE } from "@broflo/shared";
+import { VOICE, tierAtLeast } from "@broflo/shared";
 import { api } from "@/lib/api";
 import type { GiftSuggestion, SuggestionMetaResponse, Order } from "@/lib/api";
 import { SuggestionCard } from "./suggestion-card";
@@ -19,7 +19,7 @@ interface SuggestionsViewProps {
   personId: string;
   personName: string;
   token: string;
-  tier: "free" | "pro" | "elite";
+  tier: "free" | "pro" | "elite" | "family";
 }
 
 export function SuggestionsView({
@@ -331,7 +331,7 @@ export function SuggestionsView({
                 <div key={s.id}>
                   <SuggestionCard
                     suggestion={s}
-                    isTopPick={i === 0 && tier === "elite"}
+                    isTopPick={i === 0 && tierAtLeast(tier, "elite")}
                     onSelect={handleSelect}
                     onDismiss={handleDismiss}
                     selecting={selecting}

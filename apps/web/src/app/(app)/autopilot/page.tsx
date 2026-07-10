@@ -44,7 +44,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { VOICE } from "@broflo/shared";
+import { VOICE, tierAtLeast } from "@broflo/shared";
 import { api } from "@/lib/api";
 import type { AutopilotRule, AutopilotRun } from "@/lib/api";
 import type { Person } from "@broflo/shared";
@@ -84,7 +84,7 @@ export default function AutopilotPage() {
 
   // Tier gate
   const tier = session?.user?.subscriptionTier ?? "free";
-  const hasAccess = tier === "pro" || tier === "elite";
+  const hasAccess = tierAtLeast(tier, "pro");
 
   const loadData = useCallback(async () => {
     if (!session?.accessToken) return;

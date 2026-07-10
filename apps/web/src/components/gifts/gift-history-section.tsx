@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Star, ThumbsUp } from "lucide-react";
-import { VOICE } from "@broflo/shared";
+import { VOICE, tierAtLeast } from "@broflo/shared";
 import { api } from "@/lib/api";
 import type { GiftRecord, BrofloEvent, FeedbackResponse } from "@/lib/api";
 import { StarRating } from "./star-rating";
@@ -104,7 +104,7 @@ export function GiftHistorySection({
     }
   }
 
-  const isPro = tier === "pro" || tier === "elite";
+  const isPro = tierAtLeast(tier, "pro");
 
   return (
     <div>

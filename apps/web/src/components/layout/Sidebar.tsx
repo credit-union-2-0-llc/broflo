@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { tierAtLeast, type SubscriptionTier } from "@broflo/shared";
 import {
   LayoutDashboard,
   Users,
@@ -28,14 +29,14 @@ const sections = [
   {
     label: "Intelligence",
     items: [
-      { href: "/autopilot", label: "Autopilot", icon: Zap },
+      { href: "/autopilot", label: "Autopilot", icon: Zap, requiresTier: "pro" as SubscriptionTier },
       { href: "/profile", label: "Score", icon: Trophy },
     ],
   },
   {
     label: "System",
     items: [
-      { href: "/family", label: "Family", icon: Heart },
+      { href: "/family", label: "Family", icon: Heart, requiresTier: "family" as SubscriptionTier },
       { href: "/billing", label: "Billing", icon: Settings },
     ],
   },
@@ -44,9 +45,15 @@ const sections = [
 export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const tier = session?.user?.subscriptionTier || "free";
 
   function isActive(href: string) {
     return pathname === href || pathname.startsWith(href + "/");
+  }
+
+  function isVisible(item: object) {
+    const required = (item as { requiresTier?: SubscriptionTier }).requiresTier;
+    return !required || tierAtLeast(tier, required);
   }
 
   return (
@@ -55,7 +62,11 @@ export function Sidebar() {
       style={{ borderRight: "1px solid var(--border2)" }}
     >
       <nav className="flex-1 py-4">
-        {sections.map((section) => (
+        {sections.map((section) => {
+          const visibleItems = section.items.filter(isVisible);
+          if (visibleItems.length === 0) return null;
+
+          return (
           <div key={section.label}>
             <div
               className="xl:px-[18px] px-0 pt-4 pb-1.5 text-[8px] uppercase xl:block hidden"
@@ -68,7 +79,7 @@ export function Sidebar() {
               {section.label}
             </div>
             <div className="xl:hidden pt-3 first:pt-0" />
-            {section.items.map((item) => {
+            {visibleItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
               return (
@@ -106,7 +117,8 @@ export function Sidebar() {
               );
             })}
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Autopilot status footer */}
