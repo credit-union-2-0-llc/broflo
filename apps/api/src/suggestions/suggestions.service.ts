@@ -479,6 +479,10 @@ export class SuggestionsService {
 
     let giftRecord;
     let scoreChange = 0;
+    let newScore = (await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { brofloScore: true },
+    })).brofloScore;
 
     const snapshot = {
       title: suggestion.title,
@@ -520,17 +524,18 @@ export class SuggestionsService {
       });
 
       // +10 Broflo Score for first gift record on this event
-      await this.prisma.user.update({
+      const user = await this.prisma.user.update({
         where: { id: userId },
         data: { brofloScore: { increment: 10 } },
       });
       scoreChange = 10;
+      newScore = user.brofloScore;
     }
 
     // Invalidate cache for this person (new gift affects future history context)
     await this.redis.invalidateByPattern(`suggest:${suggestion.personId}:*`);
 
-    return { suggestion: updated, giftRecord, scoreChange };
+    return { suggestion: updated, giftRecord, scoreChange, newScore };
   }
 
   async dismissSuggestion(userId: string, suggestionId: string, dto: DismissSuggestionDto) {
