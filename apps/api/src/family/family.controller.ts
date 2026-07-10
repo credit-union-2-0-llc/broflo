@@ -49,4 +49,9 @@ export class FamilyController {
   async leave(@CurrentUser() user: User) {
     return this.family.leaveFamily(user);
   }
+
+  @Get("shared-events")
+  async sharedEvents(@CurrentUser() user: User) {
+    return this.family.getSharedEvents(user.id);
+  }
 }

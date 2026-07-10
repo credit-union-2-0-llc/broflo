@@ -12,6 +12,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { EmailService } from "../../email/email.service";
 import { NotificationsService } from "../../notifications/notifications.service";
 import { EntitlementsService } from "../../entitlements/entitlements.service";
+import { EventsService } from "../../events/events.service";
 
 describe("FamilyService", () => {
   let service: FamilyService;
@@ -20,11 +21,13 @@ describe("FamilyService", () => {
     familyMembership: { findUnique: jest.Mock; findFirst: jest.Mock; create: jest.Mock; delete: jest.Mock };
     familyInvite: { findUnique: jest.Mock; updateMany: jest.Mock; create: jest.Mock; update: jest.Mock };
     user: { update: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
+    event: { findMany: jest.Mock };
     $transaction: jest.Mock;
   };
   let email: { sendFamilyInvite: jest.Mock };
   let notifications: { create: jest.Mock };
   let entitlements: { getIntLimit: jest.Mock };
+  let events: { computeNextOccurrence: jest.Mock };
 
   const FAMILY_USER = { id: "owner-1", email: "owner@example.com", name: "Owner", subscriptionTier: "family" } as User;
   const FREE_USER = { id: "user-2", email: "member@example.com", name: "Member", subscriptionTier: "free" } as User;
@@ -54,11 +57,13 @@ describe("FamilyService", () => {
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         findUniqueOrThrow: jest.fn(),
       },
+      event: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn().mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops)),
     };
     email = { sendFamilyInvite: jest.fn().mockResolvedValue(undefined) };
     notifications = { create: jest.fn().mockResolvedValue({}) };
     entitlements = { getIntLimit: jest.fn().mockResolvedValue(5) };
+    events = { computeNextOccurrence: jest.fn((date: Date) => date) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -67,6 +72,7 @@ describe("FamilyService", () => {
         { provide: EmailService, useValue: email },
         { provide: NotificationsService, useValue: notifications },
         { provide: EntitlementsService, useValue: entitlements },
+        { provide: EventsService, useValue: events },
       ],
     }).compile();
 
@@ -304,6 +310,61 @@ describe("FamilyService", () => {
 
       expect(prisma.user.updateMany).not.toHaveBeenCalled();
       expect(prisma.familyGroup.delete).toHaveBeenCalledWith({ where: { id: "group-1" } });
+    });
+  });
+
+  describe("getSharedEvents", () => {
+    it("throws when the caller isn't part of a family plan", async () => {
+      prisma.familyGroup.findUnique.mockResolvedValue(null);
+      prisma.familyMembership.findUnique.mockResolvedValue(null);
+      await expect(service.getSharedEvents("owner-1")).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it("returns only date/occasion/first-name/owner — never notes, budget, or gift plans", async () => {
+      prisma.familyGroup.findUnique.mockResolvedValue({ id: "group-1", ownerId: "owner-1" });
+      prisma.familyGroup.findUniqueOrThrow.mockResolvedValue({
+        id: "group-1",
+        ownerId: "owner-1",
+        memberships: [{ userId: "member-1" }],
+      });
+      prisma.event.findMany.mockResolvedValue([
+        {
+          userId: "member-1",
+          occasionType: "birthday",
+          date: new Date("2026-08-15"),
+          isRecurring: true,
+          person: { name: "Alice Smith" },
+        },
+      ]);
+      events.computeNextOccurrence.mockReturnValue(new Date("2026-08-15"));
+
+      const result = await service.getSharedEvents("owner-1");
+
+      expect(prisma.event.findMany).toHaveBeenCalledWith({
+        where: { userId: { in: ["owner-1", "member-1"] }, sharedWithFamily: true, userDeleted: false },
+        include: { person: { select: { name: true } } },
+      });
+      expect(result).toEqual([
+        { personFirstName: "Alice", occasionType: "birthday", date: "2026-08-15", ownerUserId: "member-1" },
+      ]);
+    });
+
+    it("sorts multiple shared events by date", async () => {
+      prisma.familyGroup.findUnique.mockResolvedValue({ id: "group-1", ownerId: "owner-1" });
+      prisma.familyGroup.findUniqueOrThrow.mockResolvedValue({
+        id: "group-1",
+        ownerId: "owner-1",
+        memberships: [],
+      });
+      prisma.event.findMany.mockResolvedValue([
+        { userId: "owner-1", occasionType: "birthday", date: new Date("2026-12-01"), isRecurring: false, person: { name: "Later Person" } },
+        { userId: "owner-1", occasionType: "anniversary", date: new Date("2026-08-01"), isRecurring: false, person: { name: "Earlier Person" } },
+      ]);
+      events.computeNextOccurrence.mockImplementation((date: Date) => date);
+
+      const result = await service.getSharedEvents("owner-1");
+
+      expect(result.map((e) => e.personFirstName)).toEqual(["Earlier", "Later"]);
     });
   });
 });

@@ -38,6 +38,7 @@ export interface CreateEventData {
   budgetMinCents?: number;
   budgetMaxCents?: number;
   notes?: string;
+  sharedWithFamily?: boolean;
 }
 
 export interface Reminder {
@@ -1023,7 +1024,18 @@ export const api = {
       method: "DELETE",
       token,
     }),
+
+  // Shared family calendar
+  getSharedEvents: (token: string) =>
+    apiFetch<SharedEvent[]>("/family/shared-events", { token }),
 };
+
+export interface SharedEvent {
+  personFirstName: string;
+  occasionType: string;
+  date: string;
+  ownerUserId: string;
+}
 
 export interface SecretSantaExchangeSummary {
   id: string;

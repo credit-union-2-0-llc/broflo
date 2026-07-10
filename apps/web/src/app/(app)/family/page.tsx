@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
 import { SecretSantaSection } from "@/components/family/secret-santa-section";
 import { GiftPoolSection } from "@/components/family/gift-pool-section";
+import { SharedCalendarSection } from "@/components/family/shared-calendar-section";
 import { api, ApiError } from "@/lib/api";
 import type { FamilyStatus } from "@/lib/api";
 import { toast } from "sonner";
@@ -235,6 +236,7 @@ export default function FamilyPage() {
             peers={role === "owner" ? (status?.group?.members ?? []) : (status?.peers ?? [])}
           />
           <GiftPoolSection token={session.accessToken} myUserId={session.user.id} />
+          <SharedCalendarSection token={session.accessToken} />
         </div>
       )}
 

@@ -59,6 +59,10 @@ export class CreateEventDto {
   @IsString()
   @MaxLength(500, { message: "Notes must be 500 characters or fewer" })
   notes?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  sharedWithFamily?: boolean;
 }
 
 export class UpdateEventDto extends PartialType(CreateEventDto) {}

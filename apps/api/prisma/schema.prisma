@@ -273,6 +273,7 @@ model Event {
   isAutoCreated  Boolean        @default(false) @map("is_auto_created")
   userModified   Boolean        @default(false) @map("user_modified")
   userDeleted    Boolean        @default(false) @map("user_deleted")
+  sharedWithFamily Boolean      @default(false) @map("shared_with_family")
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 

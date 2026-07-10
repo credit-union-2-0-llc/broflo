@@ -63,7 +63,10 @@ export function CreateEventDialog({
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
   const [notes, setNotes] = useState("");
+  const [sharedWithFamily, setSharedWithFamily] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const isFamilyTier = session?.user?.subscriptionTier === "family";
 
   useEffect(() => {
     if (preselectedPersonId) setPersonId(preselectedPersonId);
@@ -90,6 +93,7 @@ export function CreateEventDialog({
     setBudgetMin("");
     setBudgetMax("");
     setNotes("");
+    setSharedWithFamily(false);
     setErrors({});
   }
 
@@ -118,6 +122,7 @@ export function CreateEventDialog({
         budgetMinCents: budgetMin ? Math.round(parseFloat(budgetMin) * 100) : undefined,
         budgetMaxCents: budgetMax ? Math.round(parseFloat(budgetMax) * 100) : undefined,
         notes: notes.trim() || undefined,
+        sharedWithFamily: isFamilyTier ? sharedWithFamily : undefined,
       });
       toast.success(VOICE.events.created);
       setOpen(false);
@@ -248,6 +253,17 @@ export function CreateEventDialog({
               maxLength={500}
             />
           </div>
+
+          {isFamilyTier && (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={sharedWithFamily}
+                onChange={(e) => setSharedWithFamily(e.target.checked)}
+              />
+              Share this date with my family plan (just the date and occasion — no gift plans or notes)
+            </label>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button
