@@ -4,23 +4,14 @@ import { Copy, ExternalLink, Truck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { LiveTrackingBadge } from "@/components/orders/live-tracking-badge";
 
 interface TrackingCardProps {
   trackingNumber?: string | null;
   trackingUrl?: string | null;
   carrierName?: string | null;
-  carrierKey?: string | null;
-  configuredCarriers?: string[];
 }
 
-export function TrackingCard({
-  trackingNumber,
-  trackingUrl,
-  carrierName,
-  carrierKey,
-  configuredCarriers = [],
-}: TrackingCardProps) {
+export function TrackingCard({ trackingNumber, trackingUrl, carrierName }: TrackingCardProps) {
   if (!trackingNumber) return null;
 
   function copyTracking() {
@@ -35,10 +26,9 @@ export function TrackingCard({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2 flex-wrap">
+        <CardTitle className="text-sm flex items-center gap-2">
           <Truck className="h-4 w-4" />
           Tracking Info
-          <LiveTrackingBadge carrierKey={carrierKey ?? null} configuredCarriers={configuredCarriers} />
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
