@@ -13,6 +13,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { EmailService } from "../email/email.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { EntitlementsService } from "../entitlements/entitlements.service";
+import { EventsService } from "../events/events.service";
 import type { CreateFamilyGroupDto, InviteFamilyMemberDto } from "./dto/family.dto";
 
 const INVITE_TTL_DAYS = 14;
@@ -25,6 +26,7 @@ export class FamilyService {
     private readonly email: EmailService,
     private readonly notifications: NotificationsService,
     private readonly entitlements: EntitlementsService,
+    private readonly events: EventsService,
   ) {}
 
   private requireFamilyTier(user: User) {
@@ -65,6 +67,36 @@ export class FamilyService {
       include: { memberships: { select: { userId: true } } },
     });
     return [group.ownerId, ...group.memberships.map((m) => m.userId)];
+  }
+
+  // Date + occasion only — never the person's full record (no notes, gift
+  // plans, or budget). Each member's own people/gifts/events stay private;
+  // this is the one deliberate, opt-in exception (per-event, via
+  // Event.sharedWithFamily) for "who's coming up" visibility across the group.
+  async getSharedEvents(userId: string) {
+    const groupId = await this.getMyFamilyGroupId(userId);
+    if (!groupId) throw new ForbiddenException("You're not part of a family plan.");
+
+    const memberUserIds = await this.getFamilyMemberUserIds(groupId);
+    const events = await this.prisma.event.findMany({
+      where: { userId: { in: memberUserIds }, sharedWithFamily: true, userDeleted: false },
+      include: { person: { select: { name: true } } },
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return events
+      .map((e) => {
+        const nextOccurrence = this.events.computeNextOccurrence(e.date, e.isRecurring, today);
+        return {
+          personFirstName: e.person.name.split(" ")[0],
+          occasionType: e.occasionType,
+          date: nextOccurrence.toISOString().split("T")[0],
+          ownerUserId: e.userId,
+        };
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
   }
 
   async getMyFamily(user: User) {

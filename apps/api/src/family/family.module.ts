@@ -8,8 +8,10 @@ import { GiftPoolService } from "./gift-pool.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailService } from "../email/email.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { EventsModule } from "../events/events.module";
 
 @Module({
+  imports: [EventsModule],
   controllers: [FamilyController, SecretSantaController, GiftPoolController],
   providers: [
     FamilyService,

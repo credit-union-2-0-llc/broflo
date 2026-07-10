@@ -40,6 +40,7 @@ export class EventsService {
         budgetMaxCents: dto.budgetMaxCents ?? null,
         notes: dto.notes ?? null,
         isAutoCreated: false,
+        sharedWithFamily: dto.sharedWithFamily ?? false,
       },
     });
   }
@@ -107,6 +108,7 @@ export class EventsService {
     if (dto.budgetMinCents !== undefined) data.budgetMinCents = dto.budgetMinCents;
     if (dto.budgetMaxCents !== undefined) data.budgetMaxCents = dto.budgetMaxCents;
     if (dto.notes !== undefined) data.notes = dto.notes;
+    if (dto.sharedWithFamily !== undefined) data.sharedWithFamily = dto.sharedWithFamily;
 
     if (event.isAutoCreated) {
       data.userModified = true;
