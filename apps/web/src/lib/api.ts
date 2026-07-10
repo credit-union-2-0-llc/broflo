@@ -969,7 +969,47 @@ export const api = {
       `/family/invites/${inviteToken}/accept`,
       { method: "POST", token },
     ),
+
+  // Secret Santa
+  listSecretSantaExchanges: (token: string) =>
+    apiFetch<SecretSantaExchangeSummary[]>("/family/secret-santa", { token }),
+
+  createSecretSantaExchange: (token: string, name: string, budgetCents?: number) =>
+    apiFetch<{ id: string }>("/family/secret-santa", {
+      method: "POST",
+      body: JSON.stringify(budgetCents ? { name, budgetCents } : { name }),
+      token,
+    }),
+
+  joinSecretSantaExchange: (token: string, exchangeId: string, excludeUserIds?: string[]) =>
+    apiFetch<{ id: string }>(`/family/secret-santa/${exchangeId}/join`, {
+      method: "POST",
+      body: JSON.stringify(excludeUserIds ? { excludeUserIds } : {}),
+      token,
+    }),
+
+  runSecretSantaAssignment: (token: string, exchangeId: string) =>
+    apiFetch<{ assigned: true }>(`/family/secret-santa/${exchangeId}/assign`, {
+      method: "POST",
+      token,
+    }),
+
+  getMySecretSantaAssignment: (token: string, exchangeId: string) =>
+    apiFetch<{ assigned: boolean; recipientName?: string }>(
+      `/family/secret-santa/${exchangeId}/my-assignment`,
+      { token },
+    ),
 };
+
+export interface SecretSantaExchangeSummary {
+  id: string;
+  name: string;
+  budgetCents: number | null;
+  status: "open" | "assigned" | "completed";
+  createdByUserId: string;
+  participantCount: number;
+  isParticipant: boolean;
+}
 
 export interface FamilyStatus {
   role: "owner" | "member" | "none";
@@ -984,6 +1024,7 @@ export interface FamilyStatus {
   ownerEmail?: string;
   familyName?: string | null;
   joinedAt?: string;
+  peers?: Array<{ userId: string; name: string | null; email: string }>;
 }
 
 export interface SurveyResponse {

@@ -42,6 +42,31 @@ export class FamilyService {
     }
   }
 
+  // Resolves the family group a user belongs to, whether as owner or
+  // member — shared by Secret Santa, gift pooling, and the shared calendar,
+  // which all need to know "which group am I in" without caring which role.
+  async getMyFamilyGroupId(userId: string): Promise<string | null> {
+    const owned = await this.prisma.familyGroup.findUnique({
+      where: { ownerId: userId },
+      select: { id: true },
+    });
+    if (owned) return owned.id;
+
+    const membership = await this.prisma.familyMembership.findUnique({
+      where: { userId },
+      select: { familyGroupId: true },
+    });
+    return membership?.familyGroupId ?? null;
+  }
+
+  async getFamilyMemberUserIds(familyGroupId: string): Promise<string[]> {
+    const group = await this.prisma.familyGroup.findUniqueOrThrow({
+      where: { id: familyGroupId },
+      include: { memberships: { select: { userId: true } } },
+    });
+    return [group.ownerId, ...group.memberships.map((m) => m.userId)];
+  }
+
   async getMyFamily(user: User) {
     const owned = await this.prisma.familyGroup.findUnique({
       where: { ownerId: user.id },
@@ -75,16 +100,31 @@ export class FamilyService {
 
     const membership = await this.prisma.familyMembership.findUnique({
       where: { userId: user.id },
-      include: { familyGroup: { include: { owner: { select: { name: true, email: true } } } } },
+      include: {
+        familyGroup: {
+          include: {
+            owner: { select: { id: true, name: true, email: true } },
+            memberships: { include: { user: { select: { id: true, name: true, email: true } } } },
+          },
+        },
+      },
     });
 
     if (membership) {
+      const owner = membership.familyGroup.owner;
+      const peers = [
+        { userId: owner.id, name: owner.name, email: owner.email },
+        ...membership.familyGroup.memberships
+          .filter((m) => m.userId !== user.id)
+          .map((m) => ({ userId: m.user.id, name: m.user.name, email: m.user.email })),
+      ];
       return {
         role: "member" as const,
-        ownerName: membership.familyGroup.owner.name,
-        ownerEmail: membership.familyGroup.owner.email,
+        ownerName: owner.name,
+        ownerEmail: owner.email,
         familyName: membership.familyGroup.name,
         joinedAt: membership.joinedAt,
+        peers,
       };
     }
 

@@ -834,6 +834,7 @@ model FamilyGroup {
   owner       User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   memberships FamilyMembership[]
   invites     FamilyInvite[]
+  secretSantaExchanges SecretSantaExchange[]
 
   @@map("family_groups")
 }
@@ -865,4 +866,34 @@ model FamilyInvite {
 
   @@index([familyGroupId], map: "idx_family_invites_group")
   @@map("family_invites")
+}
+
+model SecretSantaExchange {
+  id              String    @id @default(uuid())
+  familyGroupId   String    @map("family_group_id")
+  createdByUserId String    @map("created_by_user_id")
+  name            String
+  budgetCents     Int?      @map("budget_cents")
+  status          String    @default("open")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  familyGroup  FamilyGroup              @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+  participants SecretSantaParticipant[]
+
+  @@index([familyGroupId], map: "idx_secret_santa_exchanges_group")
+  @@map("secret_santa_exchanges")
+}
+
+model SecretSantaParticipant {
+  id               String   @id @default(uuid())
+  exchangeId       String   @map("exchange_id")
+  userId           String   @map("user_id")
+  excludeUserIds   String[] @default([]) @map("exclude_user_ids")
+  assignedToUserId String?  @map("assigned_to_user_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  exchange SecretSantaExchange @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
+
+  @@unique([exchangeId, userId], map: "uq_secret_santa_participant")
+  @@map("secret_santa_participants")
 }
