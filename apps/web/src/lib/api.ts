@@ -999,6 +999,30 @@ export const api = {
       `/family/secret-santa/${exchangeId}/my-assignment`,
       { token },
     ),
+
+  // Gift pooling
+  listGiftPools: (token: string) =>
+    apiFetch<GiftPoolSummary[]>("/family/gift-pools", { token }),
+
+  createGiftPool: (token: string, title: string, targetCents: number) =>
+    apiFetch<{ id: string }>("/family/gift-pools", {
+      method: "POST",
+      body: JSON.stringify({ title, targetCents }),
+      token,
+    }),
+
+  addGiftPoolContribution: (token: string, poolId: string, amountCents: number, note?: string) =>
+    apiFetch<{ id: string }>(`/family/gift-pools/${poolId}/contributions`, {
+      method: "POST",
+      body: JSON.stringify(note ? { amountCents, note } : { amountCents }),
+      token,
+    }),
+
+  deleteGiftPoolContribution: (token: string, poolId: string, contributionId: string) =>
+    apiFetch<{ deleted: true }>(`/family/gift-pools/${poolId}/contributions/${contributionId}`, {
+      method: "DELETE",
+      token,
+    }),
 };
 
 export interface SecretSantaExchangeSummary {
@@ -1009,6 +1033,23 @@ export interface SecretSantaExchangeSummary {
   createdByUserId: string;
   participantCount: number;
   isParticipant: boolean;
+}
+
+export interface GiftPoolSummary {
+  id: string;
+  title: string;
+  targetCents: number;
+  status: "open" | "completed" | "cancelled";
+  createdByUserId: string;
+  totalCents: number;
+  contributions: Array<{
+    id: string;
+    userId: string;
+    contributorName: string;
+    amountCents: number;
+    note: string | null;
+    createdAt: string;
+  }>;
 }
 
 export interface FamilyStatus {

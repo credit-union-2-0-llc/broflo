@@ -835,6 +835,7 @@ model FamilyGroup {
   memberships FamilyMembership[]
   invites     FamilyInvite[]
   secretSantaExchanges SecretSantaExchange[]
+  giftPools            GiftPool[]
 
   @@map("family_groups")
 }
@@ -896,4 +897,38 @@ model SecretSantaParticipant {
 
   @@unique([exchangeId, userId], map: "uq_secret_santa_participant")
   @@map("secret_santa_participants")
+}
+
+// Deliberately NOT linked to any Person row — a pool title is a plain text
+// label (e.g. "Dad's new grill"), keeping each member's own person/gift
+// records private per the Family plan's "separate data" design. Pledge
+// tracking only, no real payment processing (Broflo is not a store).
+model GiftPool {
+  id              String   @id @default(uuid())
+  familyGroupId   String   @map("family_group_id")
+  createdByUserId String   @map("created_by_user_id")
+  title           String
+  targetCents     Int      @map("target_cents")
+  status          String   @default("open")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  familyGroup   FamilyGroup            @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+  contributions GiftPoolContribution[]
+
+  @@index([familyGroupId], map: "idx_gift_pools_group")
+  @@map("gift_pools")
+}
+
+model GiftPoolContribution {
+  id          String   @id @default(uuid())
+  poolId      String   @map("pool_id")
+  userId      String   @map("user_id")
+  amountCents Int      @map("amount_cents")
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  pool GiftPool @relation(fields: [poolId], references: [id], onDelete: Cascade)
+
+  @@index([poolId], map: "idx_gift_pool_contributions_pool")
+  @@map("gift_pool_contributions")
 }
