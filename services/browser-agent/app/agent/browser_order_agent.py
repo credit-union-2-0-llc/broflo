@@ -136,6 +136,13 @@ class BrowserOrderAgent:
         session = None
         browser: Optional[Browser] = None
         start_time = time.monotonic()
+        # Set True the instant the "Place Order" click fires. Once true, the
+        # real-world order may have already gone through — any failure past
+        # this point must never be classified as retryable (see the except
+        # blocks below), or a retry would re-run checkout with the same
+        # virtual card against a retailer that may have already charged and
+        # shipped the first attempt.
+        confirmed = False
 
         try:
             # Create isolated browser session (fresh per attempt)
@@ -290,6 +297,7 @@ class BrowserOrderAgent:
                     )
 
             await self._confirm_order(page)
+            confirmed = True
             await self._captcha.check_page(page)
             await self._complete_step("completed", page)
 
@@ -329,7 +337,7 @@ class BrowserOrderAgent:
             return AgentResult(
                 job_id=req.job_id,
                 status="aborted",
-                failure_reason="captcha",
+                failure_reason="post_confirmation_uncertain" if confirmed else "captcha",
                 steps=self._steps,
                 browser_session_id=session.session_id if session else None,
             )
@@ -339,7 +347,7 @@ class BrowserOrderAgent:
             return AgentResult(
                 job_id=req.job_id,
                 status="failed",
-                failure_reason="timeout",
+                failure_reason="post_confirmation_uncertain" if confirmed else "timeout",
                 steps=self._steps,
                 browser_session_id=session.session_id if session else None,
             )
@@ -349,7 +357,7 @@ class BrowserOrderAgent:
             return AgentResult(
                 job_id=req.job_id,
                 status="failed",
-                failure_reason="unknown",
+                failure_reason="post_confirmation_uncertain" if confirmed else "unknown",
                 steps=self._steps,
                 browser_session_id=session.session_id if session else None,
             )

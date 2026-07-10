@@ -627,6 +627,11 @@ enum AgentFailureReason {
   payment_declined @map("payment_declined")
   address_rejected @map("address_rejected")
   unknown
+  // A failure occurring after the "Place Order" click has already fired —
+  // the real-world order may have already gone through. Never retried, and
+  // deliberately excluded from the standard auto-credit/failure-notification
+  // path since telling the user "that didn't work" could be false.
+  post_confirmation_uncertain @map("post_confirmation_uncertain")
 
   @@map("agent_failure_reason")
 }

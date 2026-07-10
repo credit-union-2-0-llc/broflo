@@ -285,6 +285,17 @@ export class OrdersService {
       throw new NotFoundException('Order not found');
     }
 
+    // Browser-agent orders aren't placed through the RETAILER_ADAPTER this
+    // service is wired to — there's no generic way to cancel an arbitrary
+    // retailer's order via browser automation yet. Fail loudly here rather
+    // than silently calling the wrong adapter with a confirmation number it
+    // has never seen.
+    if (order.retailerKey === 'browser-agent') {
+      throw new BadRequestException(
+        "Orders placed by Broflo's browser agent can't be cancelled through the app yet. Contact support for help.",
+      );
+    }
+
     if (
       !order.placedAt ||
       Date.now() - order.placedAt.getTime() >= 2 * 60 * 60 * 1000

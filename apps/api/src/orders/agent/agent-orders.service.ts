@@ -318,6 +318,29 @@ export class AgentOrdersService {
   }
 
   private async _handleFailure(user: User, job: { id: string; retailerDomain: string }, reason: string) {
+    // The order may have actually gone through — the browser lost track of
+    // it only *after* the "Place Order" click fired. Auto-crediting and
+    // telling the user "that didn't work" would both be actively wrong if
+    // it succeeded, so this always needs a human to check the real order
+    // status before either of those happens.
+    if (reason === 'post_confirmation_uncertain') {
+      await this.prisma.failureReview.create({
+        data: {
+          agentJobId: job.id,
+          retailerDomain: job.retailerDomain,
+          failureReason: reason,
+        },
+      });
+
+      await this.notifications.create(user.id, {
+        type: 'agent_order_failed',
+        title: 'Still confirming your order',
+        body: "We lost track of your order right after checkout — we're double-checking with the retailer and will follow up shortly.",
+        linkUrl: `/orders`,
+      });
+      return;
+    }
+
     // Layer 1: Auto service credit
     await this.serviceCredit.issueCredit(user, job.id, reason);
 

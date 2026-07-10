@@ -5,6 +5,7 @@ import { BrowserAgentClient } from './browser-agent.client';
 import { StripeIssuingService } from './stripe-issuing.service';
 import { RetailerProfileService } from './retailer-profile.service';
 import { ServiceCreditService } from './service-credit.service';
+import { AgentJobReconciliationScheduler } from './agent-job-reconciliation.scheduler';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SubscriptionGuard } from '../../billing/guards/subscription.guard';
 import { OrdersModule } from '../orders.module';
@@ -19,6 +20,7 @@ import { NotificationsModule } from '../../notifications/notifications.module';
     StripeIssuingService,
     RetailerProfileService,
     ServiceCreditService,
+    AgentJobReconciliationScheduler,
     PrismaService,
     SubscriptionGuard,
   ],
