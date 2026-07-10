@@ -118,6 +118,7 @@ export interface SelectSuggestionResponse {
   suggestion: GiftSuggestion;
   giftRecord: Record<string, unknown>;
   scoreChange: number;
+  newScore: number;
 }
 
 // S-5 Gift History types

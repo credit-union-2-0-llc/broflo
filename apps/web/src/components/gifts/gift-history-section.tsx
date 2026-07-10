@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -13,7 +14,7 @@ import {
 import { Plus, Star, ThumbsUp } from "lucide-react";
 import { VOICE, tierAtLeast } from "@broflo/shared";
 import { api } from "@/lib/api";
-import type { GiftRecord, BrofloEvent, FeedbackResponse } from "@/lib/api";
+import type { GiftRecord, BrofloEvent, FeedbackResponse, CreateGiftResponse } from "@/lib/api";
 import { StarRating } from "./star-rating";
 import { FeedbackDialog } from "./feedback-dialog";
 import { AddGiftDialog } from "./add-gift-dialog";
@@ -35,6 +36,7 @@ export function GiftHistorySection({
   token,
   tier,
 }: GiftHistorySectionProps) {
+  const { update: updateSession } = useSession();
   const [gifts, setGifts] = useState<GiftRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [yearFilter, setYearFilter] = useState<string>("all");
@@ -86,6 +88,9 @@ export function GiftHistorySection({
       setGifts((prev) =>
         prev.map((g) => (g.id === gift.id ? result.giftRecord : g)),
       );
+      if (result.scoreChange > 0) {
+        updateSession({ user: { brofloScore: result.newScore } });
+      }
     } catch {
       toast.error("Failed to save. Try again.");
     }
@@ -95,12 +100,22 @@ export function GiftHistorySection({
     setGifts((prev) =>
       prev.map((g) => (g.id === result.giftRecord.id ? result.giftRecord : g)),
     );
+    if (result.scoreChange > 0) {
+      updateSession({ user: { brofloScore: result.newScore } });
+    }
     // Check if 1-star → trigger never-again prompt
     if (result.promptNeverAgain) {
       const gift = gifts.find((g) => g.id === result.giftRecord.id);
       if (gift) {
         setNeverAgainGift(result.giftRecord);
       }
+    }
+  }
+
+  function handleGiftCreated(result: CreateGiftResponse) {
+    loadGifts();
+    if (result.scoreChange > 0) {
+      updateSession({ user: { brofloScore: result.newScore } });
     }
   }
 
@@ -194,7 +209,7 @@ export function GiftHistorySection({
         token={token}
         open={addOpen}
         onOpenChange={setAddOpen}
-        onCreated={() => loadGifts()}
+        onCreated={handleGiftCreated}
       />
 
       {feedbackGift && (

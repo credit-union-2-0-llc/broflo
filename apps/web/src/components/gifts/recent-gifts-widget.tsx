@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,6 +29,7 @@ function GiftOrderBadge({ placedAt }: { placedAt: string }) {
 }
 
 export function RecentGiftsWidget({ token, initialGifts }: RecentGiftsWidgetProps) {
+  const { update: updateSession } = useSession();
   const [gifts, setGifts] = useState<RecentGift[]>(initialGifts ?? []);
   const [loading, setLoading] = useState(initialGifts === undefined);
   const [feedbackGift, setFeedbackGift] = useState<RecentGift | null>(null);
@@ -72,6 +74,9 @@ export function RecentGiftsWidget({ token, initialGifts }: RecentGiftsWidgetProp
           g.id === gift.id ? { ...result.giftRecord, personName: gift.personName, eventName: gift.eventName } as RecentGift : g,
         ),
       );
+      if (result.scoreChange > 0) {
+        updateSession({ user: { brofloScore: result.newScore } });
+      }
     } catch {
       toast.error("Failed to save. Try again.");
     }
@@ -159,6 +164,9 @@ export function RecentGiftsWidget({ token, initialGifts }: RecentGiftsWidgetProp
                     : g,
                 ),
               );
+              if (result.scoreChange > 0) {
+                updateSession({ user: { brofloScore: result.newScore } });
+              }
             }}
           />
         )}
