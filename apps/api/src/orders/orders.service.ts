@@ -18,7 +18,6 @@ import { PlaceOrderDto } from './dto/place-order.dto';
 import { ListOrdersDto } from './dto/list-orders.dto';
 import { CreateManualOrderDto } from './dto/create-manual-order.dto';
 import { UpdateTrackingDto } from './dto/update-tracking.dto';
-import { CarrierDetectionService } from './carriers/carrier-detection.service';
 
 @Injectable()
 export class OrdersService {
@@ -30,7 +29,6 @@ export class OrdersService {
     private readonly orderAudit: OrderAuditService,
     private readonly statusHistory: OrderStatusHistoryService,
     private readonly stripeConnect: StripeConnectService,
-    private readonly carrierDetection: CarrierDetectionService,
   ) {}
 
   async preview(user: User, dto: PreviewOrderDto) {
@@ -503,9 +501,6 @@ export class OrdersService {
         trackingNumber: dto.trackingNumber ?? null,
         trackingUrl: dto.trackingUrl ?? null,
         carrierName: dto.carrierName ?? null,
-        carrierKey: dto.trackingNumber
-          ? this.carrierDetection.detectCarrier(dto.trackingNumber)
-          : null,
         shippingName: person.name,
         shippingAddress1: person.shippingAddress1 ?? '',
         shippingAddress2: person.shippingAddress2 ?? null,
@@ -566,7 +561,6 @@ export class OrdersService {
         trackingNumber: dto.trackingNumber,
         trackingUrl: dto.trackingUrl ?? undefined,
         carrierName: dto.carrierName ?? undefined,
-        carrierKey: this.carrierDetection.detectCarrier(dto.trackingNumber),
         ...(statusChanging
           ? {
               status: dto.status,
@@ -600,7 +594,6 @@ export class OrdersService {
       trackingNumber?: string;
       trackingUrl?: string;
       carrierName?: string;
-      estimatedDeliveryDate?: Date;
       metadata?: Record<string, unknown>;
     },
   ) {
@@ -632,7 +625,6 @@ export class OrdersService {
     if (extra?.trackingNumber) updateData.trackingNumber = extra.trackingNumber;
     if (extra?.trackingUrl) updateData.trackingUrl = extra.trackingUrl;
     if (extra?.carrierName) updateData.carrierName = extra.carrierName;
-    if (extra?.estimatedDeliveryDate) updateData.estimatedDeliveryDate = extra.estimatedDeliveryDate;
     if (toStatus === 'delivered') updateData.deliveredAt = new Date();
 
     const updated = await this.prisma.order.update({
