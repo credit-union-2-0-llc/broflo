@@ -145,6 +145,7 @@ describe("SurveyService", () => {
       prisma.personSurveyLink.findUnique.mockResolvedValue({
         id: "link-1",
         personId: "person-1",
+        createdAt: new Date(),
         respondedAt: new Date(),
         expiresAt: new Date(Date.now() + 86400000),
         fields: [],
@@ -157,6 +158,7 @@ describe("SurveyService", () => {
       prisma.personSurveyLink.findUnique.mockResolvedValue({
         id: "link-1",
         personId: "person-1",
+        createdAt: new Date(),
         respondedAt: null,
         expiresAt: new Date(Date.now() - 1000),
         fields: [],
@@ -169,6 +171,7 @@ describe("SurveyService", () => {
       prisma.personSurveyLink.findUnique.mockResolvedValue({
         id: "link-1",
         personId: "person-1",
+        createdAt: new Date(),
         respondedAt: null,
         expiresAt: new Date(Date.now() + 86400000),
         fields: [],
@@ -184,6 +187,7 @@ describe("SurveyService", () => {
       prisma.personSurveyLink.findUnique.mockResolvedValue({
         id: "link-1",
         personId: "person-1",
+        createdAt: new Date(),
         respondedAt: null,
         expiresAt: new Date(Date.now() + 86400000),
         fields: ["hobbies", "shoeSize"],
@@ -197,6 +201,7 @@ describe("SurveyService", () => {
       prisma.personSurveyLink.findUnique.mockResolvedValue({
         id: "link-1",
         personId: "person-1",
+        createdAt: new Date(),
         respondedAt: null,
         expiresAt: new Date(Date.now() + 86400000),
         fields: [],
@@ -224,6 +229,7 @@ describe("SurveyService", () => {
       prisma.personSurveyLink.findUnique.mockResolvedValue({
         id: "link-1",
         personId: "person-1",
+        createdAt: new Date(),
         respondedAt: null,
         expiresAt: new Date(Date.now() + 86400000),
         fields: ["hobbies"],
@@ -243,6 +249,7 @@ describe("SurveyService", () => {
       prisma.personSurveyLink.findUnique.mockResolvedValue({
         id: "link-1",
         personId: "person-1",
+        createdAt: new Date(),
         respondedAt: new Date(),
         expiresAt: new Date(Date.now() + 86400000),
         fields: [],
