@@ -200,6 +200,7 @@ export interface Order {
   trackingNumber: string | null;
   trackingUrl: string | null;
   carrierName: string | null;
+  carrierKey: string | null;
   deliveredAt: string | null;
   estimatedDeliveryDate: string | null;
   placedAt: string | null;
@@ -653,6 +654,9 @@ export const api = {
 
   getOrderTimeline: (token: string, orderId: string) =>
     apiFetch<OrderStatusHistoryEntry[]>(`/orders/${orderId}/timeline`, { token }),
+
+  getCarrierStatus: (token: string) =>
+    apiFetch<{ configuredCarriers: string[] }>("/orders/carriers/status", { token }),
 
   createManualOrder: (token: string, data: {
     personId: string;
