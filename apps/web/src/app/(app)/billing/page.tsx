@@ -60,7 +60,7 @@ function BillingContent() {
     setSwitching(newTier);
     try {
       await api.devSetTier(session.accessToken, newTier);
-      await update();
+      await update({ user: { subscriptionTier: newTier } });
       toast.success(`Switched to ${newTier}.`);
     } catch {
       toast.error("Failed to switch tier.");
