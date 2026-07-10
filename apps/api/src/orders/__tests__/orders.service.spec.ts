@@ -82,6 +82,25 @@ describe('OrdersService - cancel window', () => {
     });
   });
 
+  it('throws BadRequestException for a browser-agent order instead of calling the retailer adapter', async () => {
+    prisma.order.findFirst.mockResolvedValue({
+      id: orderId,
+      userId,
+      status: 'ordered',
+      placedAt: new Date(),
+      retailerKey: 'browser-agent',
+      retailerOrderId: 'REAL-CONF-123',
+      giftRecordId: null,
+      stripePaymentIntentId: null,
+    });
+
+    await expect(service.cancel(userId, orderId)).rejects.toThrow(BadRequestException);
+    await expect(service.cancel(userId, orderId)).rejects.toMatchObject({
+      message: expect.stringContaining("can't be cancelled through the app yet"),
+    });
+    expect(adapter.cancelOrder).not.toHaveBeenCalled();
+  });
+
   it('succeeds when order.placedAt is < 2 hours ago', async () => {
     const mockOrder = {
       id: orderId,

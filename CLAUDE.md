@@ -71,6 +71,7 @@ Expensive background schedulers are gated behind env vars to prevent idle cost b
 | `AUTOPILOT_ENABLED` | `false` (off) | Daily AI suggestion generation (Claude + Exa API costs) |
 | `ORDER_POLLING_ENABLED` | `false` (off) | Retailer order status polling (every 15 min when enabled) |
 | `REMINDERS_ENABLED` | `true` (on) | Daily reminder generation (DB-only, no external API cost) |
+| `AGENT_JOB_RECONCILIATION_ENABLED` | `false` (off) | Browser-agent stuck-job + orphaned-virtual-card cleanup (every 5 min when enabled) — inert until the browser-agent purchasing system is actually deployed |
 
 Set `AUTOPILOT_ENABLED=true` and `ORDER_POLLING_ENABLED=true` in Azure App Service config when real users onboard.
 

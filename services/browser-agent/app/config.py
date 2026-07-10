@@ -35,6 +35,8 @@ RETRY_BACKOFF_SECONDS = [30, 120]  # exponential backoff
 RETRY_MAX_WALL_CLOCK_SECONDS = 300  # 5-minute P95 cap for all attempts
 TRANSIENT_FAILURE_REASONS = {"timeout", "unknown"}  # only these get retried
 
-# AI models
-PRODUCT_MATCH_MODEL = "claude-sonnet-4-6-20260217"  # vision + reasoning for matching
-NAVIGATION_MODEL = "claude-haiku-4-5-20251001"  # fast classification for nav
+# AI models — must match exactly what the LiteLLM-gated production Anthropic
+# key is authorized for (bare aliases, no dated snapshots) — see the same
+# fix in services/ai/app/config.py for the incident this class of bug caused.
+PRODUCT_MATCH_MODEL = "claude-sonnet-4-6"  # vision + reasoning for matching
+NAVIGATION_MODEL = "claude-haiku-4-5"  # fast classification for nav
