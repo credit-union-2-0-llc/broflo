@@ -73,3 +73,19 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     },
   },
 };
+
+// Rank order for "at least X" tier checks — matches
+// apps/api/src/billing/guards/subscription.guard.ts's TIER_RANK exactly.
+// Use tierAtLeast() instead of hardcoding `tier === "pro" || tier === "elite"`
+// style checks, which silently exclude any tier added later (e.g. family
+// was missed in several places until this was introduced).
+export const TIER_RANK: Record<SubscriptionTier, number> = {
+  free: 0,
+  pro: 1,
+  elite: 2,
+  family: 3,
+};
+
+export function tierAtLeast(tier: string, minimum: SubscriptionTier): boolean {
+  return (TIER_RANK[tier as SubscriptionTier] ?? 0) >= TIER_RANK[minimum];
+}

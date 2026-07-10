@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { X, ChevronLeft, ChevronRight, RotateCw, Trash2, Lock } from "lucide-react";
 import { VOICE } from "@broflo/shared/copy/voice";
+import { tierAtLeast } from "@broflo/shared";
 import { api } from "@/lib/api";
 
 interface PhotoLightboxProps {
@@ -176,7 +177,7 @@ export function PhotoLightbox({
 
           {/* Actions */}
           <div className="mt-6 flex gap-2">
-            {tier === "elite" && current.analysisStatus === "complete" && (
+            {tierAtLeast(tier, "elite") && current.analysisStatus === "complete" && (
               <button
                 onClick={() => onReanalyze(currentId)}
                 className="inline-flex items-center gap-1.5 rounded-md border border-white/20 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10"
