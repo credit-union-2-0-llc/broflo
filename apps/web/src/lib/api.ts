@@ -161,6 +161,7 @@ export interface RetailerProduct {
 
 export interface OrderPreviewResponse {
   product: RetailerProduct;
+  retailerKey: string;
   suggestion: { id: string; title: string; description: string };
   person: {
     id: string;

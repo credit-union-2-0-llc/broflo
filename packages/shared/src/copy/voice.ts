@@ -128,6 +128,9 @@ export const VOICE = {
   cancelWindow:
     "You've got 2 hours to cancel. After that, it's in the mail and you're a hero.",
 
+  simulatedPurchaseNotice:
+    "Demo mode: this order is simulated for preview purposes. No product is purchased or shipped, and your card is not charged.",
+
   orderSuccess:
     "Done. They have no idea how easy that was. Keep it that way.",
 

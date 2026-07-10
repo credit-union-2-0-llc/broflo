@@ -153,6 +153,12 @@ export function OrderPreviewModal({
               )}
             </div>
 
+            {preview.retailerKey === "mock" && (
+              <div className="rounded-md bg-amber-glow border border-amber-3/30 px-3 py-2 text-sm text-amber">
+                {VOICE.simulatedPurchaseNotice}
+              </div>
+            )}
+
             <div className="rounded-md bg-s2 border px-3 py-2 text-sm text-muted-foreground">
               {VOICE.cancelWindow}
             </div>
