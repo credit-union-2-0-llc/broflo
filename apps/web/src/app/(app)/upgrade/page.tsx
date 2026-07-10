@@ -108,7 +108,7 @@ function UpgradeContent() {
     setSwitching(tier);
     try {
       await api.devSetTier(session.accessToken, tier);
-      await update();
+      await update({ user: { subscriptionTier: tier } });
       toast.success(`Unlocked ${tier} for testing.`);
     } catch {
       toast.error("Failed to unlock plan.");

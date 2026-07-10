@@ -18,7 +18,7 @@ export function AcceptInviteClient({ token }: { token: string }) {
     setError(null);
     try {
       await api.acceptFamilyInvite(session.accessToken, token);
-      await update();
+      await update({ user: { subscriptionTier: "family" } });
       router.push("/family");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to accept invite.");

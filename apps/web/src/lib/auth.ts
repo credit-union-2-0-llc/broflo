@@ -82,7 +82,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         const u = user as Record<string, unknown>;
         token.accessToken = u.accessToken as string;
@@ -118,13 +118,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
 
-      if (trigger === "update" && token.accessToken) {
-        try {
-          const sub = await api.getSubscription(token.accessToken as string);
-          (token.user as { subscriptionTier: string }).subscriptionTier =
-            sub.subscriptionTier;
-        } catch {
-          // keep existing tier on failure
+      if (trigger === "update") {
+        const suppliedTier = (session as { user?: { subscriptionTier?: string } } | undefined)
+          ?.user?.subscriptionTier;
+        if (suppliedTier) {
+          // Fast path: the caller already knows the new tier (e.g. right
+          // after a dev-tier-override switch or a family-invite accept) —
+          // trust it directly instead of racing a re-fetch against a
+          // possibly still-refreshing access token.
+          (token.user as { subscriptionTier: string }).subscriptionTier = suppliedTier;
+        } else if (token.accessToken) {
+          try {
+            const sub = await api.getSubscription(token.accessToken as string);
+            (token.user as { subscriptionTier: string }).subscriptionTier =
+              sub.subscriptionTier;
+          } catch {
+            // keep existing tier on failure
+          }
         }
       }
       return token;
