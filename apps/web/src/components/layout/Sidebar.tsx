@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut,
   Heart,
+  Sparkles,
 } from "lucide-react";
 
 const sections = [
@@ -38,6 +39,8 @@ const sections = [
     items: [
       { href: "/family", label: "Family", icon: Heart, requiresTier: "family" as SubscriptionTier },
       { href: "/billing", label: "Billing", icon: Settings },
+      // Only the highest tier has nothing left to upgrade to.
+      { href: "/upgrade", label: "Upgrade", icon: Sparkles, hideAtTier: "family" as SubscriptionTier },
     ],
   },
 ] as const;
@@ -52,8 +55,13 @@ export function Sidebar() {
   }
 
   function isVisible(item: object) {
-    const required = (item as { requiresTier?: SubscriptionTier }).requiresTier;
-    return !required || tierAtLeast(tier, required);
+    const { requiresTier, hideAtTier } = item as {
+      requiresTier?: SubscriptionTier;
+      hideAtTier?: SubscriptionTier;
+    };
+    if (requiresTier && !tierAtLeast(tier, requiresTier)) return false;
+    if (hideAtTier && tier === hideAtTier) return false;
+    return true;
   }
 
   return (
