@@ -70,7 +70,7 @@ export function SurveyFormClient({ token, personFirstName, fields }: SurveyFormC
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 410
-          ? "This survey was already submitted — thanks again for filling it out!"
+          ? err.message
           : "Something went wrong submitting this. Try again in a moment.",
       );
     } finally {

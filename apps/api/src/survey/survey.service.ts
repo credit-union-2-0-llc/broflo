@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { randomBytes } from "crypto";
@@ -22,6 +23,8 @@ const SURVEY_TTL_DAYS = 14;
 
 @Injectable()
 export class SurveyService {
+  private readonly log = new Logger(SurveyService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
@@ -101,9 +104,23 @@ export class SurveyService {
       where: { token },
       include: { person: { select: { name: true } } },
     });
-    if (!link) throw new NotFoundException("Survey link not found");
-    if (link.respondedAt) throw new GoneException("This survey has already been completed");
-    if (link.expiresAt < new Date()) throw new GoneException("This survey link has expired");
+    const tokenPrefix = token.slice(0, 8);
+    if (!link) {
+      this.log.warn(`Survey link not found: token=${tokenPrefix}...`);
+      throw new NotFoundException("Survey link not found");
+    }
+    if (link.respondedAt) {
+      this.log.warn(
+        `Survey link already responded: token=${tokenPrefix}... id=${link.id} respondedAt=${link.respondedAt.toISOString()} createdAt=${link.createdAt.toISOString()}`,
+      );
+      throw new GoneException("This survey has already been completed");
+    }
+    if (link.expiresAt < new Date()) {
+      this.log.warn(
+        `Survey link expired: token=${tokenPrefix}... id=${link.id} expiresAt=${link.expiresAt.toISOString()} createdAt=${link.createdAt.toISOString()} now=${new Date().toISOString()}`,
+      );
+      throw new GoneException("This survey link has expired");
+    }
     return link;
   }
 

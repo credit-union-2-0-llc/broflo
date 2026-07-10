@@ -16,7 +16,11 @@ export default async function SurveyPage({
     survey = await api.getPublicSurvey(token);
   } catch (err) {
     if (err instanceof ApiError && err.status === 410) {
-      errorMessage = "This survey has already been completed or has expired — no worries, the link only works once.";
+      // Backend already distinguishes "already completed" from "expired" —
+      // use its specific message instead of a generic catch-all so someone
+      // who never submitted anything isn't told their non-existent
+      // submission was received.
+      errorMessage = `${err.message} — if you think this is wrong, ask them to send you a new link.`;
     } else if (err instanceof ApiError && err.status === 404) {
       errorMessage = "We couldn't find this survey. Double check the link, or ask them to send you a new one.";
     } else {
