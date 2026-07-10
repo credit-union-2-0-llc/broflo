@@ -3,15 +3,18 @@ import { FamilyController } from "./family.controller";
 import { FamilyService } from "./family.service";
 import { SecretSantaController } from "./secret-santa.controller";
 import { SecretSantaService } from "./secret-santa.service";
+import { GiftPoolController } from "./gift-pool.controller";
+import { GiftPoolService } from "./gift-pool.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailService } from "../email/email.service";
 import { NotificationsService } from "../notifications/notifications.service";
 
 @Module({
-  controllers: [FamilyController, SecretSantaController],
+  controllers: [FamilyController, SecretSantaController, GiftPoolController],
   providers: [
     FamilyService,
     SecretSantaService,
+    GiftPoolService,
     PrismaService,
     EmailService,
     NotificationsService,
