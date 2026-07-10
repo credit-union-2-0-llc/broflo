@@ -56,8 +56,12 @@ export class EventsService {
       include: { person: { select: { name: true, deletedAt: true } } },
     });
 
+    // UTC, not local — `date` is a @db.Date column with no time component,
+    // read back as UTC midnight. Comparing it against a *local*-midnight
+    // "today" shifts the result by a day in any timezone behind UTC (see
+    // computeNextOccurrence).
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
 
     const enriched = events
       .filter((e) => !e.person.deletedAt)
@@ -221,14 +225,23 @@ export class EventsService {
 
   // --- Helpers ---
 
+  // Everything here runs in UTC, never local time. `eventDate` comes from a
+  // @db.Date column (UTC midnight, no real time component) and `today` is
+  // expected to be UTC midnight too (see callers) — mixing UTC-parsed dates
+  // with local-timezone getters (the previous bug) silently shifts the
+  // result by a day in any timezone behind UTC.
   computeNextOccurrence(eventDate: Date, isRecurring: boolean, today: Date): Date {
     const d = new Date(eventDate);
     if (!isRecurring) return d;
 
-    const thisYear = new Date(today.getFullYear(), d.getMonth(), d.getDate());
-    if (thisYear >= today) return thisYear;
+    const month = d.getUTCMonth();
+    const day = d.getUTCDate();
+    const todayTime = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
 
-    return new Date(today.getFullYear() + 1, d.getMonth(), d.getDate());
+    const thisYear = new Date(Date.UTC(today.getUTCFullYear(), month, day));
+    if (thisYear.getTime() >= todayTime) return thisYear;
+
+    return new Date(Date.UTC(today.getUTCFullYear() + 1, month, day));
   }
 
   private computeDaysUntil(target: Date, today: Date): number {

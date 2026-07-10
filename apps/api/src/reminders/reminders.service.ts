@@ -17,7 +17,7 @@ export class RemindersService {
 
   async listActive(userId: string) {
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
 
     return this.prisma.reminder.findMany({
       where: {
@@ -55,11 +55,12 @@ export class RemindersService {
   }
 
   async generateReminders() {
+    // UTC, not local — see EventsService.computeNextOccurrence's comment.
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
 
     const horizon = new Date(today);
-    horizon.setDate(horizon.getDate() + 30);
+    horizon.setUTCDate(horizon.getUTCDate() + 30);
 
     // Fetch all events for all users, including person for deletedAt check
     const events = await this.prisma.event.findMany({
@@ -78,7 +79,7 @@ export class RemindersService {
 
       for (const lead of LEAD_DAYS) {
         const scheduledFor = new Date(nextOcc);
-        scheduledFor.setDate(scheduledFor.getDate() - lead);
+        scheduledFor.setUTCDate(scheduledFor.getUTCDate() - lead);
 
         // Only create reminders that are within the 30-day window from today
         if (scheduledFor < today || scheduledFor > horizon) continue;

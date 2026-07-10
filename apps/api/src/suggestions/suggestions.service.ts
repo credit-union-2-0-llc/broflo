@@ -10,6 +10,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { ProductSearchService } from "./product-search.service";
 import { EntitlementsService } from "../entitlements/entitlements.service";
+import { EventsService } from "../events/events.service";
 import type {
   GenerateSuggestionsDto,
   SelectSuggestionDto,
@@ -33,6 +34,7 @@ export class SuggestionsService {
     private readonly redis: RedisService,
     private readonly productSearch: ProductSearchService,
     private readonly entitlements: EntitlementsService,
+    private readonly events: EventsService,
   ) {}
 
   async generate(userId: string, dto: GenerateSuggestionsDto) {
@@ -110,15 +112,12 @@ export class SuggestionsService {
     const budgetMax = event.budgetMaxCents ?? person.budgetMaxCents ?? 10000;
     const budgetSource = event.budgetMinCents != null ? "event" : person.budgetMinCents != null ? "person" : "default";
 
-    // Compute next occurrence + days until
+    // Compute next occurrence + days until — UTC, not local (see
+    // EventsService.computeNextOccurrence's comment for why mixing UTC-
+    // parsed dates with local-timezone math silently shifts this by a day).
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const eventDate = new Date(event.date);
-    let nextOcc = new Date(eventDate);
-    if (event.isRecurring) {
-      nextOcc.setFullYear(today.getFullYear());
-      if (nextOcc < today) nextOcc.setFullYear(today.getFullYear() + 1);
-    }
+    today.setUTCHours(0, 0, 0, 0);
+    const nextOcc = this.events.computeNextOccurrence(event.date, event.isRecurring, today);
     const daysUntil = Math.ceil((nextOcc.getTime() - today.getTime()) / 86400000);
 
     // Birthday/anniversary month-day extraction
@@ -470,12 +469,9 @@ export class SuggestionsService {
 
     // Create or update GiftRecord
     const event = await this.prisma.event.findUniqueOrThrow({ where: { id: eventId } });
-    const eventDate = new Date(event.date);
-    if (event.isRecurring) {
-      const now = new Date();
-      eventDate.setFullYear(now.getFullYear());
-      if (eventDate < now) eventDate.setFullYear(now.getFullYear() + 1);
-    }
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const eventDate = this.events.computeNextOccurrence(event.date, event.isRecurring, today);
 
     const existingRecord = await this.prisma.giftRecord.findFirst({
       where: { eventId, userId, source: "suggestion" },
