@@ -34,8 +34,11 @@ export class AutopilotScheduler {
     if (!this.enabled) return;
     this.log.log('Autopilot cron started');
 
+    // UTC, not local — Event.date is a @db.Date column (UTC midnight, no
+    // real time component); comparing it against local-midnight bounds
+    // shifts the window by a day in any timezone behind UTC.
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
 
     // Find active rules for users whose tier has autopilot enabled
     const autopilotTierKeys = await this.entitlements.getEnabledTierKeys('autopilotEnabled');
@@ -82,9 +85,9 @@ export class AutopilotScheduler {
     rule: Awaited<ReturnType<typeof this.findRuleWithRelations>>,
     today: Date,
   ) {
-    // Find upcoming events within lead days window
+    // Find upcoming events within lead days window (UTC, matching `today`)
     const leadDate = new Date(today);
-    leadDate.setDate(leadDate.getDate() + rule.leadDays);
+    leadDate.setUTCDate(leadDate.getUTCDate() + rule.leadDays);
 
     const events = await this.prisma.event.findMany({
       where: {

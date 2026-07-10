@@ -83,8 +83,9 @@ export class FamilyService {
       include: { person: { select: { name: true } } },
     });
 
+    // UTC, not local — see computeNextOccurrence's comment.
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
 
     return events
       .map((e) => {
