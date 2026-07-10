@@ -11,13 +11,23 @@ export class EmailService {
     this.resend = apiKey ? new Resend(apiKey) : null;
   }
 
+  // The Resend SDK resolves normally with `{ error }` on delivery failure —
+  // it does NOT throw. Without this, a rejected send (bad domain, invalid
+  // recipient, rate limit, etc.) is silently indistinguishable from success.
+  private assertSent(result: { error: { message: string } | null }, context: string) {
+    if (result.error) {
+      this.log.error(`Failed to send ${context}: ${result.error.message}`);
+      throw new Error(`Email send failed (${context}): ${result.error.message}`);
+    }
+  }
+
   async sendOtpCode(email: string, code: string): Promise<void> {
     if (!this.resend) {
       this.log.debug(`DEV MODE — OTP for ${email}: ${code}`);
       return;
     }
 
-    await this.resend.emails.send({
+    const result = await this.resend.emails.send({
       from: process.env.EMAIL_FROM || "Broflo <noreply@broflo.ai>",
       to: email,
       subject: `${code} is your Broflo code`,
@@ -33,6 +43,7 @@ export class EmailService {
       `,
       text: `Your Broflo sign-in code is: ${code}\n\nThis code expires in 5 minutes.\n\nIf you didn't request this, ignore this email.`,
     });
+    this.assertSent(result, "OTP code");
   }
 
   async sendPaymentFailedEmail(email: string): Promise<void> {
@@ -41,7 +52,7 @@ export class EmailService {
       return;
     }
 
-    await this.resend.emails.send({
+    const result = await this.resend.emails.send({
       from: process.env.EMAIL_FROM || "Broflo <noreply@broflo.ai>",
       to: email,
       subject: "Your Broflo payment didn't go through",
@@ -56,6 +67,7 @@ export class EmailService {
       `,
       text: `Your Broflo payment didn't go through. We've paused your Pro perks until it's sorted — your data and dossiers are all still there. Update your payment method at ${process.env.WEB_URL || "https://broflo.ai"}/billing to pick back up.`,
     });
+    this.assertSent(result, "payment-failed notice");
   }
 
   async sendSurveyInvite(
@@ -71,7 +83,7 @@ export class EmailService {
       return;
     }
 
-    await this.resend.emails.send({
+    const result = await this.resend.emails.send({
       from: process.env.EMAIL_FROM || "Broflo <noreply@broflo.ai>",
       to: recipientEmail,
       subject: `${giverName} wants to get you something great`,
@@ -87,6 +99,7 @@ export class EmailService {
       `,
       text: `${giverName} is putting together something great for you and could use your help. Tell them what you like: ${link}\n\nThis link expires in 14 days and can only be used once.`,
     });
+    this.assertSent(result, "survey invite");
   }
 
   async sendFamilyInvite(
@@ -102,7 +115,7 @@ export class EmailService {
       return;
     }
 
-    await this.resend.emails.send({
+    const result = await this.resend.emails.send({
       from: process.env.EMAIL_FROM || "Broflo <noreply@broflo.ai>",
       to: recipientEmail,
       subject: `${ownerName} added you to ${familyName} on Broflo`,
@@ -118,5 +131,6 @@ export class EmailService {
       `,
       text: `${ownerName} added you to ${familyName} on Broflo. Join here: ${link}\n\nThis invite expires in 14 days.`,
     });
+    this.assertSent(result, "family invite");
   }
 }
