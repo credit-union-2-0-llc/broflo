@@ -222,10 +222,18 @@ export function SuggestionsView({
             Find Gift Ideas
           </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
             No suggestions yet. Click &ldquo;Find Gift Ideas&rdquo; to get started.
           </p>
+          {error && (
+            <div className="text-sm text-destructive">
+              {error}
+              <Button variant="outline" size="sm" className="ml-2" onClick={generate}>
+                Try Again
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     );

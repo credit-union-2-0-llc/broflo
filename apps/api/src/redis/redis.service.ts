@@ -11,6 +11,13 @@ export class RedisService implements OnModuleDestroy {
       const url = process.env.REDIS_URL;
       if (url) {
         this.client = new Redis(url);
+        // ioredis emits 'error' for any transient connection issue (and
+        // rethrows as an uncaught exception, crashing the whole process, if
+        // nothing is listening) — log instead so a blip on the cache just
+        // logs and reconnects rather than taking down every in-flight request.
+        this.client.on("error", (err) => {
+          this.logger.error(`Redis connection error: ${err.message}`);
+        });
       } else {
         this.logger.warn("REDIS_URL not set — using in-memory fallback");
         this.client = null as unknown as Redis;
