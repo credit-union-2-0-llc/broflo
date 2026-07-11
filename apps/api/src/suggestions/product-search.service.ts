@@ -175,35 +175,43 @@ export class ProductSearchService {
       clearTimeout(timeout);
     }
 
-    const candidates = rawResults
-      .map((r) => {
-        const url = r.url as string | undefined;
-        const priceMatch = (r.text as string)?.match(PRICE_REGEX);
-        if (!url || !priceMatch) return null;
-        return {
-          url,
-          priceCents: Math.round(parseFloat(priceMatch[1]) * 100),
-          retailer: this.hostnameOf(url),
-        };
-      })
-      .filter((c): c is { url: string; priceCents: number; retailer: string } => c !== null);
+    const rawUrls = rawResults
+      .map((r) => ({ url: r.url as string | undefined, snippetText: r.text as string | undefined }))
+      .filter((r): r is { url: string; snippetText: string | undefined } => !!r.url);
 
-    if (candidates.length === 0) return [];
+    if (rawUrls.length === 0) {
+      this.logger.warn(`Exa returned no usable URLs for "${query}"`);
+      return [];
+    }
 
     void retailerHint; // reserved — not used for the broad multi-option search
 
-    const liveChecks = await Promise.all(
-      candidates.map((c) => this.isStillAvailable(c.url)),
+    // Liveness + price extraction happen together against the same fetch:
+    // Exa's snippet is truncated to 500 characters and frequently doesn't
+    // reach a price, so a candidate is no longer rejected just because the
+    // snippet came up short — the full page (already being fetched to check
+    // it's still live) is a much more reliable source.
+    const checked = await Promise.all(
+      rawUrls.map((r) => this.checkAvailabilityAndPrice(r.url, r.snippetText)),
     );
 
     const seenRetailers = new Set<string>();
     const options: BuyOption[] = [];
-    candidates.forEach((c, i) => {
-      if (!liveChecks[i]) return;
-      if (seenRetailers.has(c.retailer)) return;
-      seenRetailers.add(c.retailer);
-      options.push(c);
+    let liveCount = 0;
+    checked.forEach((result, i) => {
+      if (!result) return;
+      liveCount++;
+      const retailer = this.hostnameOf(rawUrls[i].url);
+      if (seenRetailers.has(retailer)) return;
+      seenRetailers.add(retailer);
+      options.push({ url: rawUrls[i].url, priceCents: result.priceCents, retailer });
     });
+
+    if (options.length === 0) {
+      this.logger.warn(
+        `Buy-options search for "${query}" found ${rawUrls.length} candidate(s), ${liveCount} live, 0 with an extractable price`,
+      );
+    }
 
     return options
       .sort((a, b) => a.priceCents - b.priceCents)
@@ -218,16 +226,31 @@ export class ProductSearchService {
     }
   }
 
-  private async isStillAvailable(url: string): Promise<boolean> {
+  private async checkAvailabilityAndPrice(
+    url: string,
+    snippetText: string | undefined,
+  ): Promise<{ priceCents: number } | null> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), LIVENESS_TIMEOUT_MS);
     try {
       const res = await fetch(url, { signal: controller.signal });
-      if (!res.ok) return false;
-      const text = (await res.text()).toLowerCase();
-      return !GONE_TEXT_INDICATORS.some((indicator) => text.includes(indicator));
+      if (!res.ok) return null;
+
+      const pageText = await res.text();
+      const lowerPageText = pageText.toLowerCase();
+      if (GONE_TEXT_INDICATORS.some((indicator) => lowerPageText.includes(indicator))) return null;
+
+      // Prefer Exa's snippet for the price (a curated, product-focused
+      // extract) — fall back to the raw page (truncated, since matching
+      // against the entire page risks picking up an unrelated price from
+      // navigation/upsells) only if the snippet didn't have one.
+      const priceMatch =
+        snippetText?.match(PRICE_REGEX) ?? pageText.slice(0, 5000).match(PRICE_REGEX);
+      if (!priceMatch) return null;
+
+      return { priceCents: Math.round(parseFloat(priceMatch[1]) * 100) };
     } catch {
-      return false;
+      return null;
     } finally {
       clearTimeout(timeout);
     }
