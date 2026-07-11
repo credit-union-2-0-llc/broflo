@@ -187,13 +187,7 @@ describe("ProductSearchService", () => {
 
   describe("findBuyOptions", () => {
     function mockExaResults(results: Array<{ url: string; text: string }>) {
-      mockFetch.mockImplementation(async (url: string) => {
-        if (url === "https://api.exa.ai/search") {
-          return { ok: true, json: async () => ({ results }) };
-        }
-        // Liveness check — default to a healthy page unless overridden below.
-        return { ok: true, text: async () => "In stock and ready to ship." };
-      });
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ results }) });
     }
 
     it("returns an empty array when EXA_API_KEY is not set", async () => {
@@ -203,30 +197,34 @@ describe("ProductSearchService", () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it("filters out a result whose liveness check reports the page is gone", async () => {
+    it("makes a single Exa call and returns quickly — no per-candidate liveness fetches", async () => {
+      // Regression guard for the production hang: an earlier version fired
+      // an additional fetch per candidate to verify it wasn't a dead link,
+      // which could stall the whole request past a minute if one retailer's
+      // response didn't respect its own abort signal. This asserts the
+      // total call count stays at exactly one (the Exa search) regardless
+      // of how many results come back.
       process.env.EXA_API_KEY = "test-key";
-      mockFetch.mockImplementation(async (url: string) => {
-        if (url === "https://api.exa.ai/search") {
-          return {
-            ok: true,
-            json: async () => ({
-              results: [
-                { url: "https://nike.com/dead-product", text: "$45.00" },
-                { url: "https://target.com/live-product", text: "$40.00" },
-              ],
-            }),
-          };
-        }
-        if (url === "https://nike.com/dead-product") {
-          return { ok: true, text: async () => "THE PRODUCT YOU ARE LOOKING FOR IS NO LONGER AVAILABLE" };
-        }
-        return { ok: true, text: async () => "Add to cart" };
-      });
+      mockExaResults([
+        { url: "https://a.com/1", text: "$30.00" },
+        { url: "https://b.com/1", text: "$40.00" },
+        { url: "https://c.com/1", text: "$50.00" },
+      ]);
 
-      const result = await service.findBuyOptions("Fleece hoodie");
+      const result = await service.findBuyOptions("Desk lamp");
 
-      expect(result).toHaveLength(1);
-      expect(result[0].url).toBe("https://target.com/live-product");
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(result).toHaveLength(3);
+    });
+
+    it("uses the same retailer-hint-biased query as the proven single-search enrichment", async () => {
+      process.env.EXA_API_KEY = "test-key";
+      mockExaResults([{ url: "https://nike.com/1", text: "$45.00" }]);
+
+      await service.findBuyOptions("Fleece hoodie", "Nike");
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.query).toBe("Fleece hoodie Nike product");
     });
 
     it("dedupes results from the same hostname, keeping only the first", async () => {
@@ -284,60 +282,6 @@ describe("ProductSearchService", () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].url).toBe("https://b.com/1");
-    });
-
-    it("does not exclude a candidate whose liveness check times out or errors — ambiguous, not proof it's dead", async () => {
-      process.env.EXA_API_KEY = "test-key";
-      mockFetch.mockImplementation(async (url: string) => {
-        if (url === "https://api.exa.ai/search") {
-          return {
-            ok: true,
-            json: async () => ({
-              results: [{ url: "https://store.realmadrid.com/jersey", text: "$79.99" }],
-            }),
-          };
-        }
-        throw new Error("timeout");
-      });
-
-      const result = await service.findBuyOptions("Jersey");
-
-      expect(result).toHaveLength(1);
-      expect(result[0].url).toBe("https://store.realmadrid.com/jersey");
-    });
-
-    it("does not exclude a candidate that returns a bot-block-style status (403/5xx) — ambiguous, not proof it's dead", async () => {
-      process.env.EXA_API_KEY = "test-key";
-      mockFetch.mockImplementation(async (url: string) => {
-        if (url === "https://api.exa.ai/search") {
-          return {
-            ok: true,
-            json: async () => ({ results: [{ url: "https://etsy.com/listing/1", text: "$45.00" }] }),
-          };
-        }
-        return { ok: false, status: 403 };
-      });
-
-      const result = await service.findBuyOptions("Scarf");
-
-      expect(result).toHaveLength(1);
-    });
-
-    it("does exclude a candidate that returns a definitive 404/410", async () => {
-      process.env.EXA_API_KEY = "test-key";
-      mockFetch.mockImplementation(async (url: string) => {
-        if (url === "https://api.exa.ai/search") {
-          return {
-            ok: true,
-            json: async () => ({ results: [{ url: "https://a.com/gone", text: "$45.00" }] }),
-          };
-        }
-        return { ok: false, status: 404 };
-      });
-
-      const result = await service.findBuyOptions("Scarf");
-
-      expect(result).toHaveLength(0);
     });
   });
 
