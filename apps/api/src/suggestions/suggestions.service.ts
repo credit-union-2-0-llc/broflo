@@ -242,6 +242,7 @@ export class SuggestionsService {
         title: s.title as string,
         retailerHint: (s.retailer_hint as string) || null,
         estimatedPriceMinCents: s.estimated_price_min_cents as number,
+        estimatedPriceMaxCents: s.estimated_price_max_cents as number,
       })),
     );
 
@@ -583,6 +584,7 @@ export class SuggestionsService {
       suggestion.title,
       suggestion.retailerHint,
       suggestion.estimatedPriceMinCents,
+      suggestion.estimatedPriceMaxCents,
     );
     return { options };
   }
