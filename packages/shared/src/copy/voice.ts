@@ -148,6 +148,19 @@ export const VOICE = {
 
   orderFailed: "Something went wrong placing your order. Try again.",
 
+  buyNowCta: "Buy Now",
+
+  confirmPurchaseTitle: "What did you pay?",
+
+  confirmPurchaseBody:
+    "We'll update your gift history with the real price — skip this and we'll keep our estimate.",
+
+  confirmPurchaseCta: "Save Price",
+
+  confirmPurchaseSkip: "Skip",
+
+  confirmPurchaseSuccess: "Got it. Added to your gift history.",
+
   tracking: {
     emptyState: "No orders yet. Find someone a gift and we'll handle the rest.",
     inFlight: "Your gifts are on the move.",

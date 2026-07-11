@@ -215,4 +215,25 @@ export class GiftsService {
       })),
     };
   }
+
+  // --- PATCH /gifts/:giftId/confirm-purchase ---
+  // Corrects a suggestion-sourced GiftRecord's estimated price to what the
+  // user actually paid after buying it themselves via the "Buy Now" link.
+  // Deliberately narrow: only for source: 'suggestion' records, price-only,
+  // no Broflo Score change (the record already earned its points at
+  // selection time — this is a correction, not a new gift).
+  async confirmPurchase(userId: string, giftId: string, dto: { priceCents: number }) {
+    const gift = await this.prisma.giftRecord.findFirst({
+      where: { id: giftId, userId },
+    });
+    if (!gift) throw new NotFoundException("Gift record not found");
+    if (gift.source !== "suggestion") {
+      throw new BadRequestException("Only suggestion-sourced gifts can have their price confirmed this way");
+    }
+
+    return this.prisma.giftRecord.update({
+      where: { id: giftId },
+      data: { priceCents: dto.priceCents },
+    });
+  }
 }

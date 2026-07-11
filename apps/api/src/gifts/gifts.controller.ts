@@ -11,7 +11,7 @@ import {
 } from "@nestjs/common";
 import { GiftsService } from "./gifts.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { CreateGiftRecordDto, RecordFeedbackDto } from "./dto/gifts.dto";
+import { CreateGiftRecordDto, RecordFeedbackDto, ConfirmPurchaseDto } from "./dto/gifts.dto";
 
 @Controller()
 export class GiftsController {
@@ -50,5 +50,14 @@ export class GiftsController {
   @Get("gifts/recent")
   getRecentGifts(@CurrentUser("id") userId: string) {
     return this.service.getRecentGifts(userId);
+  }
+
+  @Patch("gifts/:giftId/confirm-purchase")
+  confirmPurchase(
+    @CurrentUser("id") userId: string,
+    @Param("giftId", ParseUUIDPipe) giftId: string,
+    @Body() dto: ConfirmPurchaseDto,
+  ) {
+    return this.service.confirmPurchase(userId, giftId, dto);
   }
 }
