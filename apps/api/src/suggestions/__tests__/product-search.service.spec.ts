@@ -159,6 +159,27 @@ describe("ProductSearchService", () => {
     expect(result.priceCents).toBe(7999);
   });
 
+  it("picks the match closest to the estimate when text has multiple dollar figures", async () => {
+    // "Free shipping over $50" comes first in the text, but $89.99 is the
+    // one that actually matches a $70-95 estimated jersey.
+    process.env.EXA_API_KEY = "test-key";
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        results: [
+          {
+            url: "https://realmadrid.com/jersey",
+            image: "https://realmadrid.com/img.jpg",
+            text: "Free shipping over $50. Real Madrid Home Jersey — $89.99. Save $10 with membership.",
+          },
+        ],
+      }),
+    });
+
+    const result = await service.searchProduct("Real Madrid Jersey", "Adidas", 7000, 9500);
+    expect(result.priceCents).toBe(8999);
+  });
+
   it("searches multiple products in parallel", async () => {
     process.env.EXA_API_KEY = "test-key";
 
@@ -299,6 +320,60 @@ describe("ProductSearchService", () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].url).toBe("https://b.com/1");
+    });
+
+    it("picks the price closest to the estimate when a candidate's snippet has multiple dollar figures", async () => {
+      process.env.EXA_API_KEY = "test-key";
+      mockExaResults([
+        {
+          url: "https://a.com/1",
+          text: "Free shipping over $50. Fleece Hoodie — $89.99. Save $10 with membership.",
+        },
+      ]);
+
+      const result = await service.findBuyOptions("Fleece hoodie", null, 7000, 9500);
+
+      expect(result[0].priceCents).toBe(8999);
+    });
+
+    it("fires a bounded fallback query when the primary retailer-biased query yields fewer than 2 retailers", async () => {
+      process.env.EXA_API_KEY = "test-key";
+      mockExaResults([{ url: "https://nike.com/1", text: "$45.00" }]);
+      mockExaResults([
+        { url: "https://nike.com/1", text: "$45.00" },
+        { url: "https://footlocker.com/1", text: "$48.00" },
+      ]);
+
+      const result = await service.findBuyOptions("Running shoes", "Nike");
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      const secondBody = JSON.parse(mockFetch.mock.calls[1][1].body);
+      expect(secondBody.query).toBe("Running shoes product listing");
+      expect(result.map((o) => o.retailer).sort()).toEqual(["footlocker.com", "nike.com"]);
+    });
+
+    it("does not fire the fallback query when the primary query already yields 2+ retailers", async () => {
+      process.env.EXA_API_KEY = "test-key";
+      mockExaResults([
+        { url: "https://nike.com/1", text: "$45.00" },
+        { url: "https://footlocker.com/1", text: "$48.00" },
+      ]);
+
+      await service.findBuyOptions("Running shoes", "Nike");
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("sorts a known-reliable retailer above an unknown one even at a higher price", async () => {
+      process.env.EXA_API_KEY = "test-key";
+      mockExaResults([
+        { url: "https://obscure-retailer.io/1", text: "$40.00" },
+        { url: "https://amazon.com/1", text: "$55.00" },
+      ]);
+
+      const result = await service.findBuyOptions("Desk lamp");
+
+      expect(result.map((o) => o.retailer)).toEqual(["amazon.com", "obscure-retailer.io"]);
     });
   });
 
