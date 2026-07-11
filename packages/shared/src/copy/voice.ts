@@ -161,6 +161,12 @@ export const VOICE = {
 
   confirmPurchaseSuccess: "Got it. Added to your gift history.",
 
+  buyOptionsTitle: "Where to buy it",
+
+  buyOptionsLoading: "Checking who has it in stock...",
+
+  buyOptionsEmpty: "Couldn't find anywhere to buy this right now. Try again in a bit.",
+
   tracking: {
     emptyState: "No orders yet. Find someone a gift and we'll handle the rest.",
     inFlight: "Your gifts are on the move.",

@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { X, Check, ShoppingBag, ExternalLink } from "lucide-react";
 import { VOICE } from "@broflo/shared";
@@ -33,26 +33,18 @@ interface SuggestionCardProps {
 
 function BuyNowButton({
   suggestionId,
-  productUrl,
   retailerHint,
   onBuyNow,
 }: {
   suggestionId: string;
-  productUrl: string;
   retailerHint: string | null;
-  onBuyNow?: (suggestionId: string) => void;
+  onBuyNow: (suggestionId: string) => void;
 }) {
   return (
-    <a
-      href={productUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={() => onBuyNow?.(suggestionId)}
-      className={buttonVariants({ variant: "default", size: "sm" })}
-    >
+    <Button variant="default" size="sm" onClick={() => onBuyNow(suggestionId)}>
       <ExternalLink className="mr-1 h-3.5 w-3.5" />
       {retailerHint ? `Buy on ${retailerHint}` : VOICE.buyNowCta}
-    </a>
+    </Button>
   );
 }
 
@@ -201,10 +193,9 @@ export function SuggestionCard({
             Not this one
           </Button>
           <div className="flex items-center gap-2">
-            {s.isSelected && s.productUrl && (
+            {s.isSelected && onBuyNow && (
               <BuyNowButton
                 suggestionId={s.id}
-                productUrl={s.productUrl}
                 retailerHint={s.retailerHint}
                 onBuyNow={onBuyNow}
               />
