@@ -258,6 +258,23 @@ describe("ProductSearchService", () => {
       expect(result.map((o) => o.priceCents)).toEqual([1000, 1500, 2000, 3500]);
     });
 
+    it("rejects a category/collection listing page even if it has a plausible price", async () => {
+      // Real bug report: Exa returned a Real Madrid store collection page
+      // (/collections/jerseys-kits-25-26) with a plausible-looking price in
+      // its snippet, but the collection itself showed "0 products" — a
+      // browsable listing page isn't the same as a specific item's page.
+      process.env.EXA_API_KEY = "test-key";
+      mockExaResults([
+        { url: "https://us.shop.realmadrid.com/collections/jerseys-kits-25-26", text: "$290.00" },
+        { url: "https://us.shop.realmadrid.com/products/home-jersey-25-26", text: "$95.00" },
+      ]);
+
+      const result = await service.findBuyOptions("Real Madrid Jersey", null, 7000);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].url).toContain("/products/");
+    });
+
     it("skips a candidate with no extractable price in Exa's snippet", async () => {
       process.env.EXA_API_KEY = "test-key";
       mockExaResults([
