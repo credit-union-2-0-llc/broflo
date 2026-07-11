@@ -1,4 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { GiftsService } from "../gifts.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RedisService } from "../../redis/redis.service";
@@ -8,7 +9,7 @@ describe("GiftsService", () => {
   let service: GiftsService;
   let prisma: {
     person: { findFirst: jest.Mock };
-    giftRecord: { findMany: jest.Mock; count: jest.Mock; aggregate: jest.Mock };
+    giftRecord: { findMany: jest.Mock; count: jest.Mock; aggregate: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
   };
   let entitlements: { isFeatureEnabled: jest.Mock };
 
@@ -19,6 +20,8 @@ describe("GiftsService", () => {
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
         aggregate: jest.fn().mockResolvedValue({ _sum: { priceCents: 5000 }, _avg: { rating: 4.5 } }),
+        findFirst: jest.fn(),
+        update: jest.fn(),
       },
     };
     entitlements = { isFeatureEnabled: jest.fn() };
@@ -59,6 +62,35 @@ describe("GiftsService", () => {
       expect(result.meta.averageRating).toBe(4.5);
       const whereArg = prisma.giftRecord.findMany.mock.calls[0][0].where;
       expect(whereArg.givenAt).toBeDefined();
+    });
+  });
+
+  describe("confirmPurchase", () => {
+    it("updates priceCents for a suggestion-sourced gift owned by the user", async () => {
+      prisma.giftRecord.findFirst.mockResolvedValue({ id: "g1", userId: "u1", source: "suggestion" });
+      prisma.giftRecord.update.mockResolvedValue({ id: "g1", priceCents: 4250 });
+
+      const result = await service.confirmPurchase("u1", "g1", { priceCents: 4250 });
+
+      expect(prisma.giftRecord.update).toHaveBeenCalledWith({
+        where: { id: "g1" },
+        data: { priceCents: 4250 },
+      });
+      expect(result.priceCents).toBe(4250);
+    });
+
+    it("throws NotFoundException when the gift doesn't exist or isn't owned by the user", async () => {
+      prisma.giftRecord.findFirst.mockResolvedValue(null);
+
+      await expect(service.confirmPurchase("u1", "g1", { priceCents: 4250 })).rejects.toThrow(NotFoundException);
+      expect(prisma.giftRecord.update).not.toHaveBeenCalled();
+    });
+
+    it("throws BadRequestException for a manually-logged (non-suggestion) gift", async () => {
+      prisma.giftRecord.findFirst.mockResolvedValue({ id: "g1", userId: "u1", source: "manual" });
+
+      await expect(service.confirmPurchase("u1", "g1", { priceCents: 4250 })).rejects.toThrow(BadRequestException);
+      expect(prisma.giftRecord.update).not.toHaveBeenCalled();
     });
   });
 });

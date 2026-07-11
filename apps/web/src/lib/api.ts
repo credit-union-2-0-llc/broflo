@@ -572,6 +572,13 @@ export const api = {
       token,
     }),
 
+  confirmPurchase: (token: string, giftId: string, data: { priceCents: number }) =>
+    apiFetch<GiftRecord>(`/gifts/${giftId}/confirm-purchase`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+      token,
+    }),
+
   getRecentGifts: (token: string) =>
     apiFetch<RecentGiftsResponse>("/gifts/recent", { token }),
 

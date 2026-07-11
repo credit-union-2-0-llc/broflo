@@ -14,6 +14,7 @@ import { SuggestionCard } from "./suggestion-card";
 import { GuidedInterview } from "./guided-interview";
 import { OrderPreviewModal } from "@/components/orders/order-preview-modal";
 import { CancelCountdown } from "@/components/orders/cancel-countdown";
+import { ConfirmPurchaseDialog } from "./confirm-purchase-dialog";
 
 interface SuggestionsViewProps {
   eventId: string;
@@ -49,6 +50,7 @@ export function SuggestionsView({
   const [orderedSuggestions, setOrderedSuggestions] = useState<Map<string, { orderId: string; status: string; placedAt: string }>>(new Map());
   // Map from suggestionId -> giftRecordId (set when suggestion is selected)
   const [suggestionGiftRecordIds, setSuggestionGiftRecordIds] = useState<Map<string, string>>(new Map());
+  const [confirmingPurchaseSuggestionId, setConfirmingPurchaseSuggestionId] = useState<string | null>(null);
 
   // Rotate loading messages
   useEffect(() => {
@@ -156,6 +158,12 @@ export function SuggestionsView({
 
   function handleOrderThis(suggestionId: string) {
     setOrderingSuggestionId(suggestionId);
+  }
+
+  function handleBuyNow(suggestionId: string) {
+    if (suggestionGiftRecordIds.has(suggestionId)) {
+      setConfirmingPurchaseSuggestionId(suggestionId);
+    }
   }
 
   function handleOrderPlaced(order: Order) {
@@ -351,6 +359,7 @@ export function SuggestionsView({
                     onOrderThis={tier !== "free" ? handleOrderThis : undefined}
                     orderStatus={orderInfo?.status ?? null}
                     orderPlacedAt={orderInfo?.placedAt ?? null}
+                    onBuyNow={handleBuyNow}
                   />
                   {orderInfo?.status === "ordered" && orderInfo.placedAt && (
                     <div className="mt-1 flex justify-end">
@@ -408,6 +417,27 @@ export function SuggestionsView({
         onOrderPlaced={handleOrderPlaced}
       />
     )}
+
+    {confirmingPurchaseSuggestionId && (() => {
+      const confirmingGiftRecordId = suggestionGiftRecordIds.get(confirmingPurchaseSuggestionId);
+      const confirmingSuggestion = suggestions.find((s) => s.id === confirmingPurchaseSuggestionId);
+      if (!confirmingGiftRecordId || !confirmingSuggestion) return null;
+      const defaultPriceCents =
+        confirmingSuggestion.productSourcePriceCents ??
+        Math.round(
+          (confirmingSuggestion.estimatedPriceMinCents + confirmingSuggestion.estimatedPriceMaxCents) / 2,
+        );
+      return (
+        <ConfirmPurchaseDialog
+          open={!!confirmingPurchaseSuggestionId}
+          onOpenChange={(open) => { if (!open) setConfirmingPurchaseSuggestionId(null); }}
+          giftRecordId={confirmingGiftRecordId}
+          token={token}
+          defaultPriceCents={defaultPriceCents}
+          onConfirmed={() => setConfirmingPurchaseSuggestionId(null)}
+        />
+      );
+    })()}
   </>
   );
 }

@@ -43,3 +43,9 @@ export class RecordFeedbackDto {
   @MaxLength(500)
   note?: string;
 }
+
+export class ConfirmPurchaseDto {
+  @IsInt()
+  @Min(0)
+  priceCents!: number;
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { X, Check, ShoppingBag, ExternalLink } from "lucide-react";
 import { VOICE } from "@broflo/shared";
@@ -28,6 +28,32 @@ interface SuggestionCardProps {
   onOrderThis?: (suggestionId: string) => void;
   orderStatus?: string | null;
   orderPlacedAt?: string | null;
+  onBuyNow?: (suggestionId: string) => void;
+}
+
+function BuyNowButton({
+  suggestionId,
+  productUrl,
+  retailerHint,
+  onBuyNow,
+}: {
+  suggestionId: string;
+  productUrl: string;
+  retailerHint: string | null;
+  onBuyNow?: (suggestionId: string) => void;
+}) {
+  return (
+    <a
+      href={productUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={() => onBuyNow?.(suggestionId)}
+      className={buttonVariants({ variant: "default", size: "sm" })}
+    >
+      <ExternalLink className="mr-1 h-3.5 w-3.5" />
+      {retailerHint ? `Buy on ${retailerHint}` : VOICE.buyNowCta}
+    </a>
+  );
 }
 
 function OrderActions({
@@ -80,6 +106,7 @@ export function SuggestionCard({
   onOrderThis,
   orderStatus,
   orderPlacedAt,
+  onBuyNow,
 }: SuggestionCardProps) {
   const s = suggestion;
   const priceRange = `${dollars(s.estimatedPriceMinCents)} – ${dollars(s.estimatedPriceMaxCents)}`;
@@ -174,6 +201,14 @@ export function SuggestionCard({
             Not this one
           </Button>
           <div className="flex items-center gap-2">
+            {s.isSelected && s.productUrl && (
+              <BuyNowButton
+                suggestionId={s.id}
+                productUrl={s.productUrl}
+                retailerHint={s.retailerHint}
+                onBuyNow={onBuyNow}
+              />
+            )}
             {s.isSelected && (
               <OrderActions
                 suggestionId={s.id}
