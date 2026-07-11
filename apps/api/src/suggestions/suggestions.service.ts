@@ -241,6 +241,7 @@ export class SuggestionsService {
       aiResponse.suggestions.map((s: Record<string, unknown>) => ({
         title: s.title as string,
         retailerHint: (s.retailer_hint as string) || null,
+        estimatedPriceMinCents: s.estimated_price_min_cents as number,
       })),
     );
 
@@ -578,7 +579,11 @@ export class SuggestionsService {
     });
     if (!suggestion) throw new NotFoundException("Suggestion not found");
 
-    const options = await this.productSearch.findBuyOptions(suggestion.title, suggestion.retailerHint);
+    const options = await this.productSearch.findBuyOptions(
+      suggestion.title,
+      suggestion.retailerHint,
+      suggestion.estimatedPriceMinCents,
+    );
     return { options };
   }
 
