@@ -9,6 +9,17 @@ const MAX_BUY_OPTIONS = 4;
 // regex artifact) than the real product price — better to show no price
 // than a misleading one.
 const MIN_PRICE_PLAUSIBILITY_RATIO = 0.2;
+// Category/collection listing pages (browsable, filterable, and prone to
+// showing "0 products" for a specific slug once inventory rotates) rather
+// than a specific product's own page — common e-commerce URL conventions
+// across Shopify and similar platforms.
+const COLLECTION_URL_PATTERNS = [
+  /\/collections?\//i,
+  /\/categor(y|ies)\//i,
+  /\/search\b/i,
+  /\/browse\//i,
+  /\/shop\/all\b/i,
+];
 
 function isProductImage(url: string | undefined): boolean {
   if (!url) return false;
@@ -160,7 +171,7 @@ export class ProductSearchService {
         body: JSON.stringify({
           query,
           type: "auto",
-          numResults: 6,
+          numResults: 8,
           contents: { text: { maxCharacters: 2000 } },
         }),
         signal: controller.signal,
@@ -187,8 +198,9 @@ export class ProductSearchService {
     const candidates = rawResults
       .map((r) => {
         const url = r.url as string | undefined;
+        if (!url || COLLECTION_URL_PATTERNS.some((p) => p.test(url))) return null;
         const priceMatch = (r.text as string)?.match(PRICE_REGEX);
-        if (!url || !priceMatch) return null;
+        if (!priceMatch) return null;
         const priceCents = Math.round(parseFloat(priceMatch[1]) * 100);
         if (!this.isPlausiblePrice(priceCents, estimatedPriceMinCents)) return null;
         return { url, priceCents, retailer: this.hostnameOf(url) };
@@ -196,7 +208,7 @@ export class ProductSearchService {
       .filter((c): c is { url: string; priceCents: number; retailer: string } => c !== null);
 
     if (candidates.length === 0) {
-      this.logger.warn(`Buy-options search for "${query}" found ${rawResults.length} result(s), 0 with a plausible price`);
+      this.logger.warn(`Buy-options search for "${query}" found ${rawResults.length} result(s), 0 usable (product-specific + priced)`);
       return [];
     }
 
