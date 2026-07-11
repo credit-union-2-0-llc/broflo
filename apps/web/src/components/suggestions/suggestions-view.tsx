@@ -71,6 +71,13 @@ export function SuggestionsView({
         if (res.suggestions.length > 0) {
           setSuggestions(res.suggestions);
           setHasGenerated(true);
+          setSuggestionGiftRecordIds((prev) => {
+            const next = new Map(prev);
+            for (const s of res.suggestions) {
+              if (s.giftRecordId) next.set(s.id, s.giftRecordId);
+            }
+            return next;
+          });
         }
         const metaRes = await api.getSuggestionMeta(token, eventId);
         setMeta(metaRes);
@@ -163,9 +170,12 @@ export function SuggestionsView({
   }
 
   function handleBuyNow(suggestionId: string) {
-    if (suggestionGiftRecordIds.has(suggestionId)) {
-      setBuyOptionsSuggestionId(suggestionId);
-    }
+    // No need to check suggestionGiftRecordIds here — the options dialog
+    // only needs the suggestionId. That map is only used later, for the
+    // optional "confirm what you paid" step, which already handles a
+    // missing entry gracefully (e.g. after a page reload, since it's local
+    // state populated only by this session's own "Select" click).
+    setBuyOptionsSuggestionId(suggestionId);
   }
 
   function handleOptionChosen(option: BuyOption) {

@@ -330,6 +330,7 @@ export class SuggestionsService {
         surpriseFactor: s.surpriseFactor,
         isSelected: s.isSelected,
         isDismissed: s.isDismissed,
+        giftRecordId: null, // freshly generated — nothing selected/purchased yet
         createdAt: s.createdAt.toISOString(),
         expiresAt: s.expiresAt.toISOString(),
       })),
@@ -377,6 +378,7 @@ export class SuggestionsService {
     const suggestions = await this.prisma.giftSuggestion.findMany({
       where,
       orderBy: { confidenceScore: "desc" },
+      include: { giftRecord: { select: { id: true } } },
     });
 
     const total = await this.prisma.giftSuggestion.count({
@@ -406,6 +408,7 @@ export class SuggestionsService {
         surpriseFactor: s.surpriseFactor,
         isSelected: s.isSelected,
         isDismissed: s.isDismissed,
+        giftRecordId: s.giftRecord?.id ?? null,
         createdAt: s.createdAt.toISOString(),
         expiresAt: s.expiresAt.toISOString(),
       })),
