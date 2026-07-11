@@ -81,6 +81,7 @@ export interface GiftSuggestion {
   surpriseFactor: "safe" | "bold";
   isSelected: boolean;
   isDismissed: boolean;
+  giftRecordId: string | null;
   createdAt: string;
   expiresAt: string;
 }
