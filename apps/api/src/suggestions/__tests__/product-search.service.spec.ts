@@ -224,7 +224,7 @@ describe("ProductSearchService", () => {
       expect(result.map((o) => o.priceCents)).toEqual([1000, 1500, 2000, 3500]);
     });
 
-    it("skips a candidate with no extractable price", async () => {
+    it("skips a candidate with no extractable price anywhere (snippet or live page)", async () => {
       process.env.EXA_API_KEY = "test-key";
       mockExaResults([
         { url: "https://a.com/1", text: "No price listed here." },
@@ -235,6 +235,29 @@ describe("ProductSearchService", () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].url).toBe("https://b.com/1");
+    });
+
+    it("falls back to the live page's price when Exa's snippet doesn't have one", async () => {
+      // Exa truncates snippets to 500 characters, which frequently doesn't
+      // reach a price — this is the actual bug that made buy-options come
+      // back empty in practice.
+      process.env.EXA_API_KEY = "test-key";
+      mockFetch.mockImplementation(async (url: string) => {
+        if (url === "https://api.exa.ai/search") {
+          return {
+            ok: true,
+            json: async () => ({
+              results: [{ url: "https://nike.com/product", text: "A great fit for performance and everyday wear." }],
+            }),
+          };
+        }
+        return { ok: true, text: async () => "Add to Bag — $64.99 — Free shipping over $50" };
+      });
+
+      const result = await service.findBuyOptions("Fleece hoodie");
+
+      expect(result).toHaveLength(1);
+      expect(result[0].priceCents).toBe(6499);
     });
   });
 
