@@ -566,6 +566,19 @@ export class SuggestionsService {
     return { id: updated.id, isDismissed: true, dismissalReason: updated.dismissalReason };
   }
 
+  // --- GET suggestions/:suggestionId/buy-options ---
+  // Live search fired at click-time rather than trusting the cached
+  // productUrl from generation time — see ProductSearchService.findBuyOptions.
+  async getBuyOptions(userId: string, suggestionId: string) {
+    const suggestion = await this.prisma.giftSuggestion.findFirst({
+      where: { id: suggestionId, userId },
+    });
+    if (!suggestion) throw new NotFoundException("Suggestion not found");
+
+    const options = await this.productSearch.findBuyOptions(suggestion.title, suggestion.retailerHint);
+    return { options };
+  }
+
   // --- Cache invalidation hooks ---
 
   async invalidateSuggestionsForPerson(personId: string): Promise<void> {

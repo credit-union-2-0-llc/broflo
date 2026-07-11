@@ -149,6 +149,95 @@ describe("ProductSearchService", () => {
     expect(results[1].imageUrl).toBeNull();
   });
 
+  describe("findBuyOptions", () => {
+    function mockExaResults(results: Array<{ url: string; text: string }>) {
+      mockFetch.mockImplementation(async (url: string) => {
+        if (url === "https://api.exa.ai/search") {
+          return { ok: true, json: async () => ({ results }) };
+        }
+        // Liveness check — default to a healthy page unless overridden below.
+        return { ok: true, text: async () => "In stock and ready to ship." };
+      });
+    }
+
+    it("returns an empty array when EXA_API_KEY is not set", async () => {
+      delete process.env.EXA_API_KEY;
+      const result = await service.findBuyOptions("Cozy blanket");
+      expect(result).toEqual([]);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("filters out a result whose liveness check reports the page is gone", async () => {
+      process.env.EXA_API_KEY = "test-key";
+      mockFetch.mockImplementation(async (url: string) => {
+        if (url === "https://api.exa.ai/search") {
+          return {
+            ok: true,
+            json: async () => ({
+              results: [
+                { url: "https://nike.com/dead-product", text: "$45.00" },
+                { url: "https://target.com/live-product", text: "$40.00" },
+              ],
+            }),
+          };
+        }
+        if (url === "https://nike.com/dead-product") {
+          return { ok: true, text: async () => "THE PRODUCT YOU ARE LOOKING FOR IS NO LONGER AVAILABLE" };
+        }
+        return { ok: true, text: async () => "Add to cart" };
+      });
+
+      const result = await service.findBuyOptions("Fleece hoodie");
+
+      expect(result).toHaveLength(1);
+      expect(result[0].url).toBe("https://target.com/live-product");
+    });
+
+    it("dedupes results from the same hostname, keeping only the first", async () => {
+      process.env.EXA_API_KEY = "test-key";
+      mockExaResults([
+        { url: "https://amazon.com/product-a", text: "$30.00" },
+        { url: "https://amazon.com/product-b", text: "$25.00" },
+        { url: "https://target.com/product-c", text: "$28.00" },
+      ]);
+
+      const result = await service.findBuyOptions("Desk lamp");
+
+      // amazon.com's first occurrence ($30) is kept over its duplicate ($25);
+      // sorted ascending afterward puts target.com's $28 first.
+      expect(result.map((o) => o.retailer)).toEqual(["target.com", "amazon.com"]);
+      expect(result.find((o) => o.retailer === "amazon.com")?.priceCents).toBe(3000);
+    });
+
+    it("sorts options by price ascending and caps at 4", async () => {
+      process.env.EXA_API_KEY = "test-key";
+      mockExaResults([
+        { url: "https://a.com/1", text: "$50.00" },
+        { url: "https://b.com/1", text: "$20.00" },
+        { url: "https://c.com/1", text: "$35.00" },
+        { url: "https://d.com/1", text: "$10.00" },
+        { url: "https://e.com/1", text: "$15.00" },
+      ]);
+
+      const result = await service.findBuyOptions("Candle set");
+
+      expect(result.map((o) => o.priceCents)).toEqual([1000, 1500, 2000, 3500]);
+    });
+
+    it("skips a candidate with no extractable price", async () => {
+      process.env.EXA_API_KEY = "test-key";
+      mockExaResults([
+        { url: "https://a.com/1", text: "No price listed here." },
+        { url: "https://b.com/1", text: "$22.00" },
+      ]);
+
+      const result = await service.findBuyOptions("Scarf");
+
+      expect(result).toHaveLength(1);
+      expect(result[0].url).toBe("https://b.com/1");
+    });
+  });
+
   afterAll(() => {
     delete process.env.EXA_API_KEY;
   });

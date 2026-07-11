@@ -63,4 +63,12 @@ export class SuggestionsController {
   ) {
     return this.service.dismissSuggestion(userId, suggestionId, dto);
   }
+
+  @Get("suggestions/:suggestionId/buy-options")
+  getBuyOptions(
+    @CurrentUser("id") userId: string,
+    @Param("suggestionId", ParseUUIDPipe) suggestionId: string,
+  ) {
+    return this.service.getBuyOptions(userId, suggestionId);
+  }
 }

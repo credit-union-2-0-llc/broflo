@@ -85,6 +85,12 @@ export interface GiftSuggestion {
   expiresAt: string;
 }
 
+export interface BuyOption {
+  retailer: string;
+  url: string;
+  priceCents: number;
+}
+
 export interface SuggestionsResponse {
   suggestions: GiftSuggestion[];
   meta: {
@@ -534,6 +540,9 @@ export const api = {
 
   getSuggestionMeta: (token: string, eventId: string) =>
     apiFetch<SuggestionMetaResponse>(`/events/${eventId}/suggestions/meta`, { token }),
+
+  getBuyOptions: (token: string, suggestionId: string) =>
+    apiFetch<{ options: BuyOption[] }>(`/suggestions/${suggestionId}/buy-options`, { token }),
 
   selectSuggestion: (token: string, eventId: string, suggestionId: string) =>
     apiFetch<SelectSuggestionResponse>(`/events/${eventId}/select-suggestion`, {

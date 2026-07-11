@@ -9,12 +9,13 @@ import { Gift, RefreshCw, Shuffle, Lock, Loader2, Sparkles } from "lucide-react"
 import { toast } from "sonner";
 import { VOICE, tierAtLeast } from "@broflo/shared";
 import { api } from "@/lib/api";
-import type { GiftSuggestion, SuggestionMetaResponse, Order } from "@/lib/api";
+import type { GiftSuggestion, SuggestionMetaResponse, Order, BuyOption } from "@/lib/api";
 import { SuggestionCard } from "./suggestion-card";
 import { GuidedInterview } from "./guided-interview";
 import { OrderPreviewModal } from "@/components/orders/order-preview-modal";
 import { CancelCountdown } from "@/components/orders/cancel-countdown";
 import { ConfirmPurchaseDialog } from "./confirm-purchase-dialog";
+import { BuyOptionsDialog } from "./buy-options-dialog";
 
 interface SuggestionsViewProps {
   eventId: string;
@@ -50,7 +51,8 @@ export function SuggestionsView({
   const [orderedSuggestions, setOrderedSuggestions] = useState<Map<string, { orderId: string; status: string; placedAt: string }>>(new Map());
   // Map from suggestionId -> giftRecordId (set when suggestion is selected)
   const [suggestionGiftRecordIds, setSuggestionGiftRecordIds] = useState<Map<string, string>>(new Map());
-  const [confirmingPurchaseSuggestionId, setConfirmingPurchaseSuggestionId] = useState<string | null>(null);
+  const [buyOptionsSuggestionId, setBuyOptionsSuggestionId] = useState<string | null>(null);
+  const [confirmingPurchase, setConfirmingPurchase] = useState<{ suggestionId: string; priceCents: number } | null>(null);
 
   // Rotate loading messages
   useEffect(() => {
@@ -162,8 +164,14 @@ export function SuggestionsView({
 
   function handleBuyNow(suggestionId: string) {
     if (suggestionGiftRecordIds.has(suggestionId)) {
-      setConfirmingPurchaseSuggestionId(suggestionId);
+      setBuyOptionsSuggestionId(suggestionId);
     }
+  }
+
+  function handleOptionChosen(option: BuyOption) {
+    if (!buyOptionsSuggestionId) return;
+    setBuyOptionsSuggestionId(null);
+    setConfirmingPurchase({ suggestionId: buyOptionsSuggestionId, priceCents: option.priceCents });
   }
 
   function handleOrderPlaced(order: Order) {
@@ -418,23 +426,27 @@ export function SuggestionsView({
       />
     )}
 
-    {confirmingPurchaseSuggestionId && (() => {
-      const confirmingGiftRecordId = suggestionGiftRecordIds.get(confirmingPurchaseSuggestionId);
-      const confirmingSuggestion = suggestions.find((s) => s.id === confirmingPurchaseSuggestionId);
-      if (!confirmingGiftRecordId || !confirmingSuggestion) return null;
-      const defaultPriceCents =
-        confirmingSuggestion.productSourcePriceCents ??
-        Math.round(
-          (confirmingSuggestion.estimatedPriceMinCents + confirmingSuggestion.estimatedPriceMaxCents) / 2,
-        );
+    {buyOptionsSuggestionId && (
+      <BuyOptionsDialog
+        open={!!buyOptionsSuggestionId}
+        onOpenChange={(open) => { if (!open) setBuyOptionsSuggestionId(null); }}
+        suggestionId={buyOptionsSuggestionId}
+        token={token}
+        onOptionChosen={handleOptionChosen}
+      />
+    )}
+
+    {confirmingPurchase && (() => {
+      const confirmingGiftRecordId = suggestionGiftRecordIds.get(confirmingPurchase.suggestionId);
+      if (!confirmingGiftRecordId) return null;
       return (
         <ConfirmPurchaseDialog
-          open={!!confirmingPurchaseSuggestionId}
-          onOpenChange={(open) => { if (!open) setConfirmingPurchaseSuggestionId(null); }}
+          open={!!confirmingPurchase}
+          onOpenChange={(open) => { if (!open) setConfirmingPurchase(null); }}
           giftRecordId={confirmingGiftRecordId}
           token={token}
-          defaultPriceCents={defaultPriceCents}
-          onConfirmed={() => setConfirmingPurchaseSuggestionId(null)}
+          defaultPriceCents={confirmingPurchase.priceCents}
+          onConfirmed={() => setConfirmingPurchase(null)}
         />
       );
     })()}
