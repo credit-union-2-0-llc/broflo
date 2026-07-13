@@ -19,7 +19,6 @@ declare module "next-auth" {
       name: string | null;
       avatarUrl: string | null;
       subscriptionTier: string;
-      brofloScore: number;
     };
   }
 }
@@ -36,7 +35,6 @@ declare module "next-auth" {
       name: string | null;
       avatarUrl: string | null;
       subscriptionTier: string;
-      brofloScore: number;
     };
   }
 }
@@ -73,7 +71,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             refreshToken: result.refreshToken,
             avatarUrl: result.user.avatarUrl as string | null,
             subscriptionTier: result.user.subscriptionTier as string,
-            brofloScore: result.user.brofloScore as number,
           };
         } catch {
           return null;
@@ -97,7 +94,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           name: u.name as string | null,
           avatarUrl: u.avatarUrl as string | null,
           subscriptionTier: u.subscriptionTier as string,
-          brofloScore: u.brofloScore as number,
         };
       }
 
@@ -115,12 +111,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.refreshToken = refreshed.refreshToken;
           token.accessTokenExpires = getTokenExpiry(refreshed.accessToken);
           delete token.error;
-          // Refresh already re-fetches the user row — piggyback on it to keep
-          // the Broflo Score from going stale for the length of a session.
-          if (refreshed.user?.brofloScore !== undefined) {
-            (token.user as { brofloScore: number }).brofloScore =
-              refreshed.user.brofloScore as number;
-          }
         } catch {
           token.error = "RefreshTokenError";
           return token;
@@ -128,16 +118,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
 
       if (trigger === "update") {
-        const suppliedScore = (session as { user?: { brofloScore?: number } } | undefined)
-          ?.user?.brofloScore;
-        if (suppliedScore !== undefined) {
-          // Same fast path as subscriptionTier below — the caller (right
-          // after logging a gift, feedback, or selecting a suggestion)
-          // already knows the new score, so trust it directly instead of
-          // waiting for the next access-token refresh cycle.
-          (token.user as { brofloScore: number }).brofloScore = suppliedScore;
-        }
-
         const suppliedTier = (session as { user?: { subscriptionTier?: string } } | undefined)
           ?.user?.subscriptionTier;
         if (suppliedTier) {

@@ -124,8 +124,6 @@ export interface SuggestionMetaResponse {
 export interface SelectSuggestionResponse {
   suggestion: GiftSuggestion;
   giftRecord: Record<string, unknown>;
-  scoreChange: number;
-  newScore: number;
 }
 
 // S-5 Gift History types
@@ -366,9 +364,6 @@ export interface CreateGiftRecordData {
 
 export interface FeedbackResponse {
   giftRecord: GiftRecord;
-  scoreChange: number;
-  newScore: number;
-  newLevel: string;
   promptNeverAgain: boolean;
 }
 
@@ -378,9 +373,6 @@ export interface RecentGiftsResponse {
 
 export interface CreateGiftResponse {
   giftRecord: GiftRecord;
-  scoreChange: number;
-  newScore: number;
-  newLevel: string;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +31,6 @@ export function SuggestionsView({
   token,
   tier,
 }: SuggestionsViewProps) {
-  const { update: updateSession } = useSession();
   const [suggestions, setSuggestions] = useState<GiftSuggestion[]>([]);
   const [meta, setMeta] = useState<SuggestionMetaResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -139,9 +137,6 @@ export function SuggestionsView({
           next.set(suggestionId, String(res.giftRecord.id));
           return next;
         });
-      }
-      if (res.scoreChange > 0) {
-        updateSession({ user: { brofloScore: res.newScore } });
       }
     } catch {
       setError(VOICE.errors.generic);

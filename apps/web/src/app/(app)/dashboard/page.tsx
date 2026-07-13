@@ -5,7 +5,6 @@ import type { UpcomingEvent, Reminder, GiftRecord, Order } from "@/lib/api";
 import { ThreatRoster } from "@/components/radar/ThreatRoster";
 import { DashboardReminders } from "./dashboard-reminders";
 import { RecentGiftsWidget } from "@/components/gifts/recent-gifts-widget";
-import { BrofloScoreWidget } from "@/components/gifts/broflo-score-widget";
 import { OrdersInFlightWidget } from "@/components/dashboard/OrdersInFlightWidget";
 
 type RecentGift = GiftRecord & { personName: string; eventName: string | null };
@@ -47,10 +46,7 @@ export default async function DashboardPage() {
 
       <ThreatRoster events={events} />
 
-      <div className="grid gap-[18px] sm:grid-cols-2">
-        <BrofloScoreWidget score={session.user?.brofloScore ?? 0} variant="compact" />
-        <RecentGiftsWidget token={session.accessToken} initialGifts={recentGifts} />
-      </div>
+      <RecentGiftsWidget token={session.accessToken} initialGifts={recentGifts} />
 
       <OrdersInFlightWidget
         token={session.accessToken}

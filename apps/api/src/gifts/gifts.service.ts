@@ -8,18 +8,6 @@ import { RedisService } from "../redis/redis.service";
 import { EntitlementsService } from "../entitlements/entitlements.service";
 import { CreateGiftRecordDto, RecordFeedbackDto } from "./dto/gifts.dto";
 
-const LEVEL_THRESHOLDS = [
-  { min: 0, max: 49, key: "rookieBro", name: "Rookie Bro" },
-  { min: 50, max: 149, key: "solidDude", name: "Solid Dude" },
-  { min: 150, max: 349, key: "giftWhisperer", name: "Gift Whisperer" },
-  { min: 350, max: 699, key: "theLegend", name: "The Legend" },
-  { min: 700, max: Infinity, key: "brofloElite", name: "Broflo Elite" },
-];
-
-function getLevel(score: number) {
-  return LEVEL_THRESHOLDS.find((l) => score >= l.min && score <= l.max)!;
-}
-
 @Injectable()
 export class GiftsService {
   constructor(
@@ -124,21 +112,10 @@ export class GiftsService {
       },
     });
 
-    // +10 Broflo Score
-    const user = await this.prisma.user.update({
-      where: { id: userId },
-      data: { brofloScore: { increment: 10 } },
-    });
-
     // Invalidate suggestion cache for this person
     await this.redis.invalidateByPattern(`suggest:${personId}:*`);
 
-    return {
-      giftRecord,
-      scoreChange: 10,
-      newScore: user.brofloScore,
-      newLevel: getLevel(user.brofloScore).name,
-    };
+    return { giftRecord };
   }
 
   // --- PATCH /gifts/:giftId/feedback ---
@@ -147,13 +124,6 @@ export class GiftsService {
       where: { id: giftId, userId },
     });
     if (!gift) throw new NotFoundException("Gift record not found");
-
-    let scoreChange = 0;
-    const isFirstFeedback = !gift.feedbackScored;
-    const isFirstFiveStar = dto.rating === 5 && gift.rating !== 5;
-
-    if (isFirstFeedback) scoreChange += 5;
-    if (isFirstFiveStar) scoreChange += 20;
 
     const updated = await this.prisma.giftRecord.update({
       where: { id: giftId },
@@ -164,28 +134,11 @@ export class GiftsService {
       },
     });
 
-    let newScore = 0;
-    if (scoreChange > 0) {
-      const user = await this.prisma.user.update({
-        where: { id: userId },
-        data: { brofloScore: { increment: scoreChange } },
-      });
-      newScore = user.brofloScore;
-    } else {
-      const user = await this.prisma.user.findUniqueOrThrow({
-        where: { id: userId },
-      });
-      newScore = user.brofloScore;
-    }
-
     // Invalidate suggestion cache
     await this.redis.invalidateByPattern(`suggest:${gift.personId}:*`);
 
     return {
       giftRecord: updated,
-      scoreChange,
-      newScore,
-      newLevel: getLevel(newScore).name,
       promptNeverAgain: dto.rating === 1,
     };
   }
@@ -219,9 +172,8 @@ export class GiftsService {
   // --- PATCH /gifts/:giftId/confirm-purchase ---
   // Corrects a suggestion-sourced GiftRecord's estimated price to what the
   // user actually paid after buying it themselves via the "Buy Now" link.
-  // Deliberately narrow: only for source: 'suggestion' records, price-only,
-  // no Broflo Score change (the record already earned its points at
-  // selection time — this is a correction, not a new gift).
+  // Deliberately narrow: only for source: 'suggestion' records, price-only —
+  // this is a correction, not a new gift.
   async confirmPurchase(userId: string, giftId: string, dto: { priceCents: number }) {
     const gift = await this.prisma.giftRecord.findFirst({
       where: { id: giftId, userId },

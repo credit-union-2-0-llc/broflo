@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { LayoutDashboard, Users, Calendar, Package, Zap, User, Trophy, LogOut, Sparkles, CreditCard } from "lucide-react";
+import { LayoutDashboard, Users, Calendar, Package, Zap, User, LogOut, Sparkles, CreditCard } from "lucide-react";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -74,10 +73,6 @@ export function MainNav() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="gap-1.5 font-normal">
-            <Trophy className="h-3.5 w-3.5 text-amber" />
-            {user?.brofloScore ?? 0}
-          </Badge>
           <NotificationBell />
           <DropdownMenu>
             <DropdownMenuTrigger className="focus:outline-none">

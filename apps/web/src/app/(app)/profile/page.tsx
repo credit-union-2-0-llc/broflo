@@ -8,7 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { BrofloScoreWidget } from "@/components/gifts/broflo-score-widget";
 
 export default async function ProfilePage() {
   const session = await auth();
@@ -70,9 +69,6 @@ export default async function ProfilePage() {
           </div>
         </CardContent>
       </Card>
-      <div className="w-full max-w-md mt-4">
-        <BrofloScoreWidget score={user?.brofloScore ?? 0} variant="compact" />
-      </div>
     </div>
   );
 }

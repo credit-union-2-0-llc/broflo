@@ -48,17 +48,6 @@ export const VOICE = {
       "We tried to warn you. The Groveling Package awaits.",
   },
 
-  levels: {
-    rookieBro: "Rookie Bro",
-    solidDude: "Solid Dude",
-    giftWhisperer: "Gift Whisperer",
-    theLegend: "The Legend",
-    brofloElite: "Broflo Elite",
-  },
-
-  levelUp: (level: string) =>
-    `Welcome to ${level}. People notice. They just won't say it.`,
-
   nudges: {
     setBudget: (name: string) =>
       `Set a budget for ${name} to get more targeted suggestions.`,
@@ -120,7 +109,6 @@ export const VOICE = {
 
   feedback: {
     recorded: "Noted. We'll remember that for next time.",
-    nailedIt: "Nailed it. Broflo Score updated.",
     neverAgainPrompt:
       "Want to make sure we never suggest this again?",
   },

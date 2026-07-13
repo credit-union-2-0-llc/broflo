@@ -9,7 +9,6 @@ export interface SubscriptionPlan {
     maxPeople: number | null; // null = unlimited
     autoExecute: boolean;
     autopilot: boolean;
-    gamification: boolean;
     concierge: boolean;
     handwrittenNotes: boolean;
   };
@@ -25,7 +24,6 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxPeople: 3,
       autoExecute: false,
       autopilot: false,
-      gamification: false,
       concierge: false,
       handwrittenNotes: false,
     },
@@ -39,7 +37,6 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxPeople: null,
       autoExecute: true,
       autopilot: true,
-      gamification: true,
       concierge: false,
       handwrittenNotes: false,
     },
@@ -53,7 +50,6 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxPeople: null,
       autoExecute: true,
       autopilot: true,
-      gamification: true,
       concierge: true,
       handwrittenNotes: true,
     },
@@ -67,7 +63,6 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxPeople: null,
       autoExecute: true,
       autopilot: true,
-      gamification: true,
       concierge: true,
       handwrittenNotes: true,
     },
