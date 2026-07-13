@@ -180,6 +180,50 @@ describe("ProductSearchService", () => {
     expect(result.priceCents).toBe(8999);
   });
 
+  it("rejects a result whose own title doesn't match the requested product", async () => {
+    // Real bug report: buy links pointed at the wrong object. Exa is
+    // semantic search, not exact lookup — it can return a real,
+    // well-formed, correctly-priced page for a similar-but-different
+    // product on the same domain.
+    process.env.EXA_API_KEY = "test-key";
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        results: [
+          {
+            url: "https://us.shop.realmadrid.com/products/away-jersey-25-26",
+            title: "FC Barcelona Away Jersey 25/26",
+            image: "https://example.com/img.jpg",
+            text: "$89.99",
+          },
+        ],
+      }),
+    });
+
+    const result = await service.searchProduct("Real Madrid Home Jersey", "Adidas", 7000, 9500);
+    expect(result).toEqual({ imageUrl: null, productUrl: null, priceCents: null });
+  });
+
+  it("accepts a result whose title matches the requested product even with a differently-cased word order", async () => {
+    process.env.EXA_API_KEY = "test-key";
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        results: [
+          {
+            url: "https://us.shop.realmadrid.com/products/home-jersey-25-26",
+            title: "Real Madrid Home Jersey 25/26 — Official Store",
+            image: "https://example.com/img.jpg",
+            text: "$89.99",
+          },
+        ],
+      }),
+    });
+
+    const result = await service.searchProduct("Real Madrid Home Jersey", "Adidas", 7000, 9500);
+    expect(result.productUrl).toBe("https://us.shop.realmadrid.com/products/home-jersey-25-26");
+  });
+
   it("searches multiple products in parallel", async () => {
     process.env.EXA_API_KEY = "test-key";
 
@@ -362,6 +406,43 @@ describe("ProductSearchService", () => {
       await service.findBuyOptions("Running shoes", "Nike");
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("filters out a candidate whose title clearly doesn't match the requested product", async () => {
+      // Same real bug report as the searchProduct relevance test above,
+      // but on the live click-time buy-options path.
+      process.env.EXA_API_KEY = "test-key";
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          results: [
+            {
+              url: "https://us.shop.realmadrid.com/products/away-jersey-25-26",
+              title: "FC Barcelona Away Jersey 25/26",
+              text: "$89.99",
+            },
+            {
+              url: "https://fanatics.com/products/rm-home-jersey",
+              title: "Real Madrid Home Jersey 25/26",
+              text: "$92.00",
+            },
+          ],
+        }),
+      });
+
+      const result = await service.findBuyOptions("Real Madrid Home Jersey", null, 7000, 9500);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].url).toBe("https://fanatics.com/products/rm-home-jersey");
+    });
+
+    it("lets a candidate through when Exa's response has no title to check (incomplete data, not a real mismatch)", async () => {
+      process.env.EXA_API_KEY = "test-key";
+      mockExaResults([{ url: "https://a.com/1", text: "$45.00" }]);
+
+      const result = await service.findBuyOptions("Real Madrid Home Jersey");
+
+      expect(result).toHaveLength(1);
     });
 
     it("sorts a known-reliable retailer above an unknown one even at a higher price", async () => {
