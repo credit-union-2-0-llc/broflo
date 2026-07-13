@@ -224,6 +224,102 @@ describe("ProductSearchService", () => {
     expect(result.productUrl).toBe("https://us.shop.realmadrid.com/products/home-jersey-25-26");
   });
 
+  it("skips a dead (404) candidate and falls through to the next relevant one", async () => {
+    // Real bug report: the price/link shown directly on a suggestion card
+    // (this cached single-search path) can go stale — vet the link before
+    // handing it to a person instead of trusting whatever Exa found.
+    process.env.EXA_API_KEY = "test-key";
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          results: [
+            { url: "https://a.com/dead-listing", image: "https://a.com/img.jpg", text: "$80.00" },
+            { url: "https://b.com/live-listing", image: "https://b.com/img.jpg", text: "$85.00" },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({ ok: false, status: 404 }) // liveness check for a.com
+      .mockResolvedValueOnce({ ok: true, status: 200, text: async () => "In stock and ready to ship." }); // liveness check for b.com
+
+    const result = await service.searchProduct("Gift widget");
+    expect(result.productUrl).toBe("https://b.com/live-listing");
+  });
+
+  it("treats a 200 page with soft-404 text as dead", async () => {
+    process.env.EXA_API_KEY = "test-key";
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          results: [{ url: "https://a.com/gone", image: "https://a.com/img.jpg", text: "$80.00" }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => "Sorry, this item is no longer available.",
+      });
+
+    const result = await service.searchProduct("Gift widget");
+    expect(result).toEqual({ imageUrl: null, productUrl: null, priceCents: null });
+  });
+
+  it("returns nulls when the only relevant candidate is confirmed dead", async () => {
+    process.env.EXA_API_KEY = "test-key";
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          results: [{ url: "https://a.com/dead", image: "https://a.com/img.jpg", text: "$80.00" }],
+        }),
+      })
+      .mockResolvedValueOnce({ ok: false, status: 410 });
+
+    const result = await service.searchProduct("Gift widget");
+    expect(result).toEqual({ imageUrl: null, productUrl: null, priceCents: null });
+  });
+
+  it("does not penalize a candidate when its liveness check is ambiguous (network error, bot-block, etc.)", async () => {
+    process.env.EXA_API_KEY = "test-key";
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          results: [{ url: "https://a.com/product", image: "https://a.com/img.jpg", text: "$80.00" }],
+        }),
+      })
+      .mockRejectedValueOnce(new Error("network error"));
+
+    const result = await service.searchProduct("Gift widget");
+    expect(result.productUrl).toBe("https://a.com/product");
+  });
+
+  it("does not hang forever when a candidate's liveness check never resolves — an independent hard deadline still bounds it", async () => {
+    // Regression guard for the exact production failure that got the
+    // original liveness check pulled from findBuyOptions (PR #61): a
+    // slow/bot-blocked retailer's connection stalled well past its own
+    // AbortController timeout. This proves the new hard deadline bounds
+    // wall-clock time even when abort() doesn't cleanly cancel anything.
+    jest.useFakeTimers();
+    process.env.EXA_API_KEY = "test-key";
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          results: [{ url: "https://slow-loris.example/1", image: "https://img.jpg", text: "$50.00" }],
+        }),
+      })
+      .mockReturnValueOnce(new Promise(() => {})); // never settles, ignores its abort signal
+
+    const resultPromise = service.searchProduct("Widget");
+    await jest.advanceTimersByTimeAsync(5000); // matches LIVENESS_HARD_DEADLINE_MS
+    const result = await resultPromise;
+
+    expect(result.productUrl).toBe("https://slow-loris.example/1"); // "unknown" liveness doesn't exclude it
+    jest.useRealTimers();
+  });
+
   it("searches multiple products in parallel", async () => {
     process.env.EXA_API_KEY = "test-key";
 
