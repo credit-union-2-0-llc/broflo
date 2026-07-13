@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -59,5 +60,13 @@ export class GiftsController {
     @Body() dto: ConfirmPurchaseDto,
   ) {
     return this.service.confirmPurchase(userId, giftId, dto);
+  }
+
+  @Delete("gifts/:giftId")
+  deleteGift(
+    @CurrentUser("id") userId: string,
+    @Param("giftId", ParseUUIDPipe) giftId: string,
+  ) {
+    return this.service.deleteGiftRecord(userId, giftId);
   }
 }

@@ -584,6 +584,9 @@ export const api = {
   getRecentGifts: (token: string) =>
     apiFetch<RecentGiftsResponse>("/gifts/recent", { token }),
 
+  deleteGift: (token: string, giftId: string) =>
+    apiFetch<{ deleted: boolean }>(`/gifts/${giftId}`, { method: "DELETE", token }),
+
   // Billing (S-6)
   createCheckoutSession: (token: string, priceId: string) =>
     apiFetch<{ url: string }>("/billing/checkout-session", {

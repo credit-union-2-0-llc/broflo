@@ -10,14 +10,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Star, ThumbsUp } from "lucide-react";
+import { Plus, Star, ThumbsUp, Trash2 } from "lucide-react";
 import { VOICE, tierAtLeast } from "@broflo/shared";
 import { api } from "@/lib/api";
-import type { GiftRecord, BrofloEvent, FeedbackResponse, CreateGiftResponse } from "@/lib/api";
+import type { GiftRecord, BrofloEvent, FeedbackResponse, CreateGiftResponse, Order } from "@/lib/api";
 import { StarRating } from "./star-rating";
 import { FeedbackDialog } from "./feedback-dialog";
 import { AddGiftDialog } from "./add-gift-dialog";
 import { NeverAgainDialog } from "./never-again-dialog";
+import { DeleteGiftDialog } from "./delete-gift-dialog";
+import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { toast } from "sonner";
 
 interface GiftHistorySectionProps {
@@ -41,7 +43,14 @@ export function GiftHistorySection({
   const [addOpen, setAddOpen] = useState(false);
   const [feedbackGift, setFeedbackGift] = useState<GiftRecord | null>(null);
   const [neverAgainGift, setNeverAgainGift] = useState<GiftRecord | null>(null);
+  const [deleteGift, setDeleteGift] = useState<GiftRecord | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Orders keyed by giftRecordId — lets each row show a real, live order
+  // status instead of a static "source" label that goes stale the moment
+  // an order ships or gets cancelled. Capped at 50 (API max page size);
+  // fine for the common case, would need real pagination for a person with
+  // more concurrent in-flight orders than that.
+  const [orderByGiftId, setOrderByGiftId] = useState<Map<string, Order>>(new Map());
 
   const loadGifts = useCallback(async () => {
     setLoading(true);
@@ -60,6 +69,19 @@ export function GiftHistorySection({
   useEffect(() => {
     loadGifts();
   }, [loadGifts]);
+
+  useEffect(() => {
+    api
+      .getOrders(token, { limit: 50 })
+      .then((res) => {
+        const map = new Map<string, Order>();
+        for (const order of res.data) {
+          if (order.giftRecordId) map.set(order.giftRecordId, order);
+        }
+        setOrderByGiftId(map);
+      })
+      .catch(() => {});
+  }, [token]);
 
   // Collect available years for filter
   const years = [
@@ -178,12 +200,14 @@ export function GiftHistorySection({
                   <GiftRow
                     key={gift.id}
                     gift={gift}
+                    order={orderByGiftId.get(gift.id) ?? null}
                     expanded={expandedId === gift.id}
                     onToggle={() =>
                       setExpandedId(expandedId === gift.id ? null : gift.id)
                     }
                     onRate={() => setFeedbackGift(gift)}
                     onNailedIt={() => handleNailedIt(gift)}
+                    onDelete={() => setDeleteGift(gift)}
                   />
                 ))}
               </div>
@@ -224,6 +248,21 @@ export function GiftHistorySection({
           onConfirmed={() => setNeverAgainGift(null)}
         />
       )}
+
+      {deleteGift && (
+        <DeleteGiftDialog
+          giftId={deleteGift.id}
+          giftTitle={deleteGift.title}
+          hasRealOrder={orderByGiftId.has(deleteGift.id)}
+          token={token}
+          open={!!deleteGift}
+          onOpenChange={(open) => !open && setDeleteGift(null)}
+          onDeleted={() => {
+            setGifts((prev) => prev.filter((g) => g.id !== deleteGift.id));
+            setDeleteGift(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -232,16 +271,20 @@ export function GiftHistorySection({
 
 function GiftRow({
   gift,
+  order,
   expanded,
   onToggle,
   onRate,
   onNailedIt,
+  onDelete,
 }: {
   gift: GiftRecord;
+  order: Order | null;
   expanded: boolean;
   onToggle: () => void;
   onRate: () => void;
   onNailedIt: () => void;
+  onDelete: () => void;
 }) {
   const date = new Date(gift.givenAt).toLocaleDateString("en-US", {
     month: "short",
@@ -252,6 +295,17 @@ function GiftRow({
   const price = gift.priceCents
     ? `$${(gift.priceCents / 100).toFixed(0)}`
     : null;
+
+  // A real order's live status is a stronger, more accurate signal than the
+  // static "source" this record was created with \u2014 source doesn't update
+  // once an order ships, gets delivered, or gets cancelled.
+  const sourceLabel = order
+    ? null
+    : gift.source === "manual"
+      ? "Added manually"
+      : gift.source === "suggestion"
+        ? "Selected, not yet ordered"
+        : "Ordered via Broflo"; // source === "ordered" but no matching order found (shouldn't normally happen)
 
   return (
     <div className="border-b border-border/50 last:border-0">
@@ -264,42 +318,58 @@ function GiftRow({
         <StarRating value={gift.rating} size="sm" readonly />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{gift.title}</p>
-          <p className="text-xs text-muted-foreground">
-            {date}
-            {price && ` \u00b7 ${price}`}
-            {gift.source === "suggestion" && " \u00b7 Broflo suggestion"}
-            {gift.source === "manual" && " \u00b7 Added manually"}
-          </p>
-        </div>
-        {!gift.rating && (
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={(e) => {
-                e.stopPropagation();
-                onNailedIt();
-              }}
-              aria-label="Rate this gift 5 stars - nailed it"
-            >
-              <ThumbsUp className="mr-1 h-3 w-3" />
-              Nailed It
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRate();
-              }}
-            >
-              <Star className="mr-1 h-3 w-3" />
-              Rate
-            </Button>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="text-xs text-muted-foreground">
+              {date}
+              {price && ` \u00b7 ${price}`}
+              {sourceLabel && ` \u00b7 ${sourceLabel}`}
+            </p>
+            {order && <OrderStatusBadge status={order.status} />}
           </div>
-        )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {!gift.rating && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNailedIt();
+                }}
+                aria-label="Rate this gift 5 stars - nailed it"
+              >
+                <ThumbsUp className="mr-1 h-3 w-3" />
+                Nailed It
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRate();
+                }}
+              >
+                <Star className="mr-1 h-3 w-3" />
+                Rate
+              </Button>
+            </>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            aria-label={`Delete ${gift.title} from gift history`}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </button>
 
       {expanded && (

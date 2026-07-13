@@ -188,4 +188,20 @@ export class GiftsService {
       data: { priceCents: dto.priceCents },
     });
   }
+
+  // --- DELETE /gifts/:giftId ---
+  // Removes a gift-history entry. Safe even for a gift with a real placed
+  // order attached — Order.giftRecordId is onDelete: SetNull, so the actual
+  // order/payment record is untouched, just orphaned from this log entry.
+  async deleteGiftRecord(userId: string, giftId: string) {
+    const gift = await this.prisma.giftRecord.findFirst({
+      where: { id: giftId, userId },
+    });
+    if (!gift) throw new NotFoundException("Gift record not found");
+
+    await this.prisma.giftRecord.delete({ where: { id: giftId } });
+    await this.redis.invalidateByPattern(`suggest:${gift.personId}:*`);
+
+    return { deleted: true };
+  }
 }

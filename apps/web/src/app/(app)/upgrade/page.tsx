@@ -139,18 +139,18 @@ function UpgradeContent() {
           const isHighlighted = tier === "pro";
 
           return (
-            <Card
-              key={tier}
-              className={cn(
-                "relative flex flex-col",
-                isHighlighted && "border-amber shadow-md",
-              )}
-            >
+            <div key={tier} className="relative">
               {isHighlighted && (
-                <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber text-white">
+                <Badge className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 bg-amber text-white">
                   Most Popular
                 </Badge>
               )}
+              <Card
+                className={cn(
+                  "relative flex h-full flex-col",
+                  isHighlighted && "border-amber shadow-md",
+                )}
+              >
               <CardHeader>
                 <CardTitle className="text-xl">{plan.name}</CardTitle>
                 <CardDescription>{TAGLINES[tier]}</CardDescription>
@@ -239,7 +239,8 @@ function UpgradeContent() {
                   </>
                 )}
               </CardFooter>
-            </Card>
+              </Card>
+            </div>
           );
         })}
       </div>
