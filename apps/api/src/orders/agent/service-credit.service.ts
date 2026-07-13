@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Stripe from 'stripe';
+import { Prisma } from '@prisma/client';
 import type { User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EntitlementsService } from '../../entitlements/entitlements.service';
@@ -42,19 +43,32 @@ export class ServiceCreditService {
       return false;
     }
 
-    // Check if credit already issued this billing cycle
-    const existing = await this.prisma.serviceCredit.findUnique({
-      where: {
-        uq_service_credit_user_cycle: {
+    // Claim this user's one-credit-per-cycle slot BEFORE touching Stripe.
+    // The unique constraint on (userId, billingCycleKey) means at most one
+    // concurrent caller can win this insert — if a race loses here, it
+    // returns before ever calling Stripe, so two concurrent failed-order
+    // credits can no longer both issue real money (the previous check-then-
+    // act order let both callers pass a `findUnique` miss, both call Stripe,
+    // and only fail on the second's DB insert — by then the double credit
+    // was already issued and unrecoverable).
+    let credit;
+    try {
+      credit = await this.prisma.serviceCredit.create({
+        data: {
           userId: user.id,
+          agentJobId,
+          amountCents,
+          reason: `Agent order failed: ${reason}`,
           billingCycleKey,
+          stripeCouponId: null,
         },
-      },
-    });
-
-    if (existing) {
-      this.log.debug('Credit already issued for user %s in cycle %s', user.id, billingCycleKey);
-      return false;
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        this.log.debug('Credit already issued for user %s in cycle %s', user.id, billingCycleKey);
+        return false;
+      }
+      throw err;
     }
 
     let stripeTxnId: string | null = null;
@@ -74,16 +88,12 @@ export class ServiceCreditService {
       }
     }
 
-    await this.prisma.serviceCredit.create({
-      data: {
-        userId: user.id,
-        agentJobId,
-        amountCents,
-        reason: `Agent order failed: ${reason}`,
-        billingCycleKey,
-        stripeCouponId: stripeTxnId,
-      },
-    });
+    if (stripeTxnId) {
+      await this.prisma.serviceCredit.update({
+        where: { id: credit.id },
+        data: { stripeCouponId: stripeTxnId },
+      });
+    }
 
     this.log.log(
       'Service credit issued: $%s for user %s (cycle: %s, reason: %s)',

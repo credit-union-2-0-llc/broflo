@@ -283,6 +283,7 @@ model Event {
   giftRecords GiftRecord[]
   orders      Order[]
   autopilotRuns AutopilotRun[]
+  suggestionRequestClaims SuggestionRequestClaim[]
 
   @@unique([personId, occasionType, isAutoCreated], name: "uq_person_auto_event", map: "uq_person_auto_event")
   @@index([userId, date], map: "idx_events_user_date")
@@ -377,6 +378,25 @@ model GiftSuggestion {
   @@index([userId, createdAt], map: "idx_suggestions_user_created")
   @@index([expiresAt], map: "idx_suggestions_expires")
   @@map("gift_suggestions")
+}
+
+// Atomically claims a (event, requestIndex) slot before the slow AI call in
+// SuggestionsService.generate() runs, so two concurrent re-roll requests
+// can't both read the same "next" index and both slip past the tier's
+// maxRerollRequests cap. The unique constraint is the enforcement — a DB
+// transaction can't wrap the external AI-service call, so a lightweight
+// claim row does the job a serializable transaction does elsewhere.
+model SuggestionRequestClaim {
+  id           String   @id @default(uuid())
+  eventId      String   @map("event_id")
+  userId       String   @map("user_id")
+  requestIndex Int      @map("request_index")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, requestIndex], map: "uq_suggestion_claim_event_request")
+  @@map("suggestion_request_claims")
 }
 
 // --- S-5: Gift History ---

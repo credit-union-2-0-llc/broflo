@@ -4,7 +4,8 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
-import type { User, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import type { User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BrowserAgentClient } from './browser-agent.client';
 import { StripeIssuingService } from './stripe-issuing.service';
@@ -62,25 +63,55 @@ export class AgentOrdersService {
       );
     }
 
-    // Create agent job
-    const job = await this.prisma.agentJob.create({
-      data: {
-        userId: user.id,
-        suggestionId: dto.suggestionId,
-        status: 'queued',
-        retailerDomain,
-        retailerUrl,
-        searchTerms,
-        maxBudgetCents: suggestion.estimatedPriceMaxCents,
-        shippingName: person.name,
-        shippingAddress1: person.shippingAddress1 || '',
-        shippingAddress2: person.shippingAddress2,
-        shippingCity: person.shippingCity || '',
-        shippingState: person.shippingState || '',
-        shippingZip: person.shippingZip || '',
-        idempotencyKey: `preview-${dto.suggestionId}-${randomUUID().slice(0, 8)}`,
-      },
-    });
+    // Create agent job. The concurrency count-check and the create are
+    // re-run together inside a serializable transaction (rather than
+    // trusting the early _checkConcurrencyLimit precheck above) so two
+    // concurrent preview() calls both sitting at MAX_CONCURRENT_JOBS - 1
+    // active jobs can't both pass and both create a job — Postgres aborts
+    // one with a serialization failure instead. This matters here more than
+    // most quota checks: each job can go on to issue a real Stripe virtual
+    // card.
+    let job;
+    try {
+      job = await this.prisma.$transaction(
+        async (tx) => {
+          const activeJobs = await tx.agentJob.count({
+            where: { userId: user.id, status: { in: ['queued', 'running', 'placing'] } },
+          });
+          if (activeJobs >= MAX_CONCURRENT_JOBS) {
+            throw new BadRequestException(
+              `You have ${activeJobs} agent orders in progress. Wait for one to complete.`,
+            );
+          }
+          return tx.agentJob.create({
+            data: {
+              userId: user.id,
+              suggestionId: dto.suggestionId,
+              status: 'queued',
+              retailerDomain,
+              retailerUrl,
+              searchTerms,
+              maxBudgetCents: suggestion.estimatedPriceMaxCents,
+              shippingName: person.name,
+              shippingAddress1: person.shippingAddress1 || '',
+              shippingAddress2: person.shippingAddress2,
+              shippingCity: person.shippingCity || '',
+              shippingState: person.shippingState || '',
+              shippingZip: person.shippingZip || '',
+              idempotencyKey: `preview-${dto.suggestionId}-${randomUUID().slice(0, 8)}`,
+            },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2034') {
+        throw new BadRequestException(
+          'Another agent order just started concurrently. Wait for one to complete and try again.',
+        );
+      }
+      throw err;
+    }
 
     // Execute agent in preview mode (async — returns when done)
     try {

@@ -6,6 +6,7 @@ import {
   HttpException,
   NotFoundException,
 } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import type { User } from "@prisma/client";
 import { FamilyService } from "../family.service";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -58,7 +59,14 @@ describe("FamilyService", () => {
         findUniqueOrThrow: jest.fn(),
       },
       event: { findMany: jest.fn().mockResolvedValue([]) },
-      $transaction: jest.fn().mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops)),
+      // Supports both $transaction([...]) (array of operations) and the
+      // interactive $transaction(async (tx) => {...}) form (used by
+      // acceptInvite's serializable seat-count check) — the callback form
+      // just re-runs against this same mocked client.
+      $transaction: jest.fn().mockImplementation(
+        (arg: Promise<unknown>[] | ((tx: unknown) => unknown)) =>
+          Array.isArray(arg) ? Promise.all(arg) : arg(prisma),
+      ),
     };
     email = { sendFamilyInvite: jest.fn().mockResolvedValue(undefined) };
     notifications = { create: jest.fn().mockResolvedValue({}) };
@@ -232,6 +240,32 @@ describe("FamilyService", () => {
         expect.objectContaining({ type: "family_member_joined" }),
       );
       expect(result.joined).toBe(true);
+    });
+
+    it("uses a serializable transaction for the seat-count check + create", async () => {
+      prisma.familyInvite.findUnique.mockResolvedValue(VALID_INVITE);
+      prisma.familyMembership.findUnique.mockResolvedValue(null);
+      prisma.familyGroup.findUniqueOrThrow.mockResolvedValue(GROUP_WITH_ROOM);
+
+      await service.acceptInvite(FREE_USER, "token");
+
+      expect(prisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    });
+
+    it("regression: translates a Postgres serialization failure (two invitees racing for the last seat) into a plain BadRequestException, not a 500", async () => {
+      prisma.familyInvite.findUnique.mockResolvedValue(VALID_INVITE);
+      prisma.familyMembership.findUnique.mockResolvedValue(null);
+      prisma.$transaction.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError("Transaction failed due to a write conflict", {
+          code: "P2034",
+          clientVersion: "test",
+        }),
+      );
+
+      await expect(service.acceptInvite(FREE_USER, "token")).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 
