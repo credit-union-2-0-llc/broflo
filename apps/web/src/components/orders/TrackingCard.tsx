@@ -15,13 +15,12 @@ export function TrackingCard({ trackingNumber, trackingUrl, carrierName }: Track
   if (!trackingNumber) return null;
 
   function copyTracking() {
-    if (trackingNumber) {
-      navigator.clipboard.writeText(trackingNumber);
-      toast.success("Tracking number copied");
-    }
+    if (!trackingNumber) return;
+    navigator.clipboard
+      .writeText(trackingNumber)
+      .then(() => toast.success("Tracking number copied"))
+      .catch(() => toast.error("Couldn't copy — the number is above, ready to copy by hand."));
   }
-
-  const isValidUrl = trackingUrl?.startsWith("https://");
 
   return (
     <Card>
@@ -43,9 +42,9 @@ export function TrackingCard({ trackingNumber, trackingUrl, carrierName }: Track
             <Copy className="h-3.5 w-3.5" />
           </Button>
         </div>
-        {isValidUrl && (
+        {trackingUrl?.startsWith("https://") && (
           <a
-            href={trackingUrl!}
+            href={trackingUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-sm text-blue hover:underline"

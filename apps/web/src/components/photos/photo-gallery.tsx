@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Lock, Loader2, CheckCircle2, AlertCircle, Trash2, RotateCw } from "lucide-react";
-import { VOICE } from "@broflo/shared/copy/voice";
+import { Lock, Loader2, CheckCircle2, AlertCircle, Trash2 } from "lucide-react";
 
 interface Photo {
   id: string;

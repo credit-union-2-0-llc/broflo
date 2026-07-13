@@ -93,6 +93,7 @@ function UpgradeContent() {
   const currentTier = session?.user?.subscriptionTier || "free";
   const [devOverrideEnabled, setDevOverrideEnabled] = useState(false);
   const [switching, setSwitching] = useState<string | null>(null);
+  const [checkingOut, setCheckingOut] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session?.accessToken) return;
@@ -113,6 +114,18 @@ function UpgradeContent() {
       toast.error("Failed to unlock plan.");
     } finally {
       setSwitching(null);
+    }
+  }
+
+  async function handleCheckout(tier: string, priceId: string | undefined, period: "monthly" | "annual") {
+    if (!priceId || !session?.accessToken) return;
+    const key = `${tier}-${period}`;
+    setCheckingOut(key);
+    try {
+      await startCheckout(priceId, session.accessToken);
+    } catch {
+      toast.error("Couldn't start checkout. Try again in a moment.");
+      setCheckingOut(null);
     }
   }
 
@@ -215,26 +228,18 @@ function UpgradeContent() {
                         isHighlighted &&
                           "bg-amber hover:bg-amber-light text-white",
                       )}
-                      onClick={() => {
-                        const priceId = MONTHLY_PRICE_ID_ENV[tier];
-                        if (priceId && session?.accessToken) {
-                          startCheckout(priceId, session.accessToken);
-                        }
-                      }}
+                      disabled={!!checkingOut}
+                      onClick={() => handleCheckout(tier, MONTHLY_PRICE_ID_ENV[tier], "monthly")}
                     >
-                      Get {plan.name} Monthly
+                      {checkingOut === `${tier}-monthly` ? "Starting checkout..." : `Get ${plan.name} Monthly`}
                     </Button>
                     <Button
                       variant="outline"
                       className="w-full"
-                      onClick={() => {
-                        const priceId = ANNUAL_PRICE_ID_ENV[tier];
-                        if (priceId && session?.accessToken) {
-                          startCheckout(priceId, session.accessToken);
-                        }
-                      }}
+                      disabled={!!checkingOut}
+                      onClick={() => handleCheckout(tier, ANNUAL_PRICE_ID_ENV[tier], "annual")}
                     >
-                      Get {plan.name} Annual
+                      {checkingOut === `${tier}-annual` ? "Starting checkout..." : `Get ${plan.name} Annual`}
                     </Button>
                   </>
                 )}

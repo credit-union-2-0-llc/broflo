@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,7 +28,6 @@ import {
   CreditCard,
   FileCheck,
   CheckCircle,
-  Circle,
   Loader2,
   ExternalLink,
   Package,
@@ -66,7 +64,6 @@ interface AgentPreviewModalProps {
   personId: string;
   eventId: string;
   retailerUrl?: string;
-  giftRecordId?: string;
   token: string;
   onOrderPlaced: (order: Order) => void;
 }
@@ -78,13 +75,13 @@ export function AgentPreviewModal({
   personId,
   eventId,
   retailerUrl,
-  giftRecordId,
   token,
   onOrderPlaced,
 }: AgentPreviewModalProps) {
   const [phase, setPhase] = useState<ModalPhase>("searching");
   const [job, setJob] = useState<AgentJob | null>(null);
   const [steps, setSteps] = useState<AgentStep[]>([]);
+  const lastStep = steps.length > 0 ? steps[steps.length - 1] : null;
   const [error, setError] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -428,11 +425,11 @@ export function AgentPreviewModal({
                 </div>
 
                 {/* Live screenshot */}
-                {steps.length > 0 && steps[steps.length - 1].screenshotUrl && (
+                {lastStep?.screenshotUrl && (
                   <div className="rounded-md border overflow-hidden">
                     <img
-                      src={steps[steps.length - 1].screenshotUrl!}
-                      alt={`Agent screenshot: ${steps[steps.length - 1].action}`}
+                      src={lastStep.screenshotUrl}
+                      alt={`Agent screenshot: ${lastStep.action}`}
                       className="w-full h-36 object-cover"
                     />
                   </div>

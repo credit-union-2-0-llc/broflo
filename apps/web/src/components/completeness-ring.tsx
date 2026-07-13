@@ -2,8 +2,6 @@
 
 const SIZE = 40;
 const STROKE = 4;
-const RADIUS = (SIZE - STROKE) / 2;
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 function getColor(score: number) {
   if (score < 40) return "text-destructive";

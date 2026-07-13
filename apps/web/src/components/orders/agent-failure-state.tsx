@@ -121,10 +121,14 @@ export function AgentFailureState({
 
   async function handleCopyAddress() {
     if (!shippingAddress) return;
-    await navigator.clipboard.writeText(formatAddress(shippingAddress));
-    setAddressCopied(true);
-    toast.success(VOICE.agent.addressCopied);
-    setTimeout(() => setAddressCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(formatAddress(shippingAddress));
+      setAddressCopied(true);
+      toast.success(VOICE.agent.addressCopied);
+      setTimeout(() => setAddressCopied(false), 2000);
+    } catch {
+      toast.error("Couldn't copy — the address is above, ready to copy by hand.");
+    }
   }
 
   // Price mismatch gets a special layout with price comparison card
