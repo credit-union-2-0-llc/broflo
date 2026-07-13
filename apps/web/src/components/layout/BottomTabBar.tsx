@@ -7,7 +7,7 @@ import {
   Users,
   Calendar,
   Package,
-  Trophy,
+  User,
 } from "lucide-react";
 
 const tabs = [
@@ -15,7 +15,7 @@ const tabs = [
   { href: "/people", label: "People", icon: Users },
   { href: "/events", label: "Events", icon: Calendar },
   { href: "/orders", label: "Orders", icon: Package },
-  { href: "/profile", label: "Score", icon: Trophy },
+  { href: "/profile", label: "Profile", icon: User },
 ] as const;
 
 export function BottomTabBar() {

@@ -10,7 +10,7 @@ import {
   Calendar,
   Package,
   Zap,
-  Trophy,
+  User,
   Settings,
   LogOut,
   Heart,
@@ -31,7 +31,7 @@ const sections = [
     label: "Intelligence",
     items: [
       { href: "/autopilot", label: "Autopilot", icon: Zap, requiresTier: "pro" as SubscriptionTier },
-      { href: "/profile", label: "Score", icon: Trophy },
+      { href: "/profile", label: "Profile", icon: User },
     ],
   },
   {
