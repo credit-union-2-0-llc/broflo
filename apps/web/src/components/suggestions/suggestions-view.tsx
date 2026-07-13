@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Gift, RefreshCw, Shuffle, Lock, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +13,10 @@ import { OrderPreviewModal } from "@/components/orders/order-preview-modal";
 import { CancelCountdown } from "@/components/orders/cancel-countdown";
 import { ConfirmPurchaseDialog } from "./confirm-purchase-dialog";
 import { BuyOptionsDialog } from "./buy-options-dialog";
+
+const CYAN = "#22d3ee";
+const CORAL = "#ff8fa3";
+const AMBER = "#ffc24b";
 
 interface SuggestionsViewProps {
   eventId: string;
@@ -204,19 +206,15 @@ export function SuggestionsView({
   // Loading state
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Gift Ideas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center py-12" aria-live="polite" aria-busy="true">
-            <Loader2 className="h-8 w-8 animate-spin text-amber mb-4" />
-            <p className="text-sm text-muted-foreground italic text-center">
-              {VOICE.suggestions.loading[loadingMsgIdx]}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="rounded-[26px] border border-white/10 bg-white/[0.055] backdrop-blur-[22px] p-6">
+        <h2 className="text-base font-medium text-[#eef2fa]">Gift Ideas</h2>
+        <div className="flex flex-col items-center justify-center py-12" aria-live="polite" aria-busy="true">
+          <Loader2 className="h-8 w-8 animate-spin mb-4" style={{ color: CYAN }} />
+          <p className="text-sm italic text-center text-[#7c85a0]">
+            {VOICE.suggestions.loading[loadingMsgIdx]}
+          </p>
+        </div>
+      </div>
     );
   }
 
@@ -240,28 +238,33 @@ export function SuggestionsView({
       );
     }
     return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Gift Ideas for This Event</CardTitle>
-          <Button variant="default" size="sm" className="gap-1.5" onClick={generate}>
+      <div className="rounded-[26px] border border-white/10 bg-white/[0.055] backdrop-blur-[22px] p-6">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-medium text-[#eef2fa]">Gift Ideas for This Event</h2>
+          <button
+            onClick={generate}
+            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12.5px] font-semibold text-[#04222a] hover:opacity-90 transition-opacity"
+            style={{ background: CYAN }}
+          >
             <Gift className="h-4 w-4" />
             Find Gift Ideas
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            No suggestions yet. Click &ldquo;Find Gift Ideas&rdquo; to get started.
-          </p>
-          {error && (
-            <div className="text-sm text-destructive">
-              {error}
-              <Button variant="outline" size="sm" className="ml-2" onClick={generate}>
-                Try Again
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </button>
+        </div>
+        <p className="mt-3 text-sm text-[#7c85a0]">
+          No suggestions yet. Click &ldquo;Find Gift Ideas&rdquo; to get started.
+        </p>
+        {error && (
+          <div className="mt-3 text-sm" style={{ color: CORAL }}>
+            {error}
+            <button
+              onClick={generate}
+              className="ml-2 rounded-full border border-white/10 px-3 py-1 text-[12.5px] text-[#b9c0d4] hover:border-white/20"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -270,25 +273,28 @@ export function SuggestionsView({
 
   return (
     <>
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Gift Ideas</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="rounded-[26px] border border-white/10 bg-white/[0.055] backdrop-blur-[22px] p-6">
+      <h2 className="text-base font-medium text-[#eef2fa]">Gift Ideas</h2>
+
+      <div className="mt-4 space-y-4">
         {/* Controls row */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Safe/Bold toggle */}
-          <div className="flex rounded-md border overflow-hidden text-sm">
+          <div className="flex gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1 text-sm">
             <button
               onClick={() => tier !== "free" && setSurpriseFactor("safe")}
-              className={`px-3 py-1 ${surpriseFactor === "safe" ? "bg-primary text-primary-foreground" : "bg-background"} ${tier === "free" ? "opacity-50" : ""}`}
+              className={`rounded-full px-3 py-1 text-[12.5px] transition-colors ${
+                surpriseFactor === "safe" ? "bg-[#eef2fa] text-[#0b0e14] font-semibold" : "text-[#7c85a0]"
+              } ${tier === "free" ? "opacity-50" : ""}`}
               disabled={tier === "free"}
             >
               Safe
             </button>
             <button
               onClick={() => tier !== "free" && setSurpriseFactor("bold")}
-              className={`px-3 py-1 ${surpriseFactor === "bold" ? "bg-primary text-primary-foreground" : "bg-background"} ${tier === "free" ? "opacity-50" : ""}`}
+              className={`rounded-full px-3 py-1 text-[12.5px] transition-colors ${
+                surpriseFactor === "bold" ? "bg-[#eef2fa] text-[#0b0e14] font-semibold" : "text-[#7c85a0]"
+              } ${tier === "free" ? "opacity-50" : ""}`}
               disabled={tier === "free"}
               aria-disabled={tier === "free"}
             >
@@ -296,34 +302,30 @@ export function SuggestionsView({
             </button>
           </div>
           {tier === "free" && (
-            <span className="text-xs text-muted-foreground">{VOICE.upsell.boldMode}</span>
+            <span className="text-xs text-[#7c85a0]">{VOICE.upsell.boldMode}</span>
           )}
 
           {/* Surprise Me */}
           {!hasSelected && (
-            <Button
-              variant="outline"
-              size="sm"
+            <button
               onClick={handleSurpriseMe}
               disabled={tier === "free" || suggestions.length === 0}
-              className="gap-1"
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3.5 py-1.5 text-[12.5px] text-[#b9c0d4] hover:border-white/20 disabled:opacity-40 transition-colors"
             >
               {tier === "free" ? <Lock className="h-3.5 w-3.5" /> : <Shuffle className="h-3.5 w-3.5" />}
               Surprise Me
-            </Button>
+            </button>
           )}
 
           {/* Regenerate */}
           {tier !== "free" && canReroll && (
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={() => setShowGuidance(true)}
-              className="gap-1 ml-auto"
+              className="ml-auto inline-flex items-center gap-1.5 text-[12.5px] text-[#7c85a0] hover:text-[#b9c0d4] transition-colors"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               Try Again
-            </Button>
+            </button>
           )}
         </div>
 
@@ -335,30 +337,42 @@ export function SuggestionsView({
               value={guidanceText}
               onChange={(e) => setGuidanceText(e.target.value)}
               maxLength={200}
-              className="text-sm"
+              className="border-white/10 bg-white/[0.04] text-sm text-[#eef2fa] placeholder:text-[#7c85a0]"
             />
             <div className="flex gap-2 shrink-0">
-              <Button size="sm" onClick={generate}>Go</Button>
-              <Button size="sm" variant="ghost" onClick={() => { setShowGuidance(false); generate(); }}>
+              <button
+                onClick={generate}
+                className="rounded-full px-4 py-2 text-[12.5px] font-semibold text-[#04222a]"
+                style={{ background: CYAN }}
+              >
+                Go
+              </button>
+              <button
+                onClick={() => { setShowGuidance(false); generate(); }}
+                className="rounded-full px-4 py-2 text-[12.5px] text-[#7c85a0] hover:text-[#b9c0d4]"
+              >
                 Skip
-              </Button>
+              </button>
             </div>
           </div>
         )}
 
         {/* Error */}
         {error && (
-          <div className="text-sm text-destructive">
+          <div className="text-sm" style={{ color: CORAL }}>
             {error}
-            <Button variant="outline" size="sm" className="ml-2" onClick={generate}>
+            <button
+              onClick={generate}
+              className="ml-2 rounded-full border border-white/10 px-3 py-1 text-[12.5px] text-[#b9c0d4] hover:border-white/20"
+            >
               Try Again
-            </Button>
+            </button>
           </div>
         )}
 
         {/* Suggestion cards */}
         {suggestions.length > 0 ? (
-          <div className="space-y-3" role="list">
+          <div className="space-y-4" role="list">
             {suggestions.map((s, i) => {
               const orderInfo = orderedSuggestions.get(s.id);
               return (
@@ -389,34 +403,35 @@ export function SuggestionsView({
             })}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground italic">
+          <p className="text-sm italic text-[#7c85a0]">
             {VOICE.suggestions.empty}
           </p>
         )}
 
         {/* Free tier upsell */}
         {tier === "free" && suggestions.length > 0 && (
-          <Card className="border-amber-3 bg-gradient-to-r from-amber-glow2 to-transparent">
-            <CardContent className="flex items-start gap-3 py-4">
-              <Sparkles className="h-6 w-6 text-amber shrink-0" />
-              <div>
-                <p className="text-sm font-semibold">{VOICE.upsell.moreSuggestions}</p>
-                <Button size="sm" className="mt-2 bg-amber hover:bg-amber-light text-white">
-                  Upgrade to Pro – $9.99/mo
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex items-start gap-3 rounded-[18px] border border-white/10 bg-white/[0.04] p-4">
+            <Sparkles className="h-6 w-6 shrink-0" style={{ color: AMBER }} />
+            <div>
+              <p className="text-sm font-semibold text-[#eef2fa]">{VOICE.upsell.moreSuggestions}</p>
+              <button
+                className="mt-2 rounded-full px-4 py-1.5 text-[12.5px] font-semibold text-[#04222a]"
+                style={{ background: AMBER }}
+              >
+                Upgrade to Pro – $9.99/mo
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Selected confirmation */}
         {hasSelected && (
-          <p className="text-sm font-medium text-amber" aria-live="polite">
+          <p className="text-sm font-medium" style={{ color: CYAN }} aria-live="polite">
             {VOICE.suggestions.selected(personName)}
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
 
     {orderingSuggestionId && (
       <OrderPreviewModal
