@@ -6,6 +6,5 @@ export interface BrofloUser {
   name: string | null;
   subscriptionTier: SubscriptionTier;
   stripeCustomerId: string | null;
-  brofloScore: number;
   createdAt: Date;
 }

@@ -39,12 +39,4 @@ test.describe("UC-17: Select suggestion for Mom & rate 5 stars (Nailed It)", () 
       await fiveStars.click();
     }
   });
-
-  test("Broflo Score increases after 5-star rating", async ({ page }) => {
-    await ensurePersonExists(page, mom);
-    await page.goto("/dashboard");
-
-    const scoreWidget = page.locator('text=/Broflo Score|Rookie Bro|Solid Dude/i');
-    await expect(scoreWidget.first()).toBeVisible();
-  });
 });

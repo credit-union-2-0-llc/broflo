@@ -4,7 +4,6 @@ import { useSession } from "next-auth/react";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 const stats = [
-  { label: "Broflo Score", sub: "lifetime", color: "var(--amber)", key: "score" },
   { label: "Due Soon", sub: "next 24h", color: "var(--red)", key: "dueSoon" },
   { label: "People", sub: "tracked", color: "var(--blue)", key: "people" },
 ] as const;
@@ -24,12 +23,9 @@ export function ScoreboardStrip({ peopleCount, dueSoonCount }: ScoreboardStripPr
   const user = session?.user;
 
   const statValues: Record<string, string> = {
-    score: String(user?.brofloScore ?? 0),
     dueSoon: String(dueSoonCount),
     people: String(peopleCount),
   };
-
-  const mobileStats = stats.filter((s) => s.key === "score" || s.key === "dueSoon");
 
   return (
     <header
@@ -39,7 +35,7 @@ export function ScoreboardStrip({ peopleCount, dueSoonCount }: ScoreboardStripPr
       {/* Desktop: full strip */}
       <div
         className="hidden lg:grid"
-        style={{ gridTemplateColumns: "auto 1fr 1fr 1fr auto" }}
+        style={{ gridTemplateColumns: "auto 1fr 1fr auto" }}
       >
         {/* Logo cell */}
         <div
@@ -149,7 +145,7 @@ export function ScoreboardStrip({ peopleCount, dueSoonCount }: ScoreboardStripPr
         </div>
       </div>
 
-      {/* Mobile: collapsed strip — Score + Due Soon only */}
+      {/* Mobile: collapsed strip */}
       <div
         className="lg:hidden grid items-center"
         style={{ gridTemplateColumns: "auto 1fr 1fr auto" }}
@@ -166,7 +162,7 @@ export function ScoreboardStrip({ peopleCount, dueSoonCount }: ScoreboardStripPr
           </span>
         </div>
 
-        {mobileStats.map((stat) => (
+        {stats.map((stat) => (
           <div
             key={stat.key}
             className="relative flex flex-col justify-center px-3 py-2"

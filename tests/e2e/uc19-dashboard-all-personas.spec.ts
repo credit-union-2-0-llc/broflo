@@ -4,13 +4,10 @@ import { authFile } from "./helpers/auth";
 test.use({ storageState: authFile("delta") });
 
 test.describe("UC-19: Dashboard with all 10 personas loaded", () => {
-  test("dashboard renders all 4 widgets", async ({ page }) => {
+  test("dashboard renders its widgets", async ({ page }) => {
     await page.goto("/dashboard");
 
     await expect(page.locator("h1")).toContainText("Dashboard");
-
-    const scoreWidget = page.locator('text=/Broflo Score|Rookie Bro|score/i');
-    await expect(scoreWidget.first()).toBeVisible();
 
     const comingUp = page.locator('text=/Coming Up|Upcoming|events/i');
     await expect(comingUp.first()).toBeVisible();

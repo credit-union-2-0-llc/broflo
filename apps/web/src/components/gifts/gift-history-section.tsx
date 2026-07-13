@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -36,7 +35,6 @@ export function GiftHistorySection({
   token,
   tier,
 }: GiftHistorySectionProps) {
-  const { update: updateSession } = useSession();
   const [gifts, setGifts] = useState<GiftRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [yearFilter, setYearFilter] = useState<string>("all");
@@ -88,9 +86,6 @@ export function GiftHistorySection({
       setGifts((prev) =>
         prev.map((g) => (g.id === gift.id ? result.giftRecord : g)),
       );
-      if (result.scoreChange > 0) {
-        updateSession({ user: { brofloScore: result.newScore } });
-      }
     } catch {
       toast.error("Failed to save. Try again.");
     }
@@ -100,9 +95,6 @@ export function GiftHistorySection({
     setGifts((prev) =>
       prev.map((g) => (g.id === result.giftRecord.id ? result.giftRecord : g)),
     );
-    if (result.scoreChange > 0) {
-      updateSession({ user: { brofloScore: result.newScore } });
-    }
     // Check if 1-star → trigger never-again prompt
     if (result.promptNeverAgain) {
       const gift = gifts.find((g) => g.id === result.giftRecord.id);
@@ -113,10 +105,8 @@ export function GiftHistorySection({
   }
 
   function handleGiftCreated(result: CreateGiftResponse) {
+    void result;
     loadGifts();
-    if (result.scoreChange > 0) {
-      updateSession({ user: { brofloScore: result.newScore } });
-    }
   }
 
   const isPro = tierAtLeast(tier, "pro");

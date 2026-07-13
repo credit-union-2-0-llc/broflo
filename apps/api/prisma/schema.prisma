@@ -18,7 +18,6 @@ model User {
   stripeCustomerId      String?   @unique @map("stripe_customer_id")
   stripeSubscriptionId  String?   @unique @map("stripe_subscription_id")
   stripePaymentMethodId String?   @map("stripe_payment_method_id")
-  brofloScore           Int       @default(0) @map("broflo_score")
   isAdmin               Boolean   @default(false) @map("is_admin")
   onboardingCompletedAt DateTime? @map("onboarding_completed_at")
   pendingPlanKey        String?   @map("pending_plan_key")

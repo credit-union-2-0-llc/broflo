@@ -34,7 +34,6 @@ const FEATURES: Record<string, string[]> = {
     "Bold surprise mode",
     "Up to 3 re-rolls",
     "Gift history context",
-    "Full gamification",
     "Auto-execute purchases",
     "Autopilot mode",
   ],

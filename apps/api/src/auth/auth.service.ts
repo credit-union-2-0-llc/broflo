@@ -124,7 +124,6 @@ export class AuthService {
         name: user.name,
         avatarUrl: user.avatarUrl,
         subscriptionTier: user.subscriptionTier,
-        brofloScore: user.brofloScore,
       },
     };
   }
@@ -136,7 +135,6 @@ export class AuthService {
       name: user.name,
       avatarUrl: user.avatarUrl,
       subscriptionTier: user.subscriptionTier,
-      brofloScore: user.brofloScore,
       createdAt: user.createdAt,
     };
   }
