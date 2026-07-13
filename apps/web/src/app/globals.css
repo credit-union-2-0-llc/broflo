@@ -4,123 +4,133 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ── Broflo War Room color system ── */
+/* ── Broflo "Prism" color system ── */
 :root {
   /* Background scale */
-  --bg: #080809;
-  --s1: #0f0f11;
-  --s2: #141417;
-  --s3: #1a1a1e;
-  --s4: #202026;
+  --bg: #0b0e14;
+  --s1: #12151d;
+  --s2: #171b26;
+  --s3: #1c2130;
+  --s4: #232939;
 
-  /* Accent: Amber */
-  --amber: #e8a422;
-  --amber2: #c4891a;
-  --amber3: #7a5210;
-  --amber-glow: #e8a42212;
-  --amber-glow2: #e8a42225;
+  /* Accent: Amber (secondary accent — emphasis, top-pick, warnings) */
+  --amber: #ffc24b;
+  --amber2: #e0a83d;
+  --amber3: #8a6a1f;
+  --amber-glow: #ffc24b12;
+  --amber-glow2: #ffc24b25;
 
   /* Status */
   --green: #1a8a46;
-  --green-bright: #22c55e;
-  --green-dim: #0a3d1f;
-  --red: #dc2626;
-  --red-dim: #3d0e0e;
+  --green-bright: #3ecb6e;
+  --green-dim: #123321;
+  --red: #ff8fa3;
+  --red-dim: #401f28;
   --blue: #3b82f6;
 
-  /* Typography */
-  --cream: #e2ddd6;
-  --muted: #555560;
-  --muted2: #888894;
+  /* Accent: Cyan (primary accent — CTAs, focus, confidence) */
+  --cyan: #22d3ee;
+  --cyan-dim: #123a42;
+  --coral: #ff8fa3;
+  --coral-dim: #401f28;
 
-  /* Borders */
-  --border: #1e1e24;
-  --border2: #2a2a34;
-  --border3: #363644;
+  /* Typography */
+  --cream: #eef2fa;
+  --muted: #7c85a0;
+  --muted2: #b9c0d4;
+
+  /* Borders — hairline, translucent (glass) */
+  --border: rgba(238, 242, 250, 0.08);
+  --border2: rgba(238, 242, 250, 0.12);
+  --border3: rgba(238, 242, 250, 0.18);
 
   /* shadcn overrides — dark-only app */
-  --background: #080809;
-  --foreground: #e2ddd6;
-  --card: #0f0f11;
-  --card-foreground: #e2ddd6;
-  --popover: #0f0f11;
-  --popover-foreground: #e2ddd6;
-  --primary: #e8a422;
-  --primary-foreground: #000000;
-  --secondary: #141417;
-  --secondary-foreground: #e2ddd6;
-  --muted-shadcn: #141417;
-  --muted-foreground: #555560;
-  --accent: #141417;
-  --accent-foreground: #e2ddd6;
-  --destructive: #dc2626;
-  --input: #1a1a1e;
-  --ring: #e8a422;
-  --radius: 0px;
+  --background: #0b0e14;
+  --foreground: #eef2fa;
+  --card: rgba(255, 255, 255, 0.055);
+  --card-foreground: #eef2fa;
+  --popover: #171b26;
+  --popover-foreground: #eef2fa;
+  --primary: #22d3ee;
+  --primary-foreground: #04222a;
+  --secondary: rgba(255, 255, 255, 0.06);
+  --secondary-foreground: #eef2fa;
+  --muted-shadcn: rgba(255, 255, 255, 0.06);
+  --muted-foreground: #7c85a0;
+  --accent: rgba(255, 255, 255, 0.07);
+  --accent-foreground: #eef2fa;
+  --destructive: #ff8fa3;
+  --input: rgba(255, 255, 255, 0.06);
+  --ring: #22d3ee;
+  --radius: 20px;
 
-  --sidebar: #0f0f11;
-  --sidebar-foreground: #e2ddd6;
-  --sidebar-primary: #e8a422;
-  --sidebar-primary-foreground: #000000;
-  --sidebar-accent: #141417;
-  --sidebar-accent-foreground: #e2ddd6;
-  --sidebar-border: #1e1e24;
-  --sidebar-ring: #e8a422;
+  --sidebar: #12151d;
+  --sidebar-foreground: #eef2fa;
+  --sidebar-primary: #22d3ee;
+  --sidebar-primary-foreground: #04222a;
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
+  --sidebar-accent-foreground: #eef2fa;
+  --sidebar-border: rgba(238, 242, 250, 0.08);
+  --sidebar-ring: #22d3ee;
 }
 
 @theme inline {
-  --color-background: #080809;
-  --color-foreground: #e2ddd6;
+  --color-background: #0b0e14;
+  --color-foreground: #eef2fa;
   --font-sans: var(--font-body);
   --font-mono: var(--font-mono);
   --font-heading: var(--font-display);
 
-  /* War Room palette */
-  --color-bg: #080809;
-  --color-s1: #0f0f11;
-  --color-s2: #141417;
-  --color-s3: #1a1a1e;
-  --color-s4: #202026;
-  --color-amber: #e8a422;
-  --color-amber-2: #c4891a;
-  --color-amber-3: #7a5210;
-  --color-amber-glow: #e8a42212;
-  --color-amber-glow2: #e8a42225;
-  --color-green-bright: #22c55e;
-  --color-green-dim: #0a3d1f;
-  --color-red: #dc2626;
-  --color-red-dim: #3d0e0e;
+  /* Prism palette */
+  --color-bg: #0b0e14;
+  --color-s1: #12151d;
+  --color-s2: #171b26;
+  --color-s3: #1c2130;
+  --color-s4: #232939;
+  --color-amber: #ffc24b;
+  --color-amber-2: #e0a83d;
+  --color-amber-3: #8a6a1f;
+  --color-amber-glow: #ffc24b12;
+  --color-amber-glow2: #ffc24b25;
+  --color-cyan: #22d3ee;
+  --color-cyan-dim: #123a42;
+  --color-coral: #ff8fa3;
+  --color-coral-dim: #401f28;
+  --color-green-bright: #3ecb6e;
+  --color-green-dim: #123321;
+  --color-red: #ff8fa3;
+  --color-red-dim: #401f28;
   --color-blue: #3b82f6;
-  --color-cream: #e2ddd6;
-  --color-muted: #555560;
-  --color-muted-2: #888894;
-  --color-border: #1e1e24;
-  --color-border-2: #2a2a34;
-  --color-border-3: #363644;
+  --color-cream: #eef2fa;
+  --color-muted: #7c85a0;
+  --color-muted-2: #b9c0d4;
+  --color-border: rgba(238, 242, 250, 0.08);
+  --color-border-2: rgba(238, 242, 250, 0.12);
+  --color-border-3: rgba(238, 242, 250, 0.18);
 
   /* shadcn token passthrough */
-  --color-card: #0f0f11;
-  --color-card-foreground: #e2ddd6;
-  --color-popover: #0f0f11;
-  --color-popover-foreground: #e2ddd6;
-  --color-primary: #e8a422;
-  --color-primary-foreground: #000000;
-  --color-secondary: #141417;
-  --color-secondary-foreground: #e2ddd6;
-  --color-muted-foreground: #555560;
-  --color-accent: #141417;
-  --color-accent-foreground: #e2ddd6;
-  --color-destructive: #dc2626;
-  --color-input: #1a1a1e;
-  --color-ring: #e8a422;
-  --color-sidebar-ring: #e8a422;
-  --color-sidebar-border: #1e1e24;
-  --color-sidebar-accent-foreground: #e2ddd6;
-  --color-sidebar-accent: #141417;
-  --color-sidebar-primary-foreground: #000000;
-  --color-sidebar-primary: #e8a422;
-  --color-sidebar-foreground: #e2ddd6;
-  --color-sidebar: #0f0f11;
+  --color-card: rgba(255, 255, 255, 0.055);
+  --color-card-foreground: #eef2fa;
+  --color-popover: #171b26;
+  --color-popover-foreground: #eef2fa;
+  --color-primary: #22d3ee;
+  --color-primary-foreground: #04222a;
+  --color-secondary: rgba(255, 255, 255, 0.06);
+  --color-secondary-foreground: #eef2fa;
+  --color-muted-foreground: #7c85a0;
+  --color-accent: rgba(255, 255, 255, 0.07);
+  --color-accent-foreground: #eef2fa;
+  --color-destructive: #ff8fa3;
+  --color-input: rgba(255, 255, 255, 0.06);
+  --color-ring: #22d3ee;
+  --color-sidebar-ring: #22d3ee;
+  --color-sidebar-border: rgba(238, 242, 250, 0.08);
+  --color-sidebar-accent-foreground: #eef2fa;
+  --color-sidebar-accent: rgba(255, 255, 255, 0.06);
+  --color-sidebar-primary-foreground: #04222a;
+  --color-sidebar-primary: #22d3ee;
+  --color-sidebar-foreground: #eef2fa;
+  --color-sidebar: #12151d;
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -144,25 +154,34 @@
   }
 }
 
-/* ── CRT scanline overlay ── */
-body::after {
-  content: '';
+/* ── Aurora wash, fixed behind the whole app ── */
+.aurora-wash {
   position: fixed;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 3px,
-    rgba(0, 0, 0, 0.015) 3px,
-    rgba(0, 0, 0, 0.015) 4px
-  );
+  inset: -10%;
+  z-index: -1;
   pointer-events: none;
-  z-index: 9999;
+  filter: blur(80px);
+  opacity: 0.28;
+}
+.aurora-wash .b1,
+.aurora-wash .b2,
+.aurora-wash .b3 {
+  position: absolute;
+  border-radius: 50%;
+}
+.aurora-wash .b1 { width: 44vw; height: 44vw; top: -12%; left: -8%; background: var(--cyan); }
+.aurora-wash .b2 { width: 38vw; height: 38vw; top: 4%; right: -10%; background: var(--coral); }
+.aurora-wash .b3 { width: 40vw; height: 40vw; bottom: -18%; left: 22%; background: var(--amber); }
+
+/* ── Glass surfaces (Card, Dialog, Popover, etc.) ── */
+.glass-surface {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 /* ── Focus ring ── */
 :focus-visible {
-  outline: 2px solid var(--amber);
+  outline: 2px solid var(--cyan);
   outline-offset: 2px;
 }
 
@@ -181,9 +200,9 @@ body::after {
   display: inline-block;
   width: 5px;
   height: 5px;
-  background: var(--green-bright);
+  background: var(--cyan);
   border-radius: 50%;
-  box-shadow: 0 0 5px var(--green-bright);
+  box-shadow: 0 0 5px var(--cyan);
   animation: blink 2s infinite;
 }
 
@@ -193,6 +212,7 @@ body::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+  .aurora-wash { display: none; }
 }
 
 /* ── Mobile touch targets ── */

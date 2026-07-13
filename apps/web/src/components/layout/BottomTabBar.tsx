@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 const tabs = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/people", label: "People", icon: Users },
   { href: "/events", label: "Events", icon: Calendar },
   { href: "/orders", label: "Orders", icon: Package },
@@ -27,11 +27,8 @@ export function BottomTabBar() {
 
   return (
     <nav
-      className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-s1"
-      style={{
-        borderTop: "1px solid var(--border2)",
-        paddingBottom: "env(safe-area-inset-bottom)",
-      }}
+      className="lg:hidden fixed bottom-0 inset-x-0 z-50 border-t border-border bg-white/[0.04] backdrop-blur-xl"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Main navigation"
       role="tablist"
     >
@@ -45,14 +42,9 @@ export function BottomTabBar() {
               href={tab.href}
               role="tab"
               aria-current={active ? "page" : undefined}
-              className="flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px]"
-              style={{
-                color: active ? "var(--amber)" : "var(--muted2)",
-                fontFamily: "var(--font-mono)",
-                fontSize: "8px",
-                letterSpacing: ".1em",
-                textTransform: "uppercase",
-              }}
+              className={`flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px] text-[10px] ${
+                active ? "text-cyan" : "text-muted-foreground"
+              }`}
             >
               <Icon className="h-5 w-5" />
               <span>{tab.label}</span>

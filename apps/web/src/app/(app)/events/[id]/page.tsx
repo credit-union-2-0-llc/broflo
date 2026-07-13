@@ -102,14 +102,7 @@ export default async function EventDetailPage({
       : null;
 
   return (
-    <div className="relative -m-4 lg:-m-5 overflow-hidden bg-[#0b0e14] p-4 lg:p-8">
-      {/* aurora wash, contained to this page */}
-      <div className="pointer-events-none absolute inset-0 -z-10 opacity-30" aria-hidden="true">
-        <div className="absolute -left-[8%] -top-[12%] h-[44vw] w-[44vw] rounded-full bg-[#06b6d4] blur-[80px]" />
-        <div className="absolute -right-[10%] top-[4%] h-[38vw] w-[38vw] rounded-full bg-[#fb7185] blur-[80px]" />
-        <div className="absolute -bottom-[18%] left-[22%] h-[40vw] w-[40vw] rounded-full bg-[#f5a524] blur-[80px]" />
-      </div>
-
+    <div>
       <div className="mx-auto max-w-[1160px]">
         <div className="mb-5 flex items-center justify-between">
           <Link
