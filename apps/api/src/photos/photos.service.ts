@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
 import { RedisService } from "../redis/redis.service";
@@ -157,13 +158,21 @@ export class PhotosService {
 
     // Tier quota check — fails closed to 1 (Free's cap) if entitlements
     // data is missing, rather than silently allowing unlimited uploads.
+    //
+    // The count-check and the placeholder-row create happen together in a
+    // short serializable transaction, claiming this person's photo-count
+    // slot atomically before any slow work starts — two concurrent uploads
+    // for the same person used to both read the same count, both pass, and
+    // both land past the cap (worse here than a simple quota check, since
+    // there's a wide image-processing/blob-upload gap between the old
+    // count-check and the old create). The transaction is deliberately
+    // limited to just this fast check-and-claim step, not held open across
+    // the slow image processing / blob upload below — a DB transaction
+    // shouldn't sit open through external I/O.
     const tier = user.subscriptionTier;
     const limit = await this.entitlements.getIntLimit(tier, "photoLimitPerPerson", 1);
-    const existingCount = await this.prisma.personPhoto.count({
-      where: { personId, userId: user.id },
-    });
-    if (limit !== null && existingCount >= limit) {
-      throw new HttpException(
+    const quotaError = () =>
+      new HttpException(
         {
           statusCode: HttpStatus.PAYMENT_REQUIRED,
           message:
@@ -176,6 +185,36 @@ export class PhotosService {
         },
         HttpStatus.PAYMENT_REQUIRED,
       );
+
+    let photo: { id: string };
+    try {
+      photo = await this.prisma.$transaction(
+        async (tx) => {
+          if (limit !== null) {
+            const existingCount = await tx.personPhoto.count({
+              where: { personId, userId: user.id },
+            });
+            if (existingCount >= limit) throw quotaError();
+          }
+
+          return tx.personPhoto.create({
+            data: {
+              personId,
+              userId: user.id,
+              blobPath: "", // placeholder, filled in after upload
+              category,
+              mimeType: "image/jpeg", // always JPEG after re-encode
+              fileSizeBytes: 0, // placeholder, filled in after processing
+            },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2034") {
+        throw quotaError();
+      }
+      throw err;
     }
 
     // Process image: re-encode to JPEG, strip EXIF, generate thumbnail
@@ -184,22 +223,18 @@ export class PhotosService {
     try {
       ({ processed, thumb } = await this.storage.processImage(file.buffer));
     } catch {
+      // Processing failed — release the slot we just claimed instead of
+      // leaving a permanent placeholder row eating this person's quota.
+      await this.prisma.personPhoto.delete({ where: { id: photo.id } });
       throw new HttpException(
         "Unsupported file type. Upload JPEG, PNG, WebP, or HEIC.",
         HttpStatus.UNSUPPORTED_MEDIA_TYPE,
       );
     }
 
-    // Create DB record (generates UUID for blob path)
-    const photo = await this.prisma.personPhoto.create({
-      data: {
-        personId,
-        userId: user.id,
-        blobPath: "", // placeholder, update after upload
-        category,
-        mimeType: "image/jpeg", // always JPEG after re-encode
-        fileSizeBytes: processed.length,
-      },
+    await this.prisma.personPhoto.update({
+      where: { id: photo.id },
+      data: { fileSizeBytes: processed.length },
     });
 
     // Upload to Azure Blob

@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { AgentOrdersService } from '../agent-orders.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { BrowserAgentClient } from '../browser-agent.client';
@@ -159,5 +161,110 @@ describe('AgentOrdersService - place()', () => {
       userId,
       expect.objectContaining({ title: "That didn't work" }),
     );
+  });
+});
+
+describe('AgentOrdersService - preview() concurrency claim', () => {
+  let service: AgentOrdersService;
+  let prisma: {
+    agentJob: { count: jest.Mock; create: jest.Mock; update: jest.Mock };
+    giftSuggestion: { findFirst: jest.Mock };
+    person: { findFirst: jest.Mock };
+    $transaction: jest.Mock;
+  };
+  let agentClient: { execute: jest.Mock };
+  let retailerProfile: { isSupported: jest.Mock; recordAttempt: jest.Mock };
+  let entitlements: { isFeatureEnabled: jest.Mock };
+
+  const userId = 'user-1';
+
+  function makeUser(): User {
+    return { id: userId, subscriptionTier: 'pro' } as User;
+  }
+
+  const previewDto = {
+    suggestionId: 'sug-1',
+    eventId: 'event-1',
+    personId: 'person-1',
+  };
+
+  beforeEach(async () => {
+    prisma = {
+      agentJob: {
+        count: jest.fn().mockResolvedValue(0),
+        create: jest.fn().mockResolvedValue({ id: 'job-1' }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      giftSuggestion: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'sug-1',
+          retailerHint: 'https://example.com/product',
+          title: 'Cozy Blanket',
+          estimatedPriceMaxCents: 5000,
+        }),
+      },
+      person: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'person-1',
+          name: 'Test Person',
+          shippingAddress1: '123 Main St',
+          shippingAddress2: null,
+          shippingCity: 'Portland',
+          shippingState: 'OR',
+          shippingZip: '97201',
+        }),
+      },
+      $transaction: jest.fn().mockImplementation((callback: (tx: unknown) => unknown) => callback(prisma)),
+    };
+    agentClient = { execute: jest.fn().mockResolvedValue({ status: 'previewing', steps: [] }) };
+    retailerProfile = {
+      isSupported: jest.fn().mockResolvedValue(true),
+      recordAttempt: jest.fn().mockResolvedValue(undefined),
+    };
+    entitlements = { isFeatureEnabled: jest.fn().mockResolvedValue(true) };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AgentOrdersService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: BrowserAgentClient, useValue: agentClient },
+        { provide: StripeIssuingService, useValue: { createVirtualCard: jest.fn() } },
+        { provide: RetailerProfileService, useValue: retailerProfile },
+        { provide: ServiceCreditService, useValue: { issueCredit: jest.fn() } },
+        { provide: OrderAuditService, useValue: { record: jest.fn().mockResolvedValue(undefined) } },
+        { provide: NotificationsService, useValue: { create: jest.fn().mockResolvedValue({}) } },
+        { provide: EntitlementsService, useValue: entitlements },
+      ],
+    }).compile();
+
+    service = module.get(AgentOrdersService);
+  });
+
+  it('creates the job inside a serializable transaction, so the count-check and create cannot race', async () => {
+    await service.preview(makeUser(), previewDto);
+
+    expect(prisma.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+    expect(prisma.agentJob.create).toHaveBeenCalled();
+  });
+
+  it('rejects when already at MAX_CONCURRENT_JOBS active jobs', async () => {
+    prisma.agentJob.count.mockResolvedValue(3);
+
+    await expect(service.preview(makeUser(), previewDto)).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.agentJob.create).not.toHaveBeenCalled();
+  });
+
+  it('regression: two concurrent preview() calls both reading count=2 — the transaction serialization failure is translated into the same limit error, not a 500, and no second Stripe-card-issuing job is created', async () => {
+    prisma.$transaction.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Transaction failed due to a write conflict', {
+        code: 'P2034',
+        clientVersion: 'test',
+      }),
+    );
+
+    await expect(service.preview(makeUser(), previewDto)).rejects.toBeInstanceOf(BadRequestException);
   });
 });

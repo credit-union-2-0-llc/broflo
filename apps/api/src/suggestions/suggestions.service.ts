@@ -6,6 +6,7 @@ import {
   HttpException,
   Logger,
 } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { ProductSearchService } from "./product-search.service";
@@ -74,22 +75,24 @@ export class SuggestionsService {
     const surpriseFactor = forceSafeSurprise ? "safe" : (dto.surpriseFactor || "safe");
     const guidanceText = forceSafeSurprise ? undefined : dto.guidanceText;
 
-    // Determine request index (re-roll count)
-    const existingSets = await this.prisma.giftSuggestion.groupBy({
-      by: ["requestIndex"],
+    // Determine request index (re-roll count). Sourced from the claims
+    // table, not the GiftSuggestion rows, since the claim below is what
+    // actually enforces the limit atomically.
+    const requestIndex = await this.prisma.suggestionRequestClaim.count({
       where: { eventId: dto.eventId, userId },
     });
-    const requestIndex = existingSets.length;
     const maxRequests = await this.entitlements.getIntLimit(tier, "maxRerollRequests", 1);
-    if (maxRequests !== null && requestIndex >= maxRequests) {
-      throw new ForbiddenException(
+    const limitError = () =>
+      new ForbiddenException(
         tier === "free"
           ? "Want more options? Upgrade to Pro for up to 3 re-rolls."
           : "Re-roll limit reached for this event.",
       );
+    if (maxRequests !== null && requestIndex >= maxRequests) {
+      throw limitError();
     }
 
-    // Check Redis cache
+    // Check Redis cache — a pure read, doesn't consume a re-roll slot.
     const cacheKey = `suggest:${dto.personId}:${dto.eventId}:${tier}:${requestIndex}:${surpriseFactor}`;
     const cached = await this.redis.getCachedSuggestions(cacheKey);
     if (cached) {
@@ -107,248 +110,273 @@ export class SuggestionsService {
       return parsed;
     }
 
-    // Build context for FastAPI
-    const budgetMin = event.budgetMinCents ?? person.budgetMinCents ?? 2500;
-    const budgetMax = event.budgetMaxCents ?? person.budgetMaxCents ?? 10000;
-    const budgetSource = event.budgetMinCents != null ? "event" : person.budgetMinCents != null ? "person" : "default";
-
-    // Compute next occurrence + days until — UTC, not local (see
-    // EventsService.computeNextOccurrence's comment for why mixing UTC-
-    // parsed dates with local-timezone math silently shifts this by a day).
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const nextOcc = this.events.computeNextOccurrence(event.date, event.isRecurring, today);
-    const daysUntil = Math.ceil((nextOcc.getTime() - today.getTime()) / 86400000);
-
-    // Birthday/anniversary month-day extraction
-    const birthdayMd = person.birthday
-      ? `${(person.birthday.getMonth() + 1).toString().padStart(2, "0")}/${person.birthday.getDate().toString().padStart(2, "0")}`
-      : null;
-    const anniversaryMd = person.anniversary
-      ? `${(person.anniversary.getMonth() + 1).toString().padStart(2, "0")}/${person.anniversary.getDate().toString().padStart(2, "0")}`
-      : null;
-
-    // Gift history for Pro/Elite
-    let giftHistory: { title: string; given_at: string; rating: number | null }[] = [];
-    if (await this.entitlements.isFeatureEnabled(tier, "giftHistoryContext")) {
-      const gifts = await this.prisma.giftRecord.findMany({
-        where: { personId: dto.personId, userId },
-        orderBy: { givenAt: "desc" },
-        take: 20,
-        select: { title: true, givenAt: true, rating: true },
-      });
-      giftHistory = gifts.map((g) => ({
-        title: g.title,
-        given_at: g.givenAt.toISOString().slice(0, 10),
-        rating: g.rating,
-      }));
-    }
-
-    // Dismissed suggestions for this event (for re-roll context)
-    const dismissedSuggestions = await this.prisma.giftSuggestion.findMany({
-      where: { eventId: dto.eventId, userId, isDismissed: true },
-      select: { title: true, dismissalReason: true },
-    });
-
-    const count = await this.entitlements.getIntLimit(tier, "suggestionsPerRequest", 3) ?? 3;
-
-    // Call FastAPI
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
-
-    let aiResponse: {
-      suggestions: Array<Record<string, unknown>>;
-      model: string;
-      input_tokens: number;
-      output_tokens: number;
-      latency_ms: number;
-      prompt_cache_hit: boolean;
-      retry_count: number;
-      suggestions_filtered: number;
-    };
-
+    // Atomically claim this requestIndex — the unique constraint is what
+    // stops two concurrent re-roll requests (both having just read the same
+    // requestIndex above) from both slipping past the maxRequests check.
+    // A serializable transaction can't be used here since the "act" half of
+    // this claim spans a slow external AI-service call below.
+    let claim;
     try {
-      const res = await fetch(`${AI_SERVICE_URL}/suggest`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(AI_SERVICE_KEY && { "X-Service-Key": AI_SERVICE_KEY }),
-        },
-        body: JSON.stringify({
-          person: {
-            name: person.name.split(" ")[0], // First name only
-            relationship: person.relationship,
-            birthday_month_day: birthdayMd,
-            anniversary_month_day: anniversaryMd,
-            hobbies: person.hobbies,
-            music_taste: person.musicTaste,
-            favorite_brands: person.favoriteBrands,
-            food_preferences: person.foodPreferences,
-            clothing_size_top: person.clothingSizeTop,
-            clothing_size_bottom: person.clothingSizeBottom,
-            shoe_size: person.shoeSize,
-            notes: person.notes,
-            // S-11: enrichment fields
-            pronouns: person.pronouns,
-            allergens: person.allergens || [],
-            dietary_restrictions: person.dietaryRestrictions || [],
-            tags: person.tags?.map((t: { tag: string }) => t.tag) || [],
-            wishlist_items: person.wishlistItems?.map((w: { productName: string | null }) => w.productName).filter(Boolean) || [],
-          },
-          event_type: event.occasionType,
-          event_date: nextOcc.toISOString().slice(0, 10),
-          days_until: daysUntil,
-          budget_min_cents: budgetMin,
-          budget_max_cents: budgetMax,
-          budget_source: budgetSource,
-          never_again: person.neverAgainItems.map((na) => ({
-            description: na.description,
-          })),
-          gift_history: giftHistory,
-          dismissed: dismissedSuggestions.map((d) => ({
-            title: d.title,
-            reason: d.dismissalReason,
-          })),
-          tier,
-          surprise_factor: surpriseFactor,
-          guidance_text: guidanceText,
-          count,
-        }),
-        signal: controller.signal,
+      claim = await this.prisma.suggestionRequestClaim.create({
+        data: { eventId: dto.eventId, userId, requestIndex },
       });
-
-      if (!res.ok) {
-        const status = res.status;
-        if (status === 504) throw new HttpException("The gift oracle is temporarily offline. Even we have bad days.", 504);
-        if (status === 429) throw new HttpException("AI service rate limited", 429);
-        throw new HttpException("AI service error", 502);
-      }
-
-      aiResponse = await res.json();
     } catch (err) {
-      if (err instanceof HttpException) throw err;
-      if ((err as Error).name === "AbortError") {
-        throw new HttpException("The gift oracle is temporarily offline. Even we have bad days.", 504);
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+        throw limitError();
       }
-      this.logger.error("AI service call failed", err);
-      throw new HttpException("Something went wrong with our gift engine. Try again.", 500);
-    } finally {
-      clearTimeout(timeout);
+      throw err;
     }
 
-    // Enrich suggestions with product images
-    const productResults = await this.productSearch.searchProducts(
-      aiResponse.suggestions.map((s: Record<string, unknown>) => ({
-        title: s.title as string,
-        retailerHint: (s.retailer_hint as string) || null,
-        estimatedPriceMinCents: s.estimated_price_min_cents as number,
-        estimatedPriceMaxCents: s.estimated_price_max_cents as number,
-      })),
-    );
+    // Everything below spends the claim: on any failure, release the slot
+    // so a failed attempt (AI outage, product search error, etc.) doesn't
+    // permanently burn the user's re-roll.
+    try {
+      // Build context for FastAPI
+      const budgetMin = event.budgetMinCents ?? person.budgetMinCents ?? 2500;
+      const budgetMax = event.budgetMaxCents ?? person.budgetMaxCents ?? 10000;
+      const budgetSource = event.budgetMinCents != null ? "event" : person.budgetMinCents != null ? "person" : "default";
 
-    // Persist suggestions
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    const created = await Promise.all(
-      aiResponse.suggestions.map((s: Record<string, unknown>, i: number) =>
-        this.prisma.giftSuggestion.create({
-          data: {
-            personId: dto.personId,
-            eventId: dto.eventId,
-            userId,
-            title: s.title as string,
-            description: s.description as string,
-            estimatedPriceMinCents: s.estimated_price_min_cents as number,
-            estimatedPriceMaxCents: s.estimated_price_max_cents as number,
-            reasoning: s.reasoning as string,
-            confidenceScore: s.confidence_score as number,
-            delightScore: s.delight_score as number,
-            noveltyScore: s.novelty_score as number,
-            retailerHint: (s.retailer_hint as string) || null,
-            suggestedMessage: (s.suggested_message as string) || null,
-            imageUrl: productResults[i]?.imageUrl || null,
-            productUrl: productResults[i]?.productUrl || null,
-            productSourcePriceCents: productResults[i]?.priceCents || null,
-            modelVersion: aiResponse.model,
-            promptTokens: aiResponse.input_tokens,
-            completionTokens: aiResponse.output_tokens,
-            latencyMs: aiResponse.latency_ms,
-            requestIndex,
-            surpriseFactor: surpriseFactor as "safe" | "bold",
-            guidanceText: guidanceText || null,
-            expiresAt,
+      // Compute next occurrence + days until — UTC, not local (see
+      // EventsService.computeNextOccurrence's comment for why mixing UTC-
+      // parsed dates with local-timezone math silently shifts this by a day).
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+      const nextOcc = this.events.computeNextOccurrence(event.date, event.isRecurring, today);
+      const daysUntil = Math.ceil((nextOcc.getTime() - today.getTime()) / 86400000);
+
+      // Birthday/anniversary month-day extraction
+      const birthdayMd = person.birthday
+        ? `${(person.birthday.getMonth() + 1).toString().padStart(2, "0")}/${person.birthday.getDate().toString().padStart(2, "0")}`
+        : null;
+      const anniversaryMd = person.anniversary
+        ? `${(person.anniversary.getMonth() + 1).toString().padStart(2, "0")}/${person.anniversary.getDate().toString().padStart(2, "0")}`
+        : null;
+
+      // Gift history for Pro/Elite
+      let giftHistory: { title: string; given_at: string; rating: number | null }[] = [];
+      if (await this.entitlements.isFeatureEnabled(tier, "giftHistoryContext")) {
+        const gifts = await this.prisma.giftRecord.findMany({
+          where: { personId: dto.personId, userId },
+          orderBy: { givenAt: "desc" },
+          take: 20,
+          select: { title: true, givenAt: true, rating: true },
+        });
+        giftHistory = gifts.map((g) => ({
+          title: g.title,
+          given_at: g.givenAt.toISOString().slice(0, 10),
+          rating: g.rating,
+        }));
+      }
+
+      // Dismissed suggestions for this event (for re-roll context)
+      const dismissedSuggestions = await this.prisma.giftSuggestion.findMany({
+        where: { eventId: dto.eventId, userId, isDismissed: true },
+        select: { title: true, dismissalReason: true },
+      });
+
+      const count = await this.entitlements.getIntLimit(tier, "suggestionsPerRequest", 3) ?? 3;
+
+      // Call FastAPI
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+
+      let aiResponse: {
+        suggestions: Array<Record<string, unknown>>;
+        model: string;
+        input_tokens: number;
+        output_tokens: number;
+        latency_ms: number;
+        prompt_cache_hit: boolean;
+        retry_count: number;
+        suggestions_filtered: number;
+      };
+
+      try {
+        const res = await fetch(`${AI_SERVICE_URL}/suggest`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(AI_SERVICE_KEY && { "X-Service-Key": AI_SERVICE_KEY }),
           },
-        }),
-      ),
-    );
+          body: JSON.stringify({
+            person: {
+              name: person.name.split(" ")[0], // First name only
+              relationship: person.relationship,
+              birthday_month_day: birthdayMd,
+              anniversary_month_day: anniversaryMd,
+              hobbies: person.hobbies,
+              music_taste: person.musicTaste,
+              favorite_brands: person.favoriteBrands,
+              food_preferences: person.foodPreferences,
+              clothing_size_top: person.clothingSizeTop,
+              clothing_size_bottom: person.clothingSizeBottom,
+              shoe_size: person.shoeSize,
+              notes: person.notes,
+              // S-11: enrichment fields
+              pronouns: person.pronouns,
+              allergens: person.allergens || [],
+              dietary_restrictions: person.dietaryRestrictions || [],
+              tags: person.tags?.map((t: { tag: string }) => t.tag) || [],
+              wishlist_items: person.wishlistItems?.map((w: { productName: string | null }) => w.productName).filter(Boolean) || [],
+            },
+            event_type: event.occasionType,
+            event_date: nextOcc.toISOString().slice(0, 10),
+            days_until: daysUntil,
+            budget_min_cents: budgetMin,
+            budget_max_cents: budgetMax,
+            budget_source: budgetSource,
+            never_again: person.neverAgainItems.map((na) => ({
+              description: na.description,
+            })),
+            gift_history: giftHistory,
+            dismissed: dismissedSuggestions.map((d) => ({
+              title: d.title,
+              reason: d.dismissalReason,
+            })),
+            tier,
+            surprise_factor: surpriseFactor,
+            guidance_text: guidanceText,
+            count,
+          }),
+          signal: controller.signal,
+        });
 
-    // Write audit log
-    await this.prisma.aiAuditLog.create({
-      data: {
-        userId,
-        personId: dto.personId,
-        eventId: dto.eventId,
-        model: aiResponse.model,
-        tier,
-        inputTokens: aiResponse.input_tokens,
-        outputTokens: aiResponse.output_tokens,
-        latencyMs: aiResponse.latency_ms,
-        cacheHit: false,
-        promptCacheHit: aiResponse.prompt_cache_hit,
-        suggestionsReturned: created.length,
-        suggestionsFiltered: aiResponse.suggestions_filtered,
-        retryCount: aiResponse.retry_count,
-        status: "success",
-      },
-    });
+        if (!res.ok) {
+          const status = res.status;
+          if (status === 504) throw new HttpException("The gift oracle is temporarily offline. Even we have bad days.", 504);
+          if (status === 429) throw new HttpException("AI service rate limited", 429);
+          throw new HttpException("AI service error", 502);
+        }
 
-    // Estimate cost and track spend (F-05)
-    const aiModel = await this.entitlements.getStringLimit(tier, "aiModel");
-    const costPerMTokOut = aiModel === "haiku" ? 5 : 15;
-    const estimatedCostCents = Math.ceil(
-      (aiResponse.output_tokens / 1_000_000) * costPerMTokOut * 100,
-    );
-    await this.redis.trackSpend(estimatedCostCents);
+        aiResponse = await res.json();
+      } catch (err) {
+        if (err instanceof HttpException) throw err;
+        if ((err as Error).name === "AbortError") {
+          throw new HttpException("The gift oracle is temporarily offline. Even we have bad days.", 504);
+        }
+        this.logger.error("AI service call failed", err);
+        throw new HttpException("Something went wrong with our gift engine. Try again.", 500);
+      } finally {
+        clearTimeout(timeout);
+      }
 
-    // Build response
-    const response = {
-      suggestions: created.map((s) => ({
-        id: s.id,
-        personId: s.personId,
-        eventId: s.eventId,
-        title: s.title,
-        description: s.description,
-        estimatedPriceMinCents: s.estimatedPriceMinCents,
-        estimatedPriceMaxCents: s.estimatedPriceMaxCents,
-        reasoning: s.reasoning,
-        confidenceScore: s.confidenceScore,
-        delightScore: s.delightScore,
-        noveltyScore: s.noveltyScore,
-        retailerHint: s.retailerHint,
-        suggestedMessage: s.suggestedMessage,
-        imageUrl: s.imageUrl,
-        productUrl: s.productUrl,
-        productSourcePriceCents: s.productSourcePriceCents,
-        requestIndex: s.requestIndex,
-        surpriseFactor: s.surpriseFactor,
-        isSelected: s.isSelected,
-        isDismissed: s.isDismissed,
-        giftRecordId: null, // freshly generated — nothing selected/purchased yet
-        createdAt: s.createdAt.toISOString(),
-        expiresAt: s.expiresAt.toISOString(),
-      })),
-      meta: {
-        cached: false,
-        tier,
-        model: aiResponse.model,
-        requestIndex,
-        budgetApplied: { minCents: budgetMin, maxCents: budgetMax, source: budgetSource },
-      },
-    };
+      // Enrich suggestions with product images
+      const productResults = await this.productSearch.searchProducts(
+        aiResponse.suggestions.map((s: Record<string, unknown>) => ({
+          title: s.title as string,
+          retailerHint: (s.retailer_hint as string) || null,
+          estimatedPriceMinCents: s.estimated_price_min_cents as number,
+          estimatedPriceMaxCents: s.estimated_price_max_cents as number,
+        })),
+      );
 
-    // Cache response
-    await this.redis.setCachedSuggestions(cacheKey, JSON.stringify(response));
+      // Persist suggestions
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const created = await Promise.all(
+        aiResponse.suggestions.map((s: Record<string, unknown>, i: number) =>
+          this.prisma.giftSuggestion.create({
+            data: {
+              personId: dto.personId,
+              eventId: dto.eventId,
+              userId,
+              title: s.title as string,
+              description: s.description as string,
+              estimatedPriceMinCents: s.estimated_price_min_cents as number,
+              estimatedPriceMaxCents: s.estimated_price_max_cents as number,
+              reasoning: s.reasoning as string,
+              confidenceScore: s.confidence_score as number,
+              delightScore: s.delight_score as number,
+              noveltyScore: s.novelty_score as number,
+              retailerHint: (s.retailer_hint as string) || null,
+              suggestedMessage: (s.suggested_message as string) || null,
+              imageUrl: productResults[i]?.imageUrl || null,
+              productUrl: productResults[i]?.productUrl || null,
+              productSourcePriceCents: productResults[i]?.priceCents || null,
+              modelVersion: aiResponse.model,
+              promptTokens: aiResponse.input_tokens,
+              completionTokens: aiResponse.output_tokens,
+              latencyMs: aiResponse.latency_ms,
+              requestIndex,
+              surpriseFactor: surpriseFactor as "safe" | "bold",
+              guidanceText: guidanceText || null,
+              expiresAt,
+            },
+          }),
+        ),
+      );
 
-    return response;
+      // Write audit log
+      await this.prisma.aiAuditLog.create({
+        data: {
+          userId,
+          personId: dto.personId,
+          eventId: dto.eventId,
+          model: aiResponse.model,
+          tier,
+          inputTokens: aiResponse.input_tokens,
+          outputTokens: aiResponse.output_tokens,
+          latencyMs: aiResponse.latency_ms,
+          cacheHit: false,
+          promptCacheHit: aiResponse.prompt_cache_hit,
+          suggestionsReturned: created.length,
+          suggestionsFiltered: aiResponse.suggestions_filtered,
+          retryCount: aiResponse.retry_count,
+          status: "success",
+        },
+      });
+
+      // Estimate cost and track spend (F-05)
+      const aiModel = await this.entitlements.getStringLimit(tier, "aiModel");
+      const costPerMTokOut = aiModel === "haiku" ? 5 : 15;
+      const estimatedCostCents = Math.ceil(
+        (aiResponse.output_tokens / 1_000_000) * costPerMTokOut * 100,
+      );
+      await this.redis.trackSpend(estimatedCostCents);
+
+      // Build response
+      const response = {
+        suggestions: created.map((s) => ({
+          id: s.id,
+          personId: s.personId,
+          eventId: s.eventId,
+          title: s.title,
+          description: s.description,
+          estimatedPriceMinCents: s.estimatedPriceMinCents,
+          estimatedPriceMaxCents: s.estimatedPriceMaxCents,
+          reasoning: s.reasoning,
+          confidenceScore: s.confidenceScore,
+          delightScore: s.delightScore,
+          noveltyScore: s.noveltyScore,
+          retailerHint: s.retailerHint,
+          suggestedMessage: s.suggestedMessage,
+          imageUrl: s.imageUrl,
+          productUrl: s.productUrl,
+          productSourcePriceCents: s.productSourcePriceCents,
+          requestIndex: s.requestIndex,
+          surpriseFactor: s.surpriseFactor,
+          isSelected: s.isSelected,
+          isDismissed: s.isDismissed,
+          giftRecordId: null, // freshly generated — nothing selected/purchased yet
+          createdAt: s.createdAt.toISOString(),
+          expiresAt: s.expiresAt.toISOString(),
+        })),
+        meta: {
+          cached: false,
+          tier,
+          model: aiResponse.model,
+          requestIndex,
+          budgetApplied: { minCents: budgetMin, maxCents: budgetMax, source: budgetSource },
+        },
+      };
+
+      // Cache response
+      await this.redis.setCachedSuggestions(cacheKey, JSON.stringify(response));
+
+      return response;
+    } catch (err) {
+      await this.prisma.suggestionRequestClaim.delete({ where: { id: claim.id } }).catch(() => {});
+      throw err;
+    }
   }
 
   async getEventSuggestions(userId: string, eventId: string, requestIndex?: number) {

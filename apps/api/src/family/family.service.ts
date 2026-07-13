@@ -8,6 +8,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { randomBytes } from "crypto";
+import { Prisma } from "@prisma/client";
 import type { User } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailService } from "../email/email.service";
@@ -267,43 +268,65 @@ export class FamilyService {
       throw new BadRequestException("You're already part of a family plan.");
     }
 
-    const group = await this.prisma.familyGroup.findUniqueOrThrow({
-      where: { id: invite.familyGroupId },
-      include: { memberships: true, owner: true },
-    });
+    // The seat-count read and the membership create used to be separate
+    // steps — two different invitees accepting for the same group at
+    // nearly the same time could both read the same memberships.length
+    // against maxSeats, both pass, and both get seated past the cap.
+    // Serializable isolation makes Postgres detect that conflict and abort
+    // one of the two transactions instead of letting both through.
+    let result: { ownerId: string; familyName: string };
+    try {
+      result = await this.prisma.$transaction(
+        async (tx) => {
+          const group = await tx.familyGroup.findUniqueOrThrow({
+            where: { id: invite.familyGroupId },
+            include: { memberships: true, owner: true },
+          });
 
-    const maxSeats =
-      (await this.entitlements.getIntLimit(
-        group.owner.subscriptionTier,
-        "familyMaxSeats",
-        DEFAULT_MAX_SEATS,
-      )) ?? DEFAULT_MAX_SEATS;
-    if (group.memberships.length + 1 >= maxSeats) {
-      throw new BadRequestException("This family plan is full.");
+          const maxSeats =
+            (await this.entitlements.getIntLimit(
+              group.owner.subscriptionTier,
+              "familyMaxSeats",
+              DEFAULT_MAX_SEATS,
+            )) ?? DEFAULT_MAX_SEATS;
+          if (group.memberships.length + 1 >= maxSeats) {
+            throw new BadRequestException("This family plan is full.");
+          }
+
+          await tx.familyMembership.create({
+            data: { familyGroupId: group.id, userId: user.id },
+          });
+          await tx.user.update({
+            where: { id: user.id },
+            data: { subscriptionTier: "family" },
+          });
+          await tx.familyInvite.update({
+            where: { id: invite.id },
+            data: { status: "accepted", acceptedAt: new Date() },
+          });
+
+          return {
+            ownerId: group.ownerId,
+            familyName: group.name || `${group.owner.name || "Someone"}'s family`,
+          };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2034") {
+        throw new BadRequestException("This family plan just filled up. Ask the owner to check available seats.");
+      }
+      throw err;
     }
 
-    await this.prisma.$transaction([
-      this.prisma.familyMembership.create({
-        data: { familyGroupId: group.id, userId: user.id },
-      }),
-      this.prisma.user.update({
-        where: { id: user.id },
-        data: { subscriptionTier: "family" },
-      }),
-      this.prisma.familyInvite.update({
-        where: { id: invite.id },
-        data: { status: "accepted", acceptedAt: new Date() },
-      }),
-    ]);
-
-    await this.notifications.create(group.ownerId, {
+    await this.notifications.create(result.ownerId, {
       type: "family_member_joined",
       title: "Someone joined your family plan",
       body: `${user.name || user.email} just joined your family plan.`,
       linkUrl: "/family",
     });
 
-    return { joined: true, familyName: invite.familyGroup.name };
+    return { joined: true, familyName: result.familyName };
   }
 
   async removeMember(owner: User, memberUserId: string) {

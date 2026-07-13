@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
 } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { EventsService } from "../events/events.service";
 import { EntitlementsService } from "../entitlements/entitlements.service";
@@ -47,54 +48,77 @@ export class PersonsService {
     // Fails closed: if entitlements data is missing (e.g. DB not seeded yet),
     // default to the Free cap rather than silently becoming unlimited.
     const maxPeople = await this.entitlements.getIntLimit(user.subscriptionTier, "maxPeople", 3);
-    if (maxPeople !== null) {
-      const count = await this.prisma.person.count({
-        where: { userId, deletedAt: null },
-      });
-      if (count >= maxPeople) {
-        throw new HttpException(
-          {
-            statusCode: HttpStatus.PAYMENT_REQUIRED,
-            message: `You've hit the Free limit. Three people is a lot... for a free tier. Upgrade and we'll remember everyone.`,
-            upgradeUrl: "/upgrade",
-            currentTier: user.subscriptionTier,
-            requiredTier: "pro",
-          },
-          HttpStatus.PAYMENT_REQUIRED,
-        );
-      }
-    }
 
-    const person = await this.prisma.person.create({
-      data: {
-        userId,
-        name: dto.name,
-        relationship: dto.relationship,
-        birthday: dto.birthday ? new Date(dto.birthday) : null,
-        anniversary: dto.anniversary ? new Date(dto.anniversary) : null,
-        budgetMinCents: dto.budgetMinCents ?? null,
-        budgetMaxCents: dto.budgetMaxCents ?? null,
-        clothingSizeTop: dto.clothingSizeTop ?? null,
-        clothingSizeBottom: dto.clothingSizeBottom ?? null,
-        shoeSize: dto.shoeSize ?? null,
-        musicTaste: dto.musicTaste ?? null,
-        favoriteBrands: dto.favoriteBrands ?? null,
-        hobbies: dto.hobbies ?? null,
-        foodPreferences: dto.foodPreferences ?? null,
-        wishlistUrls: dto.wishlistUrls ?? null,
-        notes: dto.notes ?? null,
-        pronouns: dto.pronouns ?? null,
-        allergens: dto.allergens ?? [],
-        dietaryRestrictions: dto.dietaryRestrictions ?? [],
-        shippingAddress1: dto.shippingAddress1 ?? null,
-        shippingAddress2: dto.shippingAddress2 ?? null,
-        shippingCity: dto.shippingCity ?? null,
-        shippingState: dto.shippingState ?? null,
-        shippingZip: dto.shippingZip ?? null,
-        completenessScore: computeCompleteness(dto),
-      },
-      include: { neverAgainItems: true, tags: true },
-    });
+    const limitError = () =>
+      new HttpException(
+        {
+          statusCode: HttpStatus.PAYMENT_REQUIRED,
+          message: `You've hit the Free limit. Three people is a lot... for a free tier. Upgrade and we'll remember everyone.`,
+          upgradeUrl: "/upgrade",
+          currentTier: user.subscriptionTier,
+          requiredTier: "pro",
+        },
+        HttpStatus.PAYMENT_REQUIRED,
+      );
+
+    // The count-check and the create used to be two separate queries — two
+    // concurrent requests could both read count=2 against maxPeople=3, both
+    // pass, and both insert, landing at 4. Serializable isolation makes
+    // Postgres detect that read/write conflict and abort one of the two
+    // transactions instead of silently letting both through.
+    let person;
+    try {
+      person = await this.prisma.$transaction(
+        async (tx) => {
+          if (maxPeople !== null) {
+            const count = await tx.person.count({
+              where: { userId, deletedAt: null },
+            });
+            if (count >= maxPeople) throw limitError();
+          }
+
+          return tx.person.create({
+            data: {
+              userId,
+              name: dto.name,
+              relationship: dto.relationship,
+              birthday: dto.birthday ? new Date(dto.birthday) : null,
+              anniversary: dto.anniversary ? new Date(dto.anniversary) : null,
+              budgetMinCents: dto.budgetMinCents ?? null,
+              budgetMaxCents: dto.budgetMaxCents ?? null,
+              clothingSizeTop: dto.clothingSizeTop ?? null,
+              clothingSizeBottom: dto.clothingSizeBottom ?? null,
+              shoeSize: dto.shoeSize ?? null,
+              musicTaste: dto.musicTaste ?? null,
+              favoriteBrands: dto.favoriteBrands ?? null,
+              hobbies: dto.hobbies ?? null,
+              foodPreferences: dto.foodPreferences ?? null,
+              wishlistUrls: dto.wishlistUrls ?? null,
+              notes: dto.notes ?? null,
+              pronouns: dto.pronouns ?? null,
+              allergens: dto.allergens ?? [],
+              dietaryRestrictions: dto.dietaryRestrictions ?? [],
+              shippingAddress1: dto.shippingAddress1 ?? null,
+              shippingAddress2: dto.shippingAddress2 ?? null,
+              shippingCity: dto.shippingCity ?? null,
+              shippingState: dto.shippingState ?? null,
+              shippingZip: dto.shippingZip ?? null,
+              completenessScore: computeCompleteness(dto),
+            },
+            include: { neverAgainItems: true, tags: true },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (err) {
+      // A genuine concurrent race lost at the database level — by
+      // definition another request just filled the last slot, so this is
+      // honestly the same "limit hit" outcome, not a generic server error.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2034") {
+        throw limitError();
+      }
+      throw err;
+    }
 
     await this.eventsService.autoSyncEvents(
       userId,
