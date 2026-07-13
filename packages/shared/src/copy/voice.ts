@@ -168,15 +168,15 @@ export const VOICE = {
 
   autopilot: {
     emptyState:
-      "No autopilot rules yet. Set one up and we'll handle gifts while you sleep.",
-    enabled: "Autopilot is live. Sit back.",
+      "No one's on autopilot yet. Flip it on for someone and we'll shop ahead of every event.",
+    enabled: "Autopilot is live. We'll ping you the moment a gift's ready to buy.",
     disabled: "Autopilot paused. We'll wait until you're ready.",
     consentLabel: (cap: string) =>
-      `I authorize Broflo to automatically place orders up to ${cap}/month on my behalf.`,
+      `I authorize Broflo to automatically shop for and vet gifts up to ${cap}/month in value on my behalf. I'll always get a notification to complete the purchase myself.`,
     budgetWarning:
       "You're getting close to your monthly cap. We'll pause autopilot before going over.",
-    orderPlaced: (name: string) =>
-      `Autopilot placed an order for ${name}. You're welcome.`,
+    readyForReview: (name: string) =>
+      `Autopilot found and vetted a gift for ${name}. Tap to review and buy.`,
     needsApproval: (name: string) =>
       `We found a gift for ${name} but weren't confident enough. Your call.`,
     tierGate:
@@ -336,5 +336,23 @@ export const VOICE = {
     consent:
       "You're uploading a photo of someone's private space. Make sure you have their okay. Broflo analyzes photos to find gift signals using AI. We never share them. You can delete any photo anytime.",
     consentButton: "Got it, let's go",
+  },
+
+  giftList: {
+    title: "Paste a gift list",
+    subtitle: "Got their holiday list? Paste it in and we'll price it out.",
+    eventLabel: "Which event is this for?",
+    eventPlaceholder: "Pick an event",
+    noEvents: "Add an event for them first, then come back and paste the list.",
+    textareaPlaceholder: "One idea per line...\nWireless earbuds\nCozy blanket\nBoard game",
+    submitCta: "Find & Save Items",
+    submitting: "Searching...",
+    results: (found: number, total: number) =>
+      found === total
+        ? `Found prices for all ${total} item${total === 1 ? "" : "s"}.`
+        : `Found prices for ${found} of ${total} item${total === 1 ? "" : "s"}.`,
+    truncatedNotice: (max: number) =>
+      `Only the first ${max} items were searched — paste the rest separately.`,
+    savedNote: "Saved to their profile — this sharpens every future suggestion.",
   },
 } as const;

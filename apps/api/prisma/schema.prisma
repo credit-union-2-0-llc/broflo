@@ -225,17 +225,24 @@ model PersonTag {
 model WishlistItem {
   id          String   @id @default(uuid())
   personId    String   @map("person_id")
-  sourceUrl   String   @map("source_url") @db.VarChar(2000)
+  eventId     String?  @map("event_id")
+  // Nullable: items imported from a pasted gift list may not resolve to a
+  // real product page (searchProduct found nothing usable), unlike the
+  // URL-parse flow where the user always supplies one.
+  sourceUrl   String?  @map("source_url") @db.VarChar(2000)
   productName String?  @map("product_name") @db.VarChar(500)
   category    String?  @db.VarChar(200)
   brand       String?  @db.VarChar(200)
   priceRange  String?  @map("price_range") @db.VarChar(100)
+  imageUrl    String?  @map("image_url") @db.VarChar(2000)
   scrapedAt   DateTime @default(now()) @map("scraped_at")
   createdAt   DateTime @default(now()) @map("created_at")
 
   person      Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  event       Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
   @@index([personId], map: "idx_wishlist_items_person")
+  @@index([eventId], map: "idx_wishlist_items_event")
   @@map("wishlist_items")
 }
 
@@ -284,6 +291,7 @@ model Event {
   orders      Order[]
   autopilotRuns AutopilotRun[]
   suggestionRequestClaims SuggestionRequestClaim[]
+  wishlistItems WishlistItem[]
 
   @@unique([personId, occasionType, isAutoCreated], name: "uq_person_auto_event", map: "uq_person_auto_event")
   @@index([userId, date], map: "idx_events_user_date")
@@ -522,6 +530,12 @@ model OrderStatusHistory {
 enum AutopilotRunStatus {
   triggered
   order_placed  @map("order_placed")
+  // The AI pipeline found and vetted (relevance + liveness checked) a gift
+  // above the confidence threshold and within budget — instead of placing a
+  // real order (no working purchase-execution path exists yet), the person
+  // is auto-selected as the pick and the user is notified to complete the
+  // purchase themselves via the already-vetted buy link.
+  ready_for_review @map("ready_for_review")
   failed
   skipped_budget @map("skipped_budget")
   skipped_confidence @map("skipped_confidence")

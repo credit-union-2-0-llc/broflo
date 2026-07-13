@@ -1,8 +1,6 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { AutopilotScheduler } from "../autopilot.scheduler";
 import { PrismaService } from "../../prisma/prisma.service";
-import { OrdersService } from "../../orders/orders.service";
-import { AgentOrdersService } from "../../orders/agent/agent-orders.service";
 import { AutopilotService } from "../autopilot.service";
 import { NotificationsService } from "../../notifications/notifications.service";
 import { SuggestionsService } from "../../suggestions/suggestions.service";
@@ -57,8 +55,6 @@ const makeSuggestion = (overrides = {}) => ({
 describe("AutopilotScheduler", () => {
   let scheduler: AutopilotScheduler;
   let prisma: Record<string, Record<string, jest.Mock>>;
-  let ordersService: Record<string, jest.Mock>;
-  let agentOrders: Record<string, jest.Mock>;
   let autopilotService: Record<string, jest.Mock>;
   let notifications: Record<string, jest.Mock>;
   let suggestionsService: Record<string, jest.Mock>;
@@ -73,14 +69,6 @@ describe("AutopilotScheduler", () => {
       event: { findMany: jest.fn().mockResolvedValue([]) },
       user: { findUniqueOrThrow: jest.fn() },
     };
-    ordersService = {
-      preview: jest.fn(),
-      place: jest.fn(),
-    };
-    agentOrders = {
-      preview: jest.fn(),
-      place: jest.fn(),
-    };
     autopilotService = {
       checkSpendingCap: jest.fn().mockResolvedValue({ allowed: true, monthlySpentCents: 0, monthlyCap: 10000 }),
     };
@@ -89,6 +77,7 @@ describe("AutopilotScheduler", () => {
     };
     suggestionsService = {
       generate: jest.fn().mockResolvedValue({ suggestions: [makeSuggestion()] }),
+      selectSuggestion: jest.fn().mockResolvedValue({}),
     };
     entitlements = {
       getEnabledTierKeys: jest.fn().mockResolvedValue(["pro", "elite"]),
@@ -98,8 +87,6 @@ describe("AutopilotScheduler", () => {
       providers: [
         AutopilotScheduler,
         { provide: PrismaService, useValue: prisma },
-        { provide: OrdersService, useValue: ordersService },
-        { provide: AgentOrdersService, useValue: agentOrders },
         { provide: AutopilotService, useValue: autopilotService },
         { provide: NotificationsService, useValue: notifications },
         { provide: SuggestionsService, useValue: suggestionsService },
@@ -132,7 +119,7 @@ describe("AutopilotScheduler", () => {
           data: expect.objectContaining({ status: "skipped_budget" }),
         }),
       );
-      expect(ordersService.place).not.toHaveBeenCalled();
+      expect(suggestionsService.selectSuggestion).not.toHaveBeenCalled();
     });
 
     it("sends budget warning at 80% cap", async () => {
@@ -183,14 +170,10 @@ describe("AutopilotScheduler", () => {
       suggestionsService.generate.mockResolvedValue({
         suggestions: [makeSuggestion({ confidenceScore: 0.8 })],
       });
-      ordersService.preview.mockResolvedValue({
-        product: { id: "prod-1", title: "Watch", priceCents: 4500 },
-      });
-      ordersService.place.mockResolvedValue({ id: "order-1" });
 
       await scheduler.runAutopilot();
 
-      expect(ordersService.place).toHaveBeenCalled();
+      expect(suggestionsService.selectSuggestion).toHaveBeenCalled();
     });
   });
 
@@ -213,64 +196,35 @@ describe("AutopilotScheduler", () => {
     });
   });
 
-  describe("order placement", () => {
-    it("places order via API adapter when available", async () => {
+  describe("auto-select and notify (no real purchase-execution path exists)", () => {
+    it("auto-selects the vetted suggestion and notifies the user to complete the purchase", async () => {
       const rule = makeRule();
       prisma.autopilotRule.findMany.mockResolvedValue([rule]);
       prisma.event.findMany.mockResolvedValue([makeEvent()]);
-      ordersService.preview.mockResolvedValue({
-        product: { id: "prod-1", title: "Watch", priceCents: 4500 },
-      });
-      ordersService.place.mockResolvedValue({ id: "order-1" });
 
       await scheduler.runAutopilot();
 
-      expect(ordersService.place).toHaveBeenCalled();
+      expect(suggestionsService.selectSuggestion).toHaveBeenCalledWith(
+        "user-1",
+        "event-1",
+        { suggestionId: "sug-1" },
+      );
       expect(prisma.autopilotRun.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ status: "order_placed" }),
+          data: expect.objectContaining({ status: "ready_for_review" }),
         }),
       );
       expect(notifications.create).toHaveBeenCalledWith(
         "user-1",
-        expect.objectContaining({ type: "autopilot_ordered" }),
+        expect.objectContaining({ type: "autopilot_ready" }),
       );
     });
 
-    it("falls back to browser agent when API preview fails", async () => {
+    it("records failure without notifying an order-placed message if auto-select fails", async () => {
       const rule = makeRule();
       prisma.autopilotRule.findMany.mockResolvedValue([rule]);
       prisma.event.findMany.mockResolvedValue([makeEvent()]);
-      ordersService.preview.mockRejectedValue(new Error("No adapter"));
-      prisma.user.findUniqueOrThrow.mockResolvedValue({ id: "user-1" });
-      agentOrders.preview.mockResolvedValue({ id: "job-1", status: "previewing" });
-      agentOrders.place.mockResolvedValue({
-        job: { status: "completed" },
-        order: { id: "order-2", productTitle: "Watch", priceCents: 4500 },
-      });
-
-      await scheduler.runAutopilot();
-
-      expect(agentOrders.preview).toHaveBeenCalled();
-      expect(agentOrders.place).toHaveBeenCalled();
-      expect(prisma.autopilotRun.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            status: "order_placed",
-            metadata: expect.objectContaining({ channel: "browser_agent" }),
-          }),
-        }),
-      );
-    });
-
-    it("records failure and notifies when order placement fails", async () => {
-      const rule = makeRule();
-      prisma.autopilotRule.findMany.mockResolvedValue([rule]);
-      prisma.event.findMany.mockResolvedValue([makeEvent()]);
-      ordersService.preview.mockResolvedValue({
-        product: { id: "prod-1", title: "Watch", priceCents: 4500 },
-      });
-      ordersService.place.mockRejectedValue(new Error("Stripe declined"));
+      suggestionsService.selectSuggestion.mockRejectedValue(new Error("suggestion dismissed"));
 
       await scheduler.runAutopilot();
 
@@ -279,9 +233,9 @@ describe("AutopilotScheduler", () => {
           data: expect.objectContaining({ status: "failed" }),
         }),
       );
-      expect(notifications.create).toHaveBeenCalledWith(
+      expect(notifications.create).not.toHaveBeenCalledWith(
         "user-1",
-        expect.objectContaining({ type: "autopilot_failed" }),
+        expect.objectContaining({ type: "autopilot_ready" }),
       );
     });
   });
