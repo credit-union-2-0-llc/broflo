@@ -1,6 +1,28 @@
 import { Injectable, Logger } from "@nestjs/common";
 
 const SEARCH_TIMEOUT_MS = 5000;
+const LIVENESS_TIMEOUT_MS = 4000;
+// An independent backstop, deliberately longer than LIVENESS_TIMEOUT_MS.
+// AbortController alone wasn't a reliable bound in production — a slow or
+// bot-blocked retailer's connection could stall well past its own abort
+// timeout (see the >1min hang that got the original liveness check pulled
+// from findBuyOptions, PR #61). This guarantees checkLiveness always
+// settles by this deadline regardless of whether abort() actually cancels
+// the underlying fetch.
+const LIVENESS_HARD_DEADLINE_MS = 5000;
+// Many retailers return a normal 200 for a removed/expired listing (e.g.
+// "THE PRODUCT YOU ARE LOOKING FOR IS NO LONGER AVAILABLE"), so a status
+// code check alone can't catch it.
+const GONE_TEXT_INDICATORS = [
+  "no longer available",
+  "is no longer available",
+  "out of stock",
+  "sold out",
+  "page not found",
+  "product not found",
+  "item is unavailable",
+  "currently unavailable",
+];
 const PRICE_REGEX = /\$(\d{1,5}(?:\.\d{2})?)/;
 const LOGO_PATTERNS = [/logo/i, /meta_tag/i, /favicon/i, /static\/img/i, /\/nav\//i];
 const MAX_BUY_OPTIONS = 4;
@@ -112,9 +134,24 @@ export class ProductSearchService {
       return { imageUrl: null, productUrl: null, priceCents: null };
     }
 
-    const best = relevantResults.find(
-      (r: Record<string, unknown>) => isProductImage(r.image as string),
-    ) || relevantResults[0];
+    // Prefer candidates with a product image, but fall through to the rest
+    // if every one of those turns out to be a dead link.
+    const ordered = [
+      ...relevantResults.filter((r: Record<string, unknown>) => isProductImage(r.image as string)),
+      ...relevantResults.filter((r: Record<string, unknown>) => !isProductImage(r.image as string)),
+    ];
+
+    // Liveness is advisory, not required — only exclude a candidate on an
+    // explicit "this is dead" signal (a definitive not-found status, or
+    // soft-404 text on an otherwise-200 page). A check that times out or
+    // gets blocked (bot protection, slow storefront) says nothing about
+    // whether a real visitor could load the page, so it doesn't count
+    // against the candidate. Run concurrently so total added latency is
+    // one check's worth, not one per candidate.
+    const liveness = await Promise.all(
+      ordered.map((r: Record<string, unknown>) => this.checkLiveness(r.url as string)),
+    );
+    const best = ordered.find((_, i) => liveness[i] !== "gone");
 
     if (!best) {
       return { imageUrl: null, productUrl: null, priceCents: null };
@@ -311,6 +348,37 @@ export class ProductSearchService {
     const candidateLower = candidateTitle.toLowerCase();
     const matches = significantWords.filter((w) => candidateLower.includes(w)).length;
     return matches >= Math.ceil(significantWords.length / 2);
+  }
+
+  private async checkLiveness(url: string): Promise<"gone" | "live" | "unknown"> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), LIVENESS_TIMEOUT_MS);
+
+    const fetchAndCheck = (async (): Promise<"gone" | "live" | "unknown"> => {
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        if (res.status === 404 || res.status === 410) return "gone";
+        if (!res.ok) return "unknown"; // e.g. 403 bot-block, 5xx — ambiguous, don't penalize
+        const text = (await res.text()).toLowerCase();
+        return GONE_TEXT_INDICATORS.some((indicator) => text.includes(indicator)) ? "gone" : "live";
+      } catch {
+        return "unknown"; // network error / abort — ambiguous, don't penalize
+      }
+    })();
+
+    // Independent hard deadline — see LIVENESS_HARD_DEADLINE_MS above for
+    // why this can't just rely on the AbortController timeout alone.
+    let hardDeadlineTimer: ReturnType<typeof setTimeout>;
+    const hardDeadline = new Promise<"unknown">((resolve) => {
+      hardDeadlineTimer = setTimeout(() => resolve("unknown"), LIVENESS_HARD_DEADLINE_MS);
+    });
+
+    try {
+      return await Promise.race([fetchAndCheck, hardDeadline]);
+    } finally {
+      clearTimeout(timeout);
+      clearTimeout(hardDeadlineTimer!);
+    }
   }
 
   private hostnameOf(url: string): string {
