@@ -15,8 +15,10 @@ export function useCancelCountdown(placedAt: string | null): {
     return Math.max(0, Math.floor((CANCEL_WINDOW_MS - elapsed) / 1000));
   });
 
+  const isRunning = secondsLeft > 0;
+
   useEffect(() => {
-    if (secondsLeft <= 0) return;
+    if (!isRunning) return;
     const interval = setInterval(() => {
       setSecondsLeft((s) => {
         const next = s - 1;
@@ -28,7 +30,7 @@ export function useCancelCountdown(placedAt: string | null): {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [secondsLeft > 0]); // re-attach only when crossing the 0 boundary
+  }, [isRunning]); // re-attach only when crossing the 0 boundary — the interval's own updater form never needs the literal secondsLeft value
 
   const hours = Math.floor(secondsLeft / 3600);
   const minutes = Math.floor((secondsLeft % 3600) / 60);

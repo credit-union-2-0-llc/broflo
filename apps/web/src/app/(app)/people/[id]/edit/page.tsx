@@ -39,21 +39,15 @@ export default function EditPersonPage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    );
+    return <p className="text-muted-foreground py-8 text-center">Loading...</p>;
   }
 
   return (
     <>
-      <>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-6">
-          Edit {person?.name || "Person"}
-        </h1>
-        {person && <DossierForm defaultValues={person} onSubmit={handleSubmit} submitLabel="Save Changes" />}
-      </>
+      <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-6">
+        Edit {person?.name || "Person"}
+      </h1>
+      {person && <DossierForm defaultValues={person} onSubmit={handleSubmit} submitLabel="Save Changes" />}
     </>
   );
 }

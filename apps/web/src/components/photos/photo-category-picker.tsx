@@ -3,7 +3,7 @@
 import {
   BookOpen, Shirt, Image, Monitor, UtensilsCrossed, Wine,
   Footprints, Watch, Moon, Wrench, Flower2, Gamepad2,
-  PawPrint, Thermometer, Car, Hash, Music, ShoppingCart, HelpCircle,
+  PawPrint, Thermometer, Car, Hash, Music, ShoppingCart,
 } from "lucide-react";
 import { VOICE } from "@broflo/shared/copy/voice";
 

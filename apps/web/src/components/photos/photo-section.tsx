@@ -130,7 +130,7 @@ export function PhotoSection({ personId, tier }: PhotoSectionProps) {
         }
       }
     },
-    [token, personId, pendingFiles, tier, loadPhotos],
+    [token, personId, pendingFiles, tier, loadPhotos, router],
   );
 
   const handleDelete = useCallback(

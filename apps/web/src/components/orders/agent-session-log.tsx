@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle, ChevronDown, ChevronUp, Image } from "lucide-react";
+import { CheckCircle, ChevronDown, ChevronUp, Image as ImageIcon } from "lucide-react";
 import { VOICE } from "@broflo/shared";
 import { cn } from "@/lib/utils";
 import type { AgentStep } from "@/lib/api";
@@ -111,13 +110,14 @@ export function AgentSessionLog({
                     {step.screenshotUrl && !isPayment && (
                       <button
                         className="cursor-pointer"
+                        aria-label="View screenshot for this step"
                         onClick={() => {
                           const idx = screenshots.findIndex((s) => s.url === step.screenshotUrl);
                           setGalleryIndex(idx >= 0 ? idx : 0);
                           setGalleryOpen(true);
                         }}
                       >
-                        <Image className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                        <ImageIcon className="h-3 w-3 text-muted-foreground hover:text-foreground" />
                       </button>
                     )}
                   </div>
