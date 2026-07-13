@@ -65,127 +65,61 @@ export function Sidebar() {
   }
 
   return (
-    <aside
-      className="hidden lg:flex flex-col bg-s1 overflow-y-auto"
-      style={{ borderRight: "1px solid var(--border2)" }}
-    >
-      <nav className="flex-1 py-4">
+    <aside className="hidden lg:flex flex-col border-r border-border bg-white/[0.02] backdrop-blur-xl overflow-y-auto">
+      <nav className="flex-1 py-4 px-2">
         {sections.map((section) => {
           const visibleItems = section.items.filter(isVisible);
           if (visibleItems.length === 0) return null;
 
           return (
-          <div key={section.label}>
-            <div
-              className="xl:px-[18px] px-0 pt-4 pb-1.5 text-[8px] uppercase xl:block hidden"
-              style={{
-                color: "var(--muted)",
-                letterSpacing: ".18em",
-                fontFamily: "var(--font-mono)",
-              }}
-            >
-              {section.label}
+            <div key={section.label} className="mb-1">
+              <div className="xl:block hidden px-3 pt-4 pb-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                {section.label}
+              </div>
+              <div className="xl:hidden pt-3 first:pt-0" />
+              {visibleItems.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    title={item.label}
+                    className={`flex items-center xl:gap-2.5 gap-0 h-9 xl:px-3 px-0 xl:justify-start justify-center rounded-full transition-colors ${
+                      active
+                        ? "bg-cyan-dim text-cyan"
+                        : "text-muted-foreground hover:bg-white/[0.05] hover:text-cream"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="xl:inline hidden text-[13px] font-medium">{item.label}</span>
+                  </Link>
+                );
+              })}
             </div>
-            <div className="xl:hidden pt-3 first:pt-0" />
-            {visibleItems.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  title={item.label}
-                  className="flex items-center xl:gap-2.5 gap-0 h-[38px] xl:px-[18px] px-0 xl:justify-start justify-center transition-all duration-[120ms]"
-                  style={{
-                    borderLeft: active
-                      ? "2px solid var(--amber)"
-                      : "2px solid transparent",
-                    background: active ? "var(--amber-glow)" : undefined,
-                    color: active ? "var(--amber)" : "var(--muted2)",
-                    fontFamily: "var(--font-body)",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!active) {
-                      e.currentTarget.style.background = "var(--s2)";
-                      e.currentTarget.style.color = "var(--cream)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!active) {
-                      e.currentTarget.style.background = "";
-                      e.currentTarget.style.color = "var(--muted2)";
-                    }
-                  }}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span className="xl:inline hidden">{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
           );
         })}
       </nav>
 
       {/* Autopilot status footer */}
-      <div
-        className="mx-2.5 mb-3 px-2.5 py-[7px] xl:block hidden"
-        style={{
-          background: "var(--green-dim)",
-          border: "1px solid rgba(34, 197, 94, 0.2)",
-        }}
-      >
+      <div className="mx-3 mb-3 rounded-2xl border border-border bg-cyan-dim px-3 py-2.5 xl:block hidden">
         <div className="flex items-center gap-1.5">
           <div className="ap-dot" />
-          <span
-            className="text-[8px] uppercase"
-            style={{
-              color: "var(--green-bright)",
-              letterSpacing: ".12em",
-              fontFamily: "var(--font-mono)",
-            }}
-          >
-            Autopilot armed
-          </span>
+          <span className="text-[10px] uppercase tracking-[0.1em] text-cyan">Autopilot armed</span>
         </div>
-        <span
-          className="text-[9px] mt-0.5 block"
-          style={{
-            color: "var(--muted2)",
-            fontFamily: "var(--font-mono)",
-          }}
-        >
-          Monitoring all assets
-        </span>
+        <span className="mt-0.5 block text-[10px] text-muted-foreground">Monitoring all assets</span>
       </div>
-      {/* Icon-only autopilot indicator at lg */}
-      <div
-        className="xl:hidden flex justify-center mb-3"
-      >
+      <div className="xl:hidden flex justify-center mb-3">
         <div className="ap-dot" />
       </div>
 
       {/* Sign out */}
       <button
         onClick={() => signOut({ callbackUrl: "/login" })}
-        className="flex items-center xl:gap-2 gap-0 xl:px-[18px] px-0 xl:justify-start justify-center py-3 transition-colors duration-[120ms]"
-        style={{
-          color: "var(--muted)",
-          fontSize: "11px",
-          fontFamily: "var(--font-body)",
-          borderTop: "1px solid var(--border)",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.color = "var(--red)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.color = "var(--muted)";
-        }}
+        className="flex items-center xl:gap-2 gap-0 xl:px-5 px-0 xl:justify-start justify-center py-3 text-muted-foreground border-t border-border transition-colors hover:text-coral"
       >
         <LogOut className="h-3.5 w-3.5 shrink-0" />
-        <span className="xl:inline hidden">Sign out</span>
+        <span className="xl:inline hidden text-xs">Sign out</span>
       </button>
     </aside>
   );

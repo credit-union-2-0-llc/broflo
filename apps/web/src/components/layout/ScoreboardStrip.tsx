@@ -4,8 +4,8 @@ import { useSession } from "next-auth/react";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 const stats = [
-  { label: "Due Soon", sub: "next 24h", color: "var(--red)", key: "dueSoon" },
-  { label: "People", sub: "tracked", color: "var(--blue)", key: "people" },
+  { label: "Due Soon", sub: "next 24h", color: "var(--coral)", key: "dueSoon" },
+  { label: "People", sub: "tracked", color: "var(--cyan)", key: "people" },
 ] as const;
 
 function initials(name: string | null | undefined) {
@@ -28,116 +28,45 @@ export function ScoreboardStrip({ peopleCount, dueSoonCount }: ScoreboardStripPr
   };
 
   return (
-    <header
-      className="col-span-full bg-s1 border-b"
-      style={{ borderColor: "var(--border2)" }}
-    >
-      {/* Desktop: full strip */}
-      <div
-        className="hidden lg:grid"
-        style={{ gridTemplateColumns: "auto 1fr 1fr auto" }}
-      >
-        {/* Logo cell */}
-        <div
-          className="flex flex-col justify-center xl:px-6 px-3"
-          style={{ borderRight: "1px solid var(--border2)" }}
-        >
-          <span
-            className="font-black uppercase xl:text-[34px] text-[24px]"
-            style={{ color: "var(--amber)", letterSpacing: "3px", fontFamily: "var(--font-display)" }}
-          >
-            BROFLO
-          </span>
-          <span
-            className="text-[8px] uppercase xl:block hidden"
-            style={{ color: "var(--muted)", letterSpacing: ".18em", fontFamily: "var(--font-mono)" }}
-          >
-            War Room
+    <header className="col-span-full border-b border-border bg-white/[0.03] backdrop-blur-xl">
+      <div className="flex items-center justify-between gap-3 px-4 lg:px-6 h-16">
+        <div className="flex items-center gap-2.5 shrink-0">
+          <span className="font-heading text-2xl font-black tracking-wide text-cream">
+            BRO<span className="text-cyan">FLO</span>
           </span>
         </div>
 
-        {/* Stat cells */}
-        {stats.map((stat) => (
-          <div
-            key={stat.key}
-            className="relative flex flex-col justify-center px-5 py-3"
-            style={{ borderRight: "1px solid var(--border2)" }}
-          >
+        <div className="hidden md:flex items-center gap-2">
+          {stats.map((stat) => (
             <div
-              className="absolute top-0 left-0 right-0 h-[2px]"
-              style={{ background: stat.color }}
-            />
-            <span
-              className="text-[8px] uppercase"
-              style={{
-                color: "var(--muted)",
-                letterSpacing: ".14em",
-                fontFamily: "var(--font-mono)",
-              }}
+              key={stat.key}
+              className="flex items-center gap-2 rounded-full border border-border bg-white/[0.04] px-3.5 py-1.5"
             >
-              {stat.label}
-            </span>
-            <span
-              className="xl:text-[44px] text-[32px] font-black leading-none"
-              style={{
-                color: stat.color,
-                fontFamily: "var(--font-display)",
-              }}
-            >
-              {statValues[stat.key]}
-            </span>
-            <span
-              className="mt-[3px] text-[8px]"
-              style={{
-                color: "var(--muted)",
-                fontFamily: "var(--font-mono)",
-              }}
-            >
-              {stat.sub}
-            </span>
-          </div>
-        ))}
-
-        {/* User cell */}
-        <div className="flex items-center gap-3 px-5">
-          <NotificationBell />
-          <div
-            className="flex h-[38px] w-[38px] items-center justify-center shrink-0"
-            style={{
-              border: "1px solid var(--amber3)",
-              background: "var(--amber-glow)",
-            }}
-          >
-            <span
-              className="text-[16px] font-extrabold"
-              style={{ color: "var(--amber)", fontFamily: "var(--font-display)" }}
-            >
-              {initials(user?.name)}
-            </span>
-          </div>
-          <div className="flex flex-col xl:block hidden">
-            <span
-              className="text-[17px] font-bold"
-              style={{
-                color: "var(--cream)",
-                letterSpacing: ".5px",
-                fontFamily: "var(--font-display)",
-              }}
-            >
-              {user?.name || "Agent"}
-            </span>
-            <div className="flex items-center gap-1.5">
               <span
-                className="text-[8px] uppercase"
-                style={{ color: "var(--amber)", fontFamily: "var(--font-mono)" }}
-              >
-                {user?.subscriptionTier === "pro" ? "PRO" : "FREE"}
+                className="h-1.5 w-1.5 rounded-full shrink-0"
+                style={{ background: stat.color }}
+              />
+              <span className="text-xs text-muted-foreground">{stat.label}</span>
+              <span className="text-sm font-semibold tabular-nums text-cream">
+                {statValues[stat.key]}
               </span>
-              <div className="ap-dot" />
-              <span
-                className="text-[8px]"
-                style={{ color: "var(--muted2)", fontFamily: "var(--font-mono)" }}
-              >
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          <NotificationBell />
+          <div className="hidden sm:flex items-center gap-2 rounded-full border border-border bg-white/[0.04] py-1 pl-1 pr-3">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-cyan to-coral text-[11px] font-bold text-[#04222a]">
+              {initials(user?.name)}
+            </div>
+            <div className="flex flex-col leading-tight">
+              <span className="text-xs font-semibold text-cream">{user?.name || "Agent"}</span>
+              <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <span className="uppercase text-amber">
+                  {user?.subscriptionTier === "free" || !user?.subscriptionTier ? "FREE" : user.subscriptionTier}
+                </span>
+                <span className="ap-dot" />
                 online
               </span>
             </div>
@@ -145,74 +74,18 @@ export function ScoreboardStrip({ peopleCount, dueSoonCount }: ScoreboardStripPr
         </div>
       </div>
 
-      {/* Mobile: collapsed strip */}
-      <div
-        className="lg:hidden grid items-center"
-        style={{ gridTemplateColumns: "auto 1fr 1fr auto" }}
-      >
-        <div
-          className="flex items-center justify-center px-3 py-2"
-          style={{ borderRight: "1px solid var(--border2)" }}
-        >
-          <span
-            className="font-black uppercase text-[20px]"
-            style={{ color: "var(--amber)", letterSpacing: "2px", fontFamily: "var(--font-display)" }}
-          >
-            BF
-          </span>
-        </div>
-
+      {/* Mobile: compact stat row */}
+      <div className="flex md:hidden items-center gap-2 px-4 pb-3">
         {stats.map((stat) => (
           <div
             key={stat.key}
-            className="relative flex flex-col justify-center px-3 py-2"
-            style={{ borderRight: "1px solid var(--border2)" }}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-border bg-white/[0.04] py-1.5"
           >
-            <div
-              className="absolute top-0 left-0 right-0 h-[2px]"
-              style={{ background: stat.color }}
-            />
-            <span
-              className="text-[7px] uppercase"
-              style={{
-                color: "var(--muted)",
-                letterSpacing: ".12em",
-                fontFamily: "var(--font-mono)",
-              }}
-            >
-              {stat.label}
-            </span>
-            <span
-              className="text-[28px] font-black leading-none"
-              style={{
-                color: stat.color,
-                fontFamily: "var(--font-display)",
-              }}
-            >
-              {statValues[stat.key]}
-            </span>
+            <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: stat.color }} />
+            <span className="text-[11px] text-muted-foreground">{stat.label}</span>
+            <span className="text-xs font-semibold tabular-nums text-cream">{statValues[stat.key]}</span>
           </div>
         ))}
-
-        <div
-          className="flex items-center gap-1 justify-center px-3"
-        >
-          <NotificationBell />
-          <div
-            className="flex h-[32px] w-[32px] items-center justify-center"
-            style={{
-              border: "1px solid var(--amber3)",
-              background: "var(--amber-glow)",
-            }}
-          >
-            <span
-              className="text-[13px] font-extrabold"
-              style={{ color: "var(--amber)", fontFamily: "var(--font-display)" }}
-            >
-              {initials(user?.name)}
-            </span>
-          </div>
-        </div>
       </div>
     </header>
   );

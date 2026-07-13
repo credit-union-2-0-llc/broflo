@@ -25,6 +25,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[48px_1fr] xl:grid-cols-[200px_1fr] grid-rows-[auto_1fr] min-h-screen">
+      <div className="aurora-wash" aria-hidden="true">
+        <div className="b1" />
+        <div className="b2" />
+        <div className="b3" />
+      </div>
       <ScoreboardStrip peopleCount={peopleCount} dueSoonCount={dueSoonCount} />
       <Sidebar />
       <main className="overflow-y-auto p-4 lg:p-5 flex flex-col gap-[18px] pb-20 lg:pb-5">
