@@ -25,6 +25,13 @@ const COLLECTION_URL_PATTERNS = [
 // strict allowlist (a suggestion's own official/niche brand store is still
 // shown if that's what's found), just a sort-order boost so a known,
 // trustworthy name surfaces above an unfamiliar one when both are options.
+// Words too generic/common to establish relevance on their own — shared
+// across totally unrelated products, so they don't count toward a match.
+const RELEVANCE_STOPWORDS = new Set([
+  "product", "listing", "gift", "item", "size", "color", "official",
+  "shop", "store", "buy", "new", "free", "shipping", "sale", "the", "and",
+]);
+const MIN_SIGNIFICANT_WORD_LENGTH = 4;
 const KNOWN_RELIABLE_RETAILERS = new Set([
   "amazon.com",
   "target.com",
@@ -92,9 +99,22 @@ export class ProductSearchService {
       return { imageUrl: null, productUrl: null, priceCents: null };
     }
 
-    const best = results.find(
+    // Exa is semantic/fuzzy search, not exact lookup — it can return a
+    // real, well-formed, correctly-priced page for a similar-but-wrong
+    // product (a different team's jersey, a different color/model on the
+    // same domain). Discard anything whose own title doesn't share a
+    // meaningful word with what was actually requested before picking a
+    // "best" result from what's left.
+    const relevantResults = results.filter((r: Record<string, unknown>) =>
+      this.isRelevantCandidate(title, r.title as string | undefined),
+    );
+    if (relevantResults.length === 0) {
+      return { imageUrl: null, productUrl: null, priceCents: null };
+    }
+
+    const best = relevantResults.find(
       (r: Record<string, unknown>) => isProductImage(r.image as string),
-    ) || results[0];
+    ) || relevantResults[0];
 
     if (!best) {
       return { imageUrl: null, productUrl: null, priceCents: null };
@@ -166,7 +186,7 @@ export class ProductSearchService {
     if (primaryResults === null) return [];
 
     const seenRetailers = new Set<string>();
-    let candidates = this.buildCandidates(primaryResults, estimatedPriceMinCents, estimatedPriceMaxCents, seenRetailers);
+    let candidates = this.buildCandidates(primaryResults, estimatedPriceMinCents, estimatedPriceMaxCents, seenRetailers, title);
 
     // A retailer-hint-biased query can end up mostly returning the same one
     // or two retailers. If that leaves fewer than two distinct options, fire
@@ -177,7 +197,7 @@ export class ProductSearchService {
       const fallbackResults = await this.queryExa(fallbackQuery, 8, 2000);
       if (fallbackResults) {
         candidates = candidates.concat(
-          this.buildCandidates(fallbackResults, estimatedPriceMinCents, estimatedPriceMaxCents, seenRetailers),
+          this.buildCandidates(fallbackResults, estimatedPriceMinCents, estimatedPriceMaxCents, seenRetailers, title),
         );
       }
     }
@@ -205,11 +225,14 @@ export class ProductSearchService {
     estimatedPriceMinCents: number | null | undefined,
     estimatedPriceMaxCents: number | null | undefined,
     seenRetailers: Set<string>,
+    suggestionTitle: string,
   ): Candidate[] {
     const candidates: Candidate[] = [];
     for (const r of results) {
       const url = r.url as string | undefined;
       if (!url || COLLECTION_URL_PATTERNS.some((p) => p.test(url))) continue;
+
+      if (!this.isRelevantCandidate(suggestionTitle, r.title as string | undefined)) continue;
 
       const priceCents = this.pickBestPrice((r.text as string) || "", estimatedPriceMinCents, estimatedPriceMaxCents);
       if (priceCents === null) continue;
@@ -266,6 +289,28 @@ export class ProductSearchService {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  // Exa's own title for a result is a much stronger relevance signal than
+  // its (often-truncated) text snippet — real API responses always include
+  // one. A candidate with no title at all (only possible with an
+  // incomplete/mocked response) is let through rather than blocked, since
+  // there's nothing to check it against.
+  private isRelevantCandidate(suggestionTitle: string, candidateTitle: string | undefined): boolean {
+    if (!candidateTitle) return true;
+
+    const significantWords = suggestionTitle
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length >= MIN_SIGNIFICANT_WORD_LENGTH && !RELEVANCE_STOPWORDS.has(w));
+    if (significantWords.length === 0) return true;
+
+    // A single shared word (e.g. both titles are some team's "jersey") isn't
+    // enough — that's exactly how a wrong-but-similar product slips through.
+    // Require a majority of the suggestion's significant words to appear.
+    const candidateLower = candidateTitle.toLowerCase();
+    const matches = significantWords.filter((w) => candidateLower.includes(w)).length;
+    return matches >= Math.ceil(significantWords.length / 2);
   }
 
   private hostnameOf(url: string): string {
