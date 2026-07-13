@@ -828,6 +828,12 @@ export const api = {
       token,
     }),
 
+  importGiftList: (token: string, personId: string, data: { eventId: string; rawText: string }) =>
+    apiFetch<{ items: WishlistItem[]; totalRequested: number; notFoundCount: number; truncated: boolean }>(
+      `/persons/${personId}/import-gift-list`,
+      { method: "POST", body: JSON.stringify(data), token },
+    ),
+
   generateTags: (token: string, personId: string) =>
     apiFetch<PersonTag[]>(`/persons/${personId}/generate-tags`, {
       method: "POST",

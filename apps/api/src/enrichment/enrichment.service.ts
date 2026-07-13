@@ -9,6 +9,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { EntitlementsService } from "../entitlements/entitlements.service";
+import { ProductSearchService } from "../suggestions/product-search.service";
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
 const AI_SERVICE_KEY = process.env.AI_SERVICE_KEY;
@@ -17,6 +18,9 @@ const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS || "60000", 10);
 // Debounce windows
 const TAG_DEBOUNCE_S = 300; // 5 minutes
 const INSIGHT_DEBOUNCE_S = 600; // 10 minutes
+
+// Bounds how many real Exa searches one pasted-list import can trigger.
+const MAX_GIFT_LIST_ITEMS = 20;
 
 // AI service response shapes
 export interface ParsedProduct {
@@ -55,6 +59,7 @@ export class EnrichmentService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly entitlements: EntitlementsService,
+    private readonly productSearch: ProductSearchService,
   ) {}
 
   // --- Ownership helper ---
@@ -158,6 +163,68 @@ export class EnrichmentService {
       return `$${(product.price_range_min_cents / 100).toFixed(2)} - $${(product.price_range_max_cents / 100).toFixed(2)}`;
     }
     return null;
+  }
+
+  // Paste a raw gift list (one idea per line) for a specific event/holiday.
+  // Broflo looks each one up for real — same relevance + liveness vetting
+  // that already backs suggestion generation and the "buy options" flow —
+  // and saves the results to the person's wishlist so future AI
+  // suggestions have more of a sense of what they actually want.
+  async importGiftList(
+    userId: string,
+    personId: string,
+    eventId: string,
+    rawText: string,
+  ) {
+    const person = await this.ensureOwnership(userId, personId);
+
+    const event = await this.prisma.event.findFirst({
+      where: { id: eventId, personId, userId },
+    });
+    if (!event) throw new NotFoundException("Event not found");
+
+    const seen = new Set<string>();
+    const titles: string[] = [];
+    for (const line of rawText.split("\n")) {
+      const title = line.trim().slice(0, 200);
+      if (!title) continue;
+      const key = title.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      titles.push(title);
+    }
+
+    const truncated = titles.length > MAX_GIFT_LIST_ITEMS;
+    const bounded = titles.slice(0, MAX_GIFT_LIST_ITEMS);
+
+    const results = await this.productSearch.searchProducts(
+      bounded.map((title) => ({ title })),
+    );
+
+    const created = [];
+    let notFoundCount = 0;
+    for (let i = 0; i < bounded.length; i++) {
+      const result = results[i];
+      if (!result.productUrl) notFoundCount++;
+      const item = await this.prisma.wishlistItem.create({
+        data: {
+          personId: person.id,
+          eventId: event.id,
+          sourceUrl: result.productUrl,
+          productName: bounded[i],
+          priceRange: result.priceCents ? `$${(result.priceCents / 100).toFixed(2)}` : null,
+          imageUrl: result.imageUrl,
+        },
+      });
+      created.push(item);
+    }
+
+    return {
+      items: created,
+      totalRequested: bounded.length,
+      notFoundCount,
+      truncated,
+    };
   }
 
   async getWishlistItems(userId: string, personId: string) {

@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Zap,
-  Plus,
   Trash2,
   ChevronDown,
   ChevronUp,
@@ -24,15 +23,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,6 +51,7 @@ const OCCASION_TYPES = [
 
 const RUN_STATUS_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   triggered: { label: "Triggered", variant: "secondary" },
+  ready_for_review: { label: "Ready to Buy", variant: "default" },
   order_placed: { label: "Ordered", variant: "default" },
   failed: { label: "Failed", variant: "destructive" },
   skipped_budget: { label: "Over Budget", variant: "outline" },
@@ -80,7 +72,7 @@ export default function AutopilotPage() {
   const [loading, setLoading] = useState(true);
   const [monthlySpent, setMonthlySpent] = useState(0);
   const [expandedRule, setExpandedRule] = useState<string | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
+  const [setupPerson, setSetupPerson] = useState<Person | null>(null);
 
   // Tier gate
   const tier = session?.user?.subscriptionTier ?? "free";
@@ -138,6 +130,18 @@ export default function AutopilotPage() {
     }
   }
 
+  // Turning a person's toggle on: if they already have a (paused) rule,
+  // just reactivate it — the consent + budget were already captured.
+  // Otherwise open the setup dialog, since a first-time rule legally
+  // requires fresh consent and a budget before it can run.
+  function handleTogglePerson(person: Person, rule: AutopilotRule | undefined) {
+    if (rule) {
+      toggleRule(rule);
+    } else {
+      setSetupPerson(person);
+    }
+  }
+
   // Tier gate screen
   if (!hasAccess && !loading) {
     return (
@@ -157,30 +161,19 @@ export default function AutopilotPage() {
     );
   }
 
+  const sortedPeople = [...persons].sort((a, b) => a.name.localeCompare(b.name));
+
   return (
     <div className="bg-transparent px-4 py-6 sm:px-6 sm:py-8 md:px-8">
       <div className="mx-auto max-w-4xl">
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Zap className="h-6 w-6 text-amber" />
+        <div className="mb-6 flex items-center gap-3">
+          <Zap className="h-6 w-6 text-amber" />
+          <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Autopilot</h1>
+            <p className="text-sm text-muted-foreground">
+              Flip it on for anyone — we&rsquo;ll shop ahead and notify you when a gift&rsquo;s ready to buy.
+            </p>
           </div>
-          <Dialog open={showCreate} onOpenChange={setShowCreate}>
-            <DialogTrigger render={<Button />}>
-              <Plus className="h-4 w-4 mr-2" />
-              New Rule
-            </DialogTrigger>
-            <CreateRuleDialog
-              token={session?.accessToken ?? ""}
-              persons={persons}
-              existingPersonIds={rules.map((r) => r.personId)}
-              onCreated={(rule) => {
-                setRules((prev) => [rule, ...prev]);
-                setShowCreate(false);
-                toast.success(VOICE.autopilot.enabled);
-              }}
-            />
-          </Dialog>
         </div>
 
         {/* Monthly spend summary */}
@@ -197,58 +190,84 @@ export default function AutopilotPage() {
           </Card>
         )}
 
-        {/* Rules list */}
+        {/* People list */}
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-28 w-full rounded-lg" />
+              <Skeleton key={i} className="h-20 w-full rounded-lg" />
             ))}
           </div>
-        ) : rules.length === 0 ? (
+        ) : sortedPeople.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <Zap className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
               <p className="text-muted-foreground italic">
-                {VOICE.autopilot.emptyState}
+                Add a person first, then come back to set up autopilot for them.
               </p>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-3">
-            {rules.map((rule) => (
-              <RuleCard
-                key={rule.id}
-                rule={rule}
-                expanded={expandedRule === rule.id}
-                onToggleExpand={() =>
-                  setExpandedRule((prev) => (prev === rule.id ? null : rule.id))
-                }
-                onToggleActive={() => toggleRule(rule)}
-                onDelete={() => deleteRule(rule.id)}
-              />
-            ))}
+            {sortedPeople.map((person) => {
+              const rule = rules.find((r) => r.personId === person.id);
+              return (
+                <PersonAutopilotRow
+                  key={person.id}
+                  person={person}
+                  rule={rule}
+                  expanded={!!rule && expandedRule === rule.id}
+                  onToggleExpand={() =>
+                    rule &&
+                    setExpandedRule((prev) => (prev === rule.id ? null : rule.id))
+                  }
+                  onToggle={() => handleTogglePerson(person, rule)}
+                  onDelete={rule ? () => deleteRule(rule.id) : undefined}
+                />
+              );
+            })}
           </div>
         )}
       </div>
+
+      <Dialog
+        open={!!setupPerson}
+        onOpenChange={(open) => {
+          if (!open) setSetupPerson(null);
+        }}
+      >
+        {setupPerson && (
+          <CreateRuleDialog
+            token={session?.accessToken ?? ""}
+            person={setupPerson}
+            onCreated={(rule) => {
+              setRules((prev) => [rule, ...prev]);
+              setSetupPerson(null);
+              toast.success(VOICE.autopilot.enabled);
+            }}
+          />
+        )}
+      </Dialog>
     </div>
   );
 }
 
-function RuleCard({
+function PersonAutopilotRow({
+  person,
   rule,
   expanded,
   onToggleExpand,
-  onToggleActive,
+  onToggle,
   onDelete,
 }: {
-  rule: AutopilotRule;
+  person: Person;
+  rule: AutopilotRule | undefined;
   expanded: boolean;
   onToggleExpand: () => void;
-  onToggleActive: () => void;
-  onDelete: () => void;
+  onToggle: () => void;
+  onDelete?: () => void;
 }) {
-  const runs = rule.runs ?? [];
-  const totalCap = rule.monthlyCapCents;
+  const runs = rule?.runs ?? [];
+  const isActive = rule?.isActive ?? false;
 
   return (
     <Card>
@@ -256,74 +275,81 @@ function RuleCard({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <button
-              onClick={onToggleActive}
+              onClick={onToggle}
               className={`shrink-0 h-5 w-9 rounded-full transition-colors relative ${
-                rule.isActive ? "bg-amber" : "bg-muted"
+                isActive ? "bg-amber" : "bg-muted"
               }`}
-              aria-label={rule.isActive ? "Disable rule" : "Enable rule"}
+              aria-label={isActive ? `Disable autopilot for ${person.name}` : `Enable autopilot for ${person.name}`}
             >
               <span
                 className={`block h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                  rule.isActive ? "translate-x-4.5" : "translate-x-0.5"
+                  isActive ? "translate-x-4.5" : "translate-x-0.5"
                 }`}
               />
             </button>
             <div className="min-w-0">
-              <p className="text-sm font-semibold truncate">{rule.person.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {rule.occasionTypes.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join(", ")}
-                {" · "}
-                {formatCents(rule.budgetMinCents)}–{formatCents(rule.budgetMaxCents)} per gift
+              <p className="text-sm font-semibold truncate">{person.name}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {rule
+                  ? `${rule.occasionTypes.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join(", ")} · ${formatCents(rule.budgetMinCents)}–${formatCents(rule.budgetMaxCents)} per gift`
+                  : "Not set up yet"}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Badge variant={rule.isActive ? "default" : "secondary"}>
-              {rule.isActive ? "Active" : "Paused"}
-            </Badge>
-            <AlertDialog>
-              <AlertDialogTrigger render={<Button variant="ghost" size="sm" className="h-8 w-8 p-0" />}>
-                <Trash2 className="h-4 w-4 text-muted-foreground" />
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete autopilot rule?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will permanently remove the autopilot rule for {rule.person.name}.
-                    No more automatic orders will be placed.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={onDelete}>Delete</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              onClick={onToggleExpand}
-            >
-              {expanded ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-            </Button>
+            {rule && (
+              <Badge variant={rule.isActive ? "default" : "secondary"}>
+                {rule.isActive ? "Active" : "Paused"}
+              </Badge>
+            )}
+            {rule && onDelete && (
+              <AlertDialog>
+                <AlertDialogTrigger render={<Button variant="ghost" size="sm" className="h-8 w-8 p-0" />}>
+                  <Trash2 className="h-4 w-4 text-muted-foreground" />
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete autopilot rule?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently remove the autopilot rule for {person.name}.
+                      We&rsquo;ll stop shopping ahead of their events.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={onDelete}>Delete</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            {rule && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={onToggleExpand}
+              >
+                {expanded ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Spend progress bar */}
-        <div className="mt-3">
-          <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-            <span>Monthly cap: {formatCents(totalCap)}/mo</span>
-            <span>Lead: {rule.leadDays} days</span>
+        {rule && (
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+              <span>Monthly cap: {formatCents(rule.monthlyCapCents)}/mo</span>
+              <span>Lead: {rule.leadDays} days</span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Expanded: recent runs */}
-        {expanded && (
+        {expanded && rule && (
           <div className="mt-4 border-t pt-3">
             <p className="text-xs font-medium mb-2 text-muted-foreground">Recent Runs</p>
             {runs.length === 0 ? (
@@ -368,18 +394,13 @@ function RuleCard({
 
 function CreateRuleDialog({
   token,
-  persons,
-  existingPersonIds,
+  person,
   onCreated,
 }: {
   token: string;
-  persons: Person[];
-  existingPersonIds: string[];
+  person: Person;
   onCreated: (rule: AutopilotRule) => void;
 }) {
-  const availablePersons = persons.filter((p) => !existingPersonIds.includes(p.id));
-
-  const [personId, setPersonId] = useState("");
   const [occasionTypes, setOccasionTypes] = useState<string[]>([]);
   const [budgetMin, setBudgetMin] = useState(20);
   const [budgetMax, setBudgetMax] = useState(75);
@@ -396,11 +417,11 @@ function CreateRuleDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!personId || occasionTypes.length === 0 || !consent) return;
+    if (occasionTypes.length === 0 || !consent) return;
     setSubmitting(true);
     try {
       const rule = await api.createRule(token, {
-        personId,
+        personId: person.id,
         occasionTypes,
         budgetMinCents: budgetMin * 100,
         budgetMaxCents: budgetMax * 100,
@@ -419,32 +440,9 @@ function CreateRuleDialog({
   return (
     <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
       <DialogHeader>
-        <DialogTitle>New Autopilot Rule</DialogTitle>
+        <DialogTitle>Set Up Autopilot for {person.name}</DialogTitle>
       </DialogHeader>
       <form onSubmit={handleSubmit} className="space-y-5 pt-2">
-        {/* Person selector */}
-        <div className="space-y-2">
-          <Label>Person</Label>
-          {availablePersons.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              All your people already have autopilot rules.
-            </p>
-          ) : (
-            <Select value={personId} onValueChange={(v) => setPersonId(v ?? "")}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a person" />
-              </SelectTrigger>
-              <SelectContent>
-                {availablePersons.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-
         {/* Occasion types multi-select */}
         <div className="space-y-2">
           <Label>Occasions</Label>
@@ -539,7 +537,7 @@ function CreateRuleDialog({
         <Button
           type="submit"
           className="w-full"
-          disabled={!personId || occasionTypes.length === 0 || !consent || submitting}
+          disabled={occasionTypes.length === 0 || !consent || submitting}
         >
           {submitting ? "Creating..." : "Enable Autopilot"}
         </Button>

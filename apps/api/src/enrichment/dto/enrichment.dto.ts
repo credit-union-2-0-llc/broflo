@@ -2,6 +2,7 @@ import {
   IsArray,
   IsString,
   IsUrl,
+  IsUUID,
   ArrayMinSize,
   ArrayMaxSize,
   MaxLength,
@@ -21,4 +22,14 @@ export class CreateManualTagDto {
   @MinLength(2)
   @MaxLength(100)
   tag!: string;
+}
+
+export class ImportGiftListDto {
+  @IsUUID()
+  eventId!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(4000)
+  rawText!: string;
 }

@@ -14,7 +14,7 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { RequiresTier } from "../billing/decorators/requires-tier.decorator";
 import { SubscriptionGuard } from "../billing/guards/subscription.guard";
 import { EnrichmentService } from "./enrichment.service";
-import { ParseWishlistDto, CreateManualTagDto } from "./dto/enrichment.dto";
+import { ParseWishlistDto, CreateManualTagDto, ImportGiftListDto } from "./dto/enrichment.dto";
 
 @Controller("persons/:personId")
 export class EnrichmentController {
@@ -49,6 +49,17 @@ export class EnrichmentController {
     @Param("itemId") itemId: string,
   ) {
     await this.enrichment.deleteWishlistItem(user.id, personId, itemId);
+  }
+
+  @Post("import-gift-list")
+  @UseGuards(SubscriptionGuard)
+  @RequiresTier("pro", "elite")
+  async importGiftList(
+    @CurrentUser() user: User,
+    @Param("personId") personId: string,
+    @Body() dto: ImportGiftListDto,
+  ) {
+    return this.enrichment.importGiftList(user.id, personId, dto.eventId, dto.rawText);
   }
 
   // --- Tags (Pro+) ---

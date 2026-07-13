@@ -67,11 +67,13 @@ export interface PersonTag {
 export interface WishlistItem {
   id: string;
   personId: string;
-  sourceUrl: string;
+  eventId: string | null;
+  sourceUrl: string | null;
   productName: string | null;
   category: string | null;
   brand: string | null;
   priceRange: string | null;
+  imageUrl: string | null;
   scrapedAt: string;
   createdAt: string;
 }

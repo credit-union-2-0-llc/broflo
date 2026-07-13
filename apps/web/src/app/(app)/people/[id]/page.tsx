@@ -233,16 +233,13 @@ export default async function PersonDetailPage({
                 ),
             )}
 
-            {(person.wishlistUrls || (person.wishlistItems && person.wishlistItems.length > 0)) && (
-              <>
-                <Separator className="my-3" />
-                <WishlistParser
-                  personId={person.id}
-                  wishlistUrls={person.wishlistUrls}
-                  initialItems={person.wishlistItems || []}
-                />
-              </>
-            )}
+            <Separator className="my-3" />
+            <WishlistParser
+              personId={person.id}
+              wishlistUrls={person.wishlistUrls}
+              initialItems={person.wishlistItems || []}
+              personEvents={events.filter((e) => e.personId === person.id)}
+            />
 
             <Separator className="my-3" />
             <PhotoSection
