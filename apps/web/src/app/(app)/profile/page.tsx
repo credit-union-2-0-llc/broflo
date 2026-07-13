@@ -19,10 +19,12 @@ export default async function ProfilePage() {
   const user = session.user;
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
+    <div className="container max-w-lg mx-auto py-6 px-4 sm:px-6 sm:py-8 md:px-8">
+      <h1 className="text-2xl font-bold tracking-tight mb-6">Profile</h1>
+
+      <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Profile</CardTitle>
+          <CardTitle className="text-base">Account</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {user?.avatarUrl && (

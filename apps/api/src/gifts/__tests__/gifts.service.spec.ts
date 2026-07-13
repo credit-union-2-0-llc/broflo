@@ -9,9 +9,10 @@ describe("GiftsService", () => {
   let service: GiftsService;
   let prisma: {
     person: { findFirst: jest.Mock };
-    giftRecord: { findMany: jest.Mock; count: jest.Mock; aggregate: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
+    giftRecord: { findMany: jest.Mock; count: jest.Mock; aggregate: jest.Mock; findFirst: jest.Mock; update: jest.Mock; delete: jest.Mock };
   };
   let entitlements: { isFeatureEnabled: jest.Mock };
+  let redis: { invalidateByPattern: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -22,15 +23,17 @@ describe("GiftsService", () => {
         aggregate: jest.fn().mockResolvedValue({ _sum: { priceCents: 5000 }, _avg: { rating: 4.5 } }),
         findFirst: jest.fn(),
         update: jest.fn(),
+        delete: jest.fn(),
       },
     };
     entitlements = { isFeatureEnabled: jest.fn() };
+    redis = { invalidateByPattern: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         GiftsService,
         { provide: PrismaService, useValue: prisma },
-        { provide: RedisService, useValue: {} },
+        { provide: RedisService, useValue: redis },
         { provide: EntitlementsService, useValue: entitlements },
       ],
     }).compile();
@@ -91,6 +94,36 @@ describe("GiftsService", () => {
 
       await expect(service.confirmPurchase("u1", "g1", { priceCents: 4250 })).rejects.toThrow(BadRequestException);
       expect(prisma.giftRecord.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("deleteGiftRecord", () => {
+    it("deletes a gift owned by the user and invalidates that person's suggestion cache", async () => {
+      prisma.giftRecord.findFirst.mockResolvedValue({ id: "g1", userId: "u1", personId: "p1" });
+
+      const result = await service.deleteGiftRecord("u1", "g1");
+
+      expect(prisma.giftRecord.delete).toHaveBeenCalledWith({ where: { id: "g1" } });
+      expect(redis.invalidateByPattern).toHaveBeenCalledWith("suggest:p1:*");
+      expect(result).toEqual({ deleted: true });
+    });
+
+    it("throws NotFoundException when the gift doesn't exist or isn't owned by the user", async () => {
+      prisma.giftRecord.findFirst.mockResolvedValue(null);
+
+      await expect(service.deleteGiftRecord("u1", "g1")).rejects.toThrow(NotFoundException);
+      expect(prisma.giftRecord.delete).not.toHaveBeenCalled();
+    });
+
+    it("this works even for a gift with a real order attached (Order.giftRecordId is onDelete: SetNull)", async () => {
+      // No order-related mock needed here — the point is deleteGiftRecord
+      // doesn't touch the Order table at all, Postgres/Prisma's SetNull
+      // handles orphaning the order record automatically.
+      prisma.giftRecord.findFirst.mockResolvedValue({ id: "g2", userId: "u1", personId: "p1", source: "ordered" });
+
+      const result = await service.deleteGiftRecord("u1", "g2");
+
+      expect(result).toEqual({ deleted: true });
     });
   });
 });

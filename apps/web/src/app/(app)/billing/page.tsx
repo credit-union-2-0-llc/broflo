@@ -40,6 +40,7 @@ function BillingContent() {
   const tier = session?.user?.subscriptionTier || "free";
   const [devOverrideEnabled, setDevOverrideEnabled] = useState(false);
   const [switching, setSwitching] = useState<string | null>(null);
+  const [openingPortal, setOpeningPortal] = useState(false);
 
   useEffect(() => {
     if (success) {
@@ -105,13 +106,19 @@ function BillingContent() {
               </p>
               <Button
                 className="w-full"
-                onClick={() => {
-                  if (session?.accessToken) {
-                    openPortal(session.accessToken);
+                disabled={openingPortal}
+                onClick={async () => {
+                  if (!session?.accessToken) return;
+                  setOpeningPortal(true);
+                  try {
+                    await openPortal(session.accessToken);
+                  } catch {
+                    toast.error("Couldn't open the billing portal. Try again in a moment.");
+                    setOpeningPortal(false);
                   }
                 }}
               >
-                {VOICE.billing.portalButton}
+                {openingPortal ? "Opening..." : VOICE.billing.portalButton}
                 <ExternalLink className="ml-2 h-4 w-4" />
               </Button>
             </>
