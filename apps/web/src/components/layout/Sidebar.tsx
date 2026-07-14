@@ -25,6 +25,7 @@ const sections = [
       { href: "/people", label: "People", icon: Users },
       { href: "/events", label: "Events", icon: Calendar },
       { href: "/orders", label: "Orders", icon: Package },
+      { href: "/family", label: "Family", icon: Heart, requiresTier: "family" as SubscriptionTier },
     ],
   },
   {
@@ -37,7 +38,6 @@ const sections = [
   {
     label: "System",
     items: [
-      { href: "/family", label: "Family", icon: Heart, requiresTier: "family" as SubscriptionTier },
       { href: "/billing", label: "Billing", icon: Settings },
       // Only the highest tier has nothing left to upgrade to.
       { href: "/upgrade", label: "Upgrade", icon: Sparkles, hideAtTier: "family" as SubscriptionTier },
