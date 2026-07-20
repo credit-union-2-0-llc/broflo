@@ -351,26 +351,38 @@ export class ProductSearchService {
   }
 
   private async checkLiveness(url: string): Promise<"gone" | "live" | "unknown"> {
+    return (await this.fetchAndCheckLiveness(url)).status;
+  }
+
+  // Shared by checkLiveness (candidate filtering during search) and
+  // checkPriceAndLiveness (re-checking one already-known URL for the
+  // price-drop/restock watch) — one fetch, one hard-deadline race, one set
+  // of "gone" text indicators, rather than two slightly different
+  // implementations of the same liveness check.
+  private async fetchAndCheckLiveness(
+    url: string,
+  ): Promise<{ status: "gone" | "live" | "unknown"; text: string | null }> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), LIVENESS_TIMEOUT_MS);
 
-    const fetchAndCheck = (async (): Promise<"gone" | "live" | "unknown"> => {
+    const fetchAndCheck = (async (): Promise<{ status: "gone" | "live" | "unknown"; text: string | null }> => {
       try {
         const res = await fetch(url, { signal: controller.signal });
-        if (res.status === 404 || res.status === 410) return "gone";
-        if (!res.ok) return "unknown"; // e.g. 403 bot-block, 5xx — ambiguous, don't penalize
-        const text = (await res.text()).toLowerCase();
-        return GONE_TEXT_INDICATORS.some((indicator) => text.includes(indicator)) ? "gone" : "live";
+        if (res.status === 404 || res.status === 410) return { status: "gone", text: null };
+        if (!res.ok) return { status: "unknown", text: null }; // e.g. 403 bot-block, 5xx — ambiguous, don't penalize
+        const rawText = await res.text();
+        const gone = GONE_TEXT_INDICATORS.some((indicator) => rawText.toLowerCase().includes(indicator));
+        return { status: gone ? "gone" : "live", text: rawText };
       } catch {
-        return "unknown"; // network error / abort — ambiguous, don't penalize
+        return { status: "unknown", text: null }; // network error / abort — ambiguous, don't penalize
       }
     })();
 
     // Independent hard deadline — see LIVENESS_HARD_DEADLINE_MS above for
     // why this can't just rely on the AbortController timeout alone.
     let hardDeadlineTimer: ReturnType<typeof setTimeout>;
-    const hardDeadline = new Promise<"unknown">((resolve) => {
-      hardDeadlineTimer = setTimeout(() => resolve("unknown"), LIVENESS_HARD_DEADLINE_MS);
+    const hardDeadline = new Promise<{ status: "unknown"; text: null }>((resolve) => {
+      hardDeadlineTimer = setTimeout(() => resolve({ status: "unknown", text: null }), LIVENESS_HARD_DEADLINE_MS);
     });
 
     try {
@@ -379,6 +391,27 @@ export class ProductSearchService {
       clearTimeout(timeout);
       clearTimeout(hardDeadlineTimer!);
     }
+  }
+
+  // Re-checks one SPECIFIC already-known product URL — used by the
+  // price-drop/restock watch to re-verify the exact link a user was shown,
+  // rather than searchProduct's fresh broad Exa search (which could drift
+  // to a different retailer or listing entirely). Reuses the same liveness
+  // detection and price extraction as the rest of this file instead of
+  // reimplementing either.
+  async checkPriceAndLiveness(
+    url: string,
+    estimatedPriceMinCents?: number | null,
+    estimatedPriceMaxCents?: number | null,
+  ): Promise<{ status: "gone" | "live" | "unknown"; priceCents: number | null }> {
+    const { status, text } = await this.fetchAndCheckLiveness(url);
+    if (status !== "live" || !text) {
+      return { status, priceCents: null };
+    }
+    return {
+      status,
+      priceCents: this.pickBestPrice(text, estimatedPriceMinCents, estimatedPriceMaxCents),
+    };
   }
 
   private hostnameOf(url: string): string {

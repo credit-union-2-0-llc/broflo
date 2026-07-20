@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PiggyBank, Trash2 } from "lucide-react";
 import {
   Card,
@@ -25,6 +26,7 @@ function dollars(cents: number) {
 }
 
 export function GiftPoolSection({ token, myUserId }: GiftPoolSectionProps) {
+  const searchParams = useSearchParams();
   const [pools, setPools] = useState<GiftPoolSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
@@ -48,6 +50,22 @@ export function GiftPoolSection({ token, myUserId }: GiftPoolSectionProps) {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // Deep-link prefill for the "New Pool" fields below — e.g. the
+  // family-pool auto-nudge notification for a big-ticket Autopilot pick
+  // links here with ?prefillTitle=...&prefillTargetCents=... so starting a
+  // pool for that gift is a single click into the existing create-pool
+  // flow, not a form the recipient has to fill in from scratch.
+  useEffect(() => {
+    const prefillTitle = searchParams.get("prefillTitle");
+    const prefillTargetCents = searchParams.get("prefillTargetCents");
+    if (prefillTitle) setTitle(prefillTitle.slice(0, 100));
+    if (prefillTargetCents) {
+      const cents = parseInt(prefillTargetCents, 10);
+      if (Number.isFinite(cents) && cents > 0) setTarget((cents / 100).toString());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleCreate() {
     if (!title.trim() || !target) return;
