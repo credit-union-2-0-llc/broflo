@@ -39,10 +39,10 @@ const FEATURES: Record<string, string[]> = {
   ],
   elite: [
     "Everything in Pro",
-    "Concierge support",
-    "Handwritten notes",
-    "Priority AI processing",
     "Unlimited re-rolls",
+    "Unlimited photos per person",
+    "Photo re-analysis",
+    "AI-powered dossier insights",
   ],
   family: [
     "Everything in Elite",
