@@ -66,6 +66,7 @@ export function ScreenshotGallery({
             size="icon"
             className="absolute top-2 right-2 text-white hover:bg-white/20"
             onClick={() => onOpenChange(false)}
+            aria-label="Close screenshot viewer"
           >
             <X className="h-5 w-5" />
           </Button>

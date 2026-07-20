@@ -46,6 +46,7 @@ export function ServiceCreditBanner({ amountCents, onDismiss }: ServiceCreditBan
             setDismissed(true);
             onDismiss?.();
           }}
+          aria-label="Dismiss credit notice"
         >
           <X className="h-3.5 w-3.5" />
         </Button>

@@ -70,18 +70,22 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const result = await signIn("credentials", {
-      email,
-      code: data.code,
-      redirect: false,
-    });
+    try {
+      const result = await signIn("credentials", {
+        email,
+        code: data.code,
+        redirect: false,
+      });
 
-    setLoading(false);
-
-    if (result?.error) {
-      setError("Invalid or expired code.");
-    } else {
-      router.push("/dashboard");
+      if (result?.error) {
+        setError("Invalid or expired code.");
+      } else {
+        router.push("/dashboard");
+      }
+    } catch {
+      setError("Something went wrong signing you in. Try again.");
+    } finally {
+      setLoading(false);
     }
   }
 

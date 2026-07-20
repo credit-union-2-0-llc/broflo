@@ -72,7 +72,11 @@ export function PhotoLightbox({
         {/* Image area */}
         <div className="relative flex flex-1 items-center justify-center p-4">
           {/* Close */}
-          <button onClick={onClose} className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20">
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+            aria-label="Close photo viewer"
+          >
             <X className="h-5 w-5" />
           </button>
 
@@ -81,6 +85,7 @@ export function PhotoLightbox({
             <button
               onClick={() => setCurrentId(photos[currentIndex - 1].id)}
               className="absolute left-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+              aria-label="Previous photo"
             >
               <ChevronLeft className="h-6 w-6" />
             </button>
@@ -89,6 +94,7 @@ export function PhotoLightbox({
             <button
               onClick={() => setCurrentId(photos[currentIndex + 1].id)}
               className="absolute right-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+              aria-label="Next photo"
             >
               <ChevronRight className="h-6 w-6" />
             </button>
