@@ -49,12 +49,24 @@ export class AuthService {
   async verifyOtp(dto: VerifyOtpDto) {
     const emailLower = dto.email.toLowerCase();
 
+    // Per-email lockout on wrong guesses — independent of the per-IP
+    // throttle on the controller, which a distributed attacker (many source
+    // IPs) can route around entirely. Without this, a 6-digit code is only
+    // ever protected by its 5-minute TTL, not by any real limit on attempts.
+    const attempt = await this.redis.checkAndIncrementOtpVerifyAttempts(emailLower);
+    if (!attempt.allowed) {
+      throw new UnauthorizedException(
+        "Too many incorrect attempts. Request a new code and try again.",
+      );
+    }
+
     const storedCode = await this.redis.getOtp(emailLower);
     if (!storedCode || storedCode !== dto.code) {
       throw new UnauthorizedException("Invalid or expired code");
     }
 
     await this.redis.deleteOtp(emailLower);
+    await this.redis.clearOtpVerifyAttempts(emailLower);
 
     let user = await this.prisma.user.findUnique({
       where: { email: emailLower },

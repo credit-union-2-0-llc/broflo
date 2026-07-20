@@ -85,6 +85,12 @@ describe("EmailService", () => {
   });
 
   describe("dev mode (no RESEND_API_KEY)", () => {
+    const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+
+    afterEach(() => {
+      process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+    });
+
     it("logs instead of sending and never touches the Resend client", async () => {
       delete process.env.RESEND_API_KEY;
       const module: TestingModule = await Test.createTestingModule({
@@ -93,6 +99,36 @@ describe("EmailService", () => {
       const devService = module.get(EmailService);
 
       await expect(devService.sendOtpCode("user@example.com", "123456")).resolves.toBeUndefined();
+    });
+
+    // Regression test: a misconfigured production deploy (RESEND_API_KEY
+    // missing) must never fall through to logging the literal OTP code /
+    // invite tokens — that's exactly the secret-in-logs mistake this guard
+    // exists to prevent. It must fail loudly instead.
+    it("refuses to log the OTP code and throws when NODE_ENV is production", async () => {
+      delete process.env.RESEND_API_KEY;
+      process.env.NODE_ENV = "production";
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [EmailService],
+      }).compile();
+      const prodService = module.get(EmailService);
+
+      await expect(
+        prodService.sendOtpCode("user@example.com", "123456"),
+      ).rejects.toThrow(/refusing to log an OTP code in production/);
+    });
+
+    it("refuses to log a family invite token when NODE_ENV is production", async () => {
+      delete process.env.RESEND_API_KEY;
+      process.env.NODE_ENV = "production";
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [EmailService],
+      }).compile();
+      const prodService = module.get(EmailService);
+
+      await expect(
+        prodService.sendFamilyInvite("recipient@example.com", "Jasper", "The Smiths", "secret-token"),
+      ).rejects.toThrow(/refusing to log a family invite link\/token in production/);
     });
   });
 });

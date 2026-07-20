@@ -28,6 +28,10 @@ function validateProductionSecrets() {
     "AI_SERVICE_KEY",
     "AZURE_STORAGE_ACCOUNT_NAME",
     "AZURE_STORAGE_CONTAINER_NAME",
+    // Without this, EmailService silently falls back to logging OTP codes
+    // and invite tokens instead of emailing them (see EmailService's
+    // dev-mode branches) — fail at boot, not at the first login attempt.
+    "RESEND_API_KEY",
   ];
   const missing = required.filter((k) => !process.env[k]);
   if (missing.length > 0) {
