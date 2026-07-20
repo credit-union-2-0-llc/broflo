@@ -100,16 +100,30 @@ export class BillingService {
       stripeSubscriptionId: user.stripeSubscriptionId,
       stripeCustomerId: user.stripeCustomerId,
       hasPaymentMethod: !!user.stripePaymentMethodId,
-      devTierOverrideEnabled: process.env.ALLOW_DEV_TIER_OVERRIDE === "true",
+      devTierOverrideEnabled:
+        process.env.ALLOW_DEV_TIER_OVERRIDE === "true" &&
+        this.isEmailAllowedForDevTierOverride(user.email),
     };
   }
 
   // Lets a user flip their own tier without going through Stripe checkout —
-  // for testing tier-gated features before Stripe is wired up. Off by
-  // default; only touches the caller's own account. Remove once real
-  // checkout is live.
+  // for testing tier-gated features before Stripe is wired up (Family tier
+  // still has no Stripe price IDs configured as of 2026-07-20, so this is
+  // still load-bearing for internal Family-tier testing). Only touches the
+  // caller's own account, but until this allowlist gate was added it had no
+  // scoping beyond the master switch — ANY signed-up user could grant
+  // themselves any paid tier for free. Now requires the caller's email to
+  // also be on DEV_TIER_OVERRIDE_ALLOWED_EMAILS (same pattern as the E2E
+  // test hatch's allowlist) — fails closed if that's unset/empty, so
+  // deploying this fix requires explicitly re-allowlisting real test
+  // accounts rather than silently keeping the old allow-everyone behavior.
+  // Remove entirely once real Family-tier checkout is live.
   async devSetTier(user: User, tier: "free" | "pro" | "elite" | "family") {
     if (process.env.ALLOW_DEV_TIER_OVERRIDE !== "true") {
+      throw new ForbiddenException("Dev tier override is not enabled.");
+    }
+    if (!this.isEmailAllowedForDevTierOverride(user.email)) {
+      this.log.warn(`Dev tier override: denied (email not allowlisted) user ${user.id}`);
       throw new ForbiddenException("Dev tier override is not enabled.");
     }
 
@@ -121,6 +135,15 @@ export class BillingService {
 
     this.log.warn(`Dev tier override: user ${user.id} → ${tier}`);
     return { subscriptionTier: tier };
+  }
+
+  private isEmailAllowedForDevTierOverride(email: string): boolean {
+    const raw = process.env.DEV_TIER_OVERRIDE_ALLOWED_EMAILS || "";
+    const allowlist = raw
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    return allowlist.includes(email.toLowerCase());
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
