@@ -159,7 +159,7 @@ npx shadcn-ui@latest add table
 
 ## Goal
 
-Broflo is installable on iOS and Android home screens. Push notifications replace email as the primary alert channel for lead-time warnings and autopilot pre-fire notifications.
+Broflo is installable on iOS and Android home screens. Push notifications replace email as the primary alert channel for lead-time warnings and autopilot ready-to-buy notifications.
 
 ---
 
@@ -169,7 +169,7 @@ Broflo is installable on iOS and Android home screens. Push notifications replac
 - [ ] "Add to home screen" prompt triggers on mobile browsers
 - [ ] App icon, splash screen, and name display correctly on iOS and Android
 - [ ] Firebase Cloud Messaging (FCM) integrated for push notifications
-- [ ] Push replaces email for: lead-time alerts, autopilot pre-fire, order status, badge earned
+- [ ] Push replaces email for: lead-time alerts, autopilot ready-to-buy notifications, order status, badge earned
 - [ ] User can manage notification preferences in settings
 - [ ] Offline shell: app shows cached dashboard if offline, not browser error
 - [ ] iOS push tested on real device (Safari requires special PWA push handling)
