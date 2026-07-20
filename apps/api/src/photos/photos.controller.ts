@@ -20,8 +20,17 @@ import { UploadPhotoDto } from "./dto/photos.dto";
 export class PhotosController {
   constructor(private readonly photos: PhotosService) {}
 
+  // fieldNestingDepth: 0 — this endpoint's form only ever sends flat fields
+  // (file + category), never bracket-nested ones (e.g. "a[b][c]"). Multer
+  // 2.2.0 patched GHSA-72gw-mp4g-v24j (DoS via unbounded nested field-name
+  // parsing) but only enforces it when a caller opts in via this limit.
+  // Cast to `any`: @nestjs/platform-express@11.1.18's MulterOptions.limits
+  // type hasn't been updated for this new multer 2.2.0 option yet, even
+  // though the underlying multer package reads and enforces it at runtime.
   @Post()
-  @UseInterceptors(FileInterceptor("file"))
+  @UseInterceptors(
+    FileInterceptor("file", { limits: { fieldNestingDepth: 0 } } as unknown as Parameters<typeof FileInterceptor>[1]),
+  )
   async uploadPhoto(
     @CurrentUser() user: User,
     @Param("personId") personId: string,
