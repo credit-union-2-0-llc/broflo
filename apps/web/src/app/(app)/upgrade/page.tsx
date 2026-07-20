@@ -118,7 +118,11 @@ function UpgradeContent() {
   }
 
   async function handleCheckout(tier: string, priceId: string | undefined, period: "monthly" | "annual") {
-    if (!priceId || !session?.accessToken) return;
+    if (!session?.accessToken) return;
+    if (!priceId) {
+      toast.error("This plan isn't available for checkout yet. Contact support.");
+      return;
+    }
     const key = `${tier}-${period}`;
     setCheckingOut(key);
     try {
