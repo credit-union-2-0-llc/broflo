@@ -321,6 +321,7 @@ describe("BillingService", () => {
   describe("getSubscription", () => {
     it("returns subscription info from user", async () => {
       const user = {
+        email: "someone@example.com",
         subscriptionTier: "pro",
         stripeSubscriptionId: "sub_123",
         stripeCustomerId: "cus_123",
@@ -340,6 +341,7 @@ describe("BillingService", () => {
 
     it("returns hasPaymentMethod false when no payment method", async () => {
       const user = {
+        email: "someone@example.com",
         subscriptionTier: "free",
         stripeSubscriptionId: null,
         stripeCustomerId: null,
@@ -349,25 +351,83 @@ describe("BillingService", () => {
       const result = await service.getSubscription(user);
       expect(result.hasPaymentMethod).toBe(false);
     });
+
+    it("devTierOverrideEnabled is false for a non-allowlisted email even when the master switch is on", async () => {
+      process.env.ALLOW_DEV_TIER_OVERRIDE = "true";
+      process.env.DEV_TIER_OVERRIDE_ALLOWED_EMAILS = "test@example.com";
+      const user = {
+        email: "someone-else@example.com",
+        subscriptionTier: "free",
+        stripeSubscriptionId: null,
+        stripeCustomerId: null,
+        stripePaymentMethodId: null,
+      } as any;
+
+      const result = await service.getSubscription(user);
+
+      expect(result.devTierOverrideEnabled).toBe(false);
+      delete process.env.ALLOW_DEV_TIER_OVERRIDE;
+      delete process.env.DEV_TIER_OVERRIDE_ALLOWED_EMAILS;
+    });
+
+    it("devTierOverrideEnabled is true for an allowlisted email (case-insensitive) when the master switch is on", async () => {
+      process.env.ALLOW_DEV_TIER_OVERRIDE = "true";
+      process.env.DEV_TIER_OVERRIDE_ALLOWED_EMAILS = "Test@Example.com, other@example.com";
+      const user = {
+        email: "test@example.com",
+        subscriptionTier: "free",
+        stripeSubscriptionId: null,
+        stripeCustomerId: null,
+        stripePaymentMethodId: null,
+      } as any;
+
+      const result = await service.getSubscription(user);
+
+      expect(result.devTierOverrideEnabled).toBe(true);
+      delete process.env.ALLOW_DEV_TIER_OVERRIDE;
+      delete process.env.DEV_TIER_OVERRIDE_ALLOWED_EMAILS;
+    });
   });
 
   describe("devSetTier", () => {
     const ORIGINAL_ENV = process.env.ALLOW_DEV_TIER_OVERRIDE;
+    const ORIGINAL_ALLOWLIST = process.env.DEV_TIER_OVERRIDE_ALLOWED_EMAILS;
 
     afterEach(() => {
       if (ORIGINAL_ENV === undefined) delete process.env.ALLOW_DEV_TIER_OVERRIDE;
       else process.env.ALLOW_DEV_TIER_OVERRIDE = ORIGINAL_ENV;
+      if (ORIGINAL_ALLOWLIST === undefined) delete process.env.DEV_TIER_OVERRIDE_ALLOWED_EMAILS;
+      else process.env.DEV_TIER_OVERRIDE_ALLOWED_EMAILS = ORIGINAL_ALLOWLIST;
     });
 
     it("throws when the override flag is not enabled", async () => {
       delete process.env.ALLOW_DEV_TIER_OVERRIDE;
-      const user = { id: "user-1" } as any;
+      const user = { id: "user-1", email: "test@example.com" } as any;
       await expect(service.devSetTier(user, "pro")).rejects.toThrow(ForbiddenException);
     });
 
-    it("updates only the caller's own subscriptionTier when enabled", async () => {
+    it("throws when the flag is enabled but the caller's email isn't allowlisted", async () => {
       process.env.ALLOW_DEV_TIER_OVERRIDE = "true";
-      const user = { id: "user-1" } as any;
+      process.env.DEV_TIER_OVERRIDE_ALLOWED_EMAILS = "someone-allowed@example.com";
+      const user = { id: "user-1", email: "not-allowed@example.com" } as any;
+
+      await expect(service.devSetTier(user, "pro")).rejects.toThrow(ForbiddenException);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("throws when the flag is enabled but no allowlist is configured at all (fails closed)", async () => {
+      process.env.ALLOW_DEV_TIER_OVERRIDE = "true";
+      delete process.env.DEV_TIER_OVERRIDE_ALLOWED_EMAILS;
+      const user = { id: "user-1", email: "anyone@example.com" } as any;
+
+      await expect(service.devSetTier(user, "pro")).rejects.toThrow(ForbiddenException);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("updates only the caller's own subscriptionTier when enabled and allowlisted", async () => {
+      process.env.ALLOW_DEV_TIER_OVERRIDE = "true";
+      process.env.DEV_TIER_OVERRIDE_ALLOWED_EMAILS = "user1@example.com";
+      const user = { id: "user-1", email: "user1@example.com" } as any;
 
       const result = await service.devSetTier(user, "elite");
 
