@@ -304,7 +304,16 @@ function PersonAutopilotRow({
             )}
             {rule && onDelete && (
               <AlertDialog>
-                <AlertDialogTrigger render={<Button variant="ghost" size="sm" className="h-8 w-8 p-0" />}>
+                <AlertDialogTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      aria-label={`Delete autopilot rule for ${person.name}`}
+                    />
+                  }
+                >
                   <Trash2 className="h-4 w-4 text-muted-foreground" />
                 </AlertDialogTrigger>
                 <AlertDialogContent>
@@ -328,6 +337,7 @@ function PersonAutopilotRow({
                 size="sm"
                 className="h-8 w-8 p-0"
                 onClick={onToggleExpand}
+                aria-label={expanded ? `Hide recent runs for ${person.name}` : `Show recent runs for ${person.name}`}
               >
                 {expanded ? (
                   <ChevronUp className="h-4 w-4" />

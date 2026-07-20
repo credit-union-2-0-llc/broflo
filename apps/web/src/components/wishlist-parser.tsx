@@ -234,6 +234,7 @@ export function WishlistParser({
                   size="sm"
                   className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
                   onClick={() => handleDismiss(item.id)}
+                  aria-label={`Remove ${item.productName || "item"} from wishlist`}
                 >
                   &#x2715;
                 </Button>
