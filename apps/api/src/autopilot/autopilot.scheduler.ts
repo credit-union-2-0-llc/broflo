@@ -5,9 +5,16 @@ import { AutopilotService } from './autopilot.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SuggestionsService } from '../suggestions/suggestions.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
+import { FamilyService } from '../family/family.service';
 
 const CONFIDENCE_AUTO_ORDER = 0.80;
 const MAX_RUNS_PER_CYCLE = 50;
+// "Big-ticket" cutoff for nudging a Family-tier plan toward pooling instead
+// of one person quietly covering it alone — no existing threshold concept
+// in the codebase to reuse (checked budget caps, plan limits), so this is a
+// deliberate judgment call: expensive enough that splitting it is a
+// reasonable ask, not so low that every routine gift triggers a nudge.
+const FAMILY_POOL_NUDGE_THRESHOLD_CENTS = 15000; // $150
 
 @Injectable()
 export class AutopilotScheduler {
@@ -20,6 +27,7 @@ export class AutopilotScheduler {
     private readonly notifications: NotificationsService,
     private readonly suggestionsService: SuggestionsService,
     private readonly entitlements: EntitlementsService,
+    private readonly family: FamilyService,
   ) {
     this.enabled = process.env.AUTOPILOT_ENABLED === 'true';
     if (!this.enabled) this.log.warn('Autopilot scheduler disabled (AUTOPILOT_ENABLED != true)');
@@ -253,6 +261,15 @@ export class AutopilotScheduler {
         });
 
         this.log.log(`Autopilot pick ready for review: rule=${rule.id}, suggestion=${suggestion.id}`);
+
+        // Best-effort nudge, not part of the autopilot run's own success —
+        // a failure here shouldn't turn an otherwise-successful pick into a
+        // "failed" AutopilotRun.
+        try {
+          await this.maybeNudgeFamilyPool(rule, suggestion);
+        } catch (err) {
+          this.log.error(`Family-pool nudge failed for rule ${rule.id}: ${err}`);
+        }
       } catch (err) {
         await this.prisma.autopilotRun.create({
           data: {
@@ -265,6 +282,39 @@ export class AutopilotScheduler {
         });
       }
     }
+  }
+
+  // Nothing built here places any charge or pledge — this only ever
+  // notifies the family that pooling might make sense and links to the
+  // existing gift-pool creation flow (GiftPoolService), which is the one
+  // thing that actually creates a (pledge-tracking, non-charging) pool.
+  private async maybeNudgeFamilyPool(
+    rule: Awaited<ReturnType<typeof this.findRuleWithRelations>>,
+    suggestion: { title: string; estimatedPriceMaxCents: number },
+  ) {
+    if (rule.user.subscriptionTier !== 'family') return;
+    if (suggestion.estimatedPriceMaxCents < FAMILY_POOL_NUDGE_THRESHOLD_CENTS) return;
+
+    const familyGroupId = await this.family.getMyFamilyGroupId(rule.userId);
+    if (!familyGroupId) return; // on the family tier but hasn't set up/joined a group yet
+
+    const memberUserIds = await this.family.getFamilyMemberUserIds(familyGroupId);
+    const prefillTitle = encodeURIComponent(`${rule.person.name}'s gift: ${suggestion.title}`);
+    const prefillTargetCents = suggestion.estimatedPriceMaxCents;
+    const linkUrl = `/family?prefillTitle=${prefillTitle}&prefillTargetCents=${prefillTargetCents}`;
+
+    await Promise.all(
+      memberUserIds.map((memberUserId) =>
+        this.notifications.create(memberUserId, {
+          type: 'family_pool_suggested',
+          title: 'Worth Pooling?',
+          body: `Autopilot picked a $${(suggestion.estimatedPriceMaxCents / 100).toFixed(2)} gift for ${rule.person.name}: "${suggestion.title}". Want to split it as a family?`,
+          linkUrl,
+        }),
+      ),
+    );
+
+    this.log.log(`Family-pool nudge sent: rule=${rule.id}, group=${familyGroupId}, members=${memberUserIds.length}`);
   }
 
   // Helper type — Prisma doesn't export a clean type for the include

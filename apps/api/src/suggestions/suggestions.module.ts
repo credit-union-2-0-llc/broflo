@@ -9,6 +9,6 @@ import { EventsModule } from "../events/events.module";
   imports: [EventsModule],
   controllers: [SuggestionsController],
   providers: [SuggestionsService, ProductSearchService, PrismaService],
-  exports: [SuggestionsService],
+  exports: [SuggestionsService, ProductSearchService],
 })
 export class SuggestionsModule {}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Users, Mail, UserMinus, LogOut } from "lucide-react";
@@ -235,7 +235,9 @@ export default function FamilyPage() {
             myUserId={session.user.id}
             peers={role === "owner" ? (status?.group?.members ?? []) : (status?.peers ?? [])}
           />
-          <GiftPoolSection token={session.accessToken} myUserId={session.user.id} />
+          <Suspense>
+            <GiftPoolSection token={session.accessToken} myUserId={session.user.id} />
+          </Suspense>
           <SharedCalendarSection token={session.accessToken} />
         </div>
       )}

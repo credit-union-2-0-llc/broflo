@@ -5,6 +5,7 @@ import { AutopilotService } from "../autopilot.service";
 import { NotificationsService } from "../../notifications/notifications.service";
 import { SuggestionsService } from "../../suggestions/suggestions.service";
 import { EntitlementsService } from "../../entitlements/entitlements.service";
+import { FamilyService } from "../../family/family.service";
 
 const makeRule = (overrides = {}) => ({
   id: "rule-1",
@@ -59,6 +60,7 @@ describe("AutopilotScheduler", () => {
   let notifications: Record<string, jest.Mock>;
   let suggestionsService: Record<string, jest.Mock>;
   let entitlements: Record<string, jest.Mock>;
+  let family: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     process.env.AUTOPILOT_ENABLED = 'true';
@@ -82,6 +84,10 @@ describe("AutopilotScheduler", () => {
     entitlements = {
       getEnabledTierKeys: jest.fn().mockResolvedValue(["pro", "elite"]),
     };
+    family = {
+      getMyFamilyGroupId: jest.fn().mockResolvedValue(null),
+      getFamilyMemberUserIds: jest.fn().mockResolvedValue([]),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -91,6 +97,7 @@ describe("AutopilotScheduler", () => {
         { provide: NotificationsService, useValue: notifications },
         { provide: SuggestionsService, useValue: suggestionsService },
         { provide: EntitlementsService, useValue: entitlements },
+        { provide: FamilyService, useValue: family },
       ],
     }).compile();
 
@@ -273,6 +280,112 @@ describe("AutopilotScheduler", () => {
       // Each processRule is called but events query returns empty, so it's a no-op per rule.
       // The key thing: it processes exactly MAX_RUNS_PER_CYCLE (50) and logs the warning.
       expect(prisma.event.findMany).toHaveBeenCalledTimes(50);
+    });
+  });
+
+  describe("family-pool auto-nudge", () => {
+    it("does not nudge when the user isn't on the family tier", async () => {
+      const rule = makeRule({ user: { id: "user-1", subscriptionTier: "pro", stripeCustomerId: "cus_123", stripePaymentMethodId: "pm_123" } });
+      prisma.autopilotRule.findMany.mockResolvedValue([rule]);
+      prisma.event.findMany.mockResolvedValue([makeEvent()]);
+      suggestionsService.generate.mockResolvedValue({
+        suggestions: [makeSuggestion({ estimatedPriceMaxCents: 20000 })],
+      });
+
+      await scheduler.runAutopilot();
+
+      expect(family.getMyFamilyGroupId).not.toHaveBeenCalled();
+      expect(notifications.create).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ type: "family_pool_suggested" }),
+      );
+    });
+
+    it("does not nudge when the family-tier user's pick is below the big-ticket threshold", async () => {
+      const rule = makeRule({ user: { id: "user-1", subscriptionTier: "family", stripeCustomerId: "cus_123", stripePaymentMethodId: "pm_123" } });
+      prisma.autopilotRule.findMany.mockResolvedValue([rule]);
+      prisma.event.findMany.mockResolvedValue([makeEvent()]);
+      suggestionsService.generate.mockResolvedValue({
+        suggestions: [makeSuggestion({ estimatedPriceMaxCents: 4500 })],
+      });
+
+      await scheduler.runAutopilot();
+
+      expect(family.getMyFamilyGroupId).not.toHaveBeenCalled();
+      expect(notifications.create).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ type: "family_pool_suggested" }),
+      );
+    });
+
+    it("does not nudge when the family-tier user has no family group set up", async () => {
+      const rule = makeRule({
+        budgetMaxCents: 25000,
+        user: { id: "user-1", subscriptionTier: "family", stripeCustomerId: "cus_123", stripePaymentMethodId: "pm_123" },
+      });
+      prisma.autopilotRule.findMany.mockResolvedValue([rule]);
+      prisma.event.findMany.mockResolvedValue([makeEvent()]);
+      suggestionsService.generate.mockResolvedValue({
+        suggestions: [makeSuggestion({ estimatedPriceMaxCents: 20000 })],
+      });
+      family.getMyFamilyGroupId.mockResolvedValue(null);
+
+      await scheduler.runAutopilot();
+
+      expect(family.getFamilyMemberUserIds).not.toHaveBeenCalled();
+      expect(notifications.create).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ type: "family_pool_suggested" }),
+      );
+    });
+
+    it("notifies every family member with a prefilled gift-pool link for a big-ticket family-tier pick", async () => {
+      const rule = makeRule({
+        budgetMaxCents: 25000,
+        user: { id: "user-1", subscriptionTier: "family", stripeCustomerId: "cus_123", stripePaymentMethodId: "pm_123" },
+      });
+      prisma.autopilotRule.findMany.mockResolvedValue([rule]);
+      prisma.event.findMany.mockResolvedValue([makeEvent()]);
+      suggestionsService.generate.mockResolvedValue({
+        suggestions: [makeSuggestion({ estimatedPriceMaxCents: 20000 })],
+      });
+      family.getMyFamilyGroupId.mockResolvedValue("group-1");
+      family.getFamilyMemberUserIds.mockResolvedValue(["user-1", "user-2", "user-3"]);
+
+      await scheduler.runAutopilot();
+
+      expect(family.getMyFamilyGroupId).toHaveBeenCalledWith("user-1");
+      expect(family.getFamilyMemberUserIds).toHaveBeenCalledWith("group-1");
+      for (const memberId of ["user-1", "user-2", "user-3"]) {
+        expect(notifications.create).toHaveBeenCalledWith(
+          memberId,
+          expect.objectContaining({
+            type: "family_pool_suggested",
+            linkUrl: expect.stringContaining("/family?prefillTitle="),
+          }),
+        );
+      }
+    });
+
+    it("does not fail the autopilot run if the nudge itself throws", async () => {
+      const rule = makeRule({
+        budgetMaxCents: 25000,
+        user: { id: "user-1", subscriptionTier: "family", stripeCustomerId: "cus_123", stripePaymentMethodId: "pm_123" },
+      });
+      prisma.autopilotRule.findMany.mockResolvedValue([rule]);
+      prisma.event.findMany.mockResolvedValue([makeEvent()]);
+      suggestionsService.generate.mockResolvedValue({
+        suggestions: [makeSuggestion({ estimatedPriceMaxCents: 20000 })],
+      });
+      family.getMyFamilyGroupId.mockRejectedValue(new Error("db down"));
+
+      await scheduler.runAutopilot();
+
+      expect(prisma.autopilotRun.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: "ready_for_review" }),
+        }),
+      );
     });
   });
 });
