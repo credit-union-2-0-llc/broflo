@@ -21,8 +21,24 @@ export class EmailService {
     }
   }
 
+  // RESEND_API_KEY missing is expected in local dev (falls through to the
+  // log-and-return dev-mode branches below) but must never happen in
+  // production — those branches log the literal OTP code / invite tokens,
+  // which would otherwise ship straight to whatever aggregates our
+  // production logs (App Insights) the moment this env var is unset by
+  // mistake. Fail loudly instead of silently downgrading to "log the secret
+  // and pretend the email sent."
+  private assertNotProductionFallback(context: string) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        `Email delivery is not configured (RESEND_API_KEY missing) — refusing to log ${context} in production.`,
+      );
+    }
+  }
+
   async sendOtpCode(email: string, code: string): Promise<void> {
     if (!this.resend) {
+      this.assertNotProductionFallback("an OTP code");
       this.log.debug(`DEV MODE — OTP for ${email}: ${code}`);
       return;
     }
@@ -48,6 +64,7 @@ export class EmailService {
 
   async sendPaymentFailedEmail(email: string): Promise<void> {
     if (!this.resend) {
+      this.assertNotProductionFallback("a payment-failed notice");
       this.log.debug(`DEV MODE — payment-failed email for ${email}`);
       return;
     }
@@ -79,6 +96,7 @@ export class EmailService {
     const link = `${process.env.WEB_URL || "https://broflo.ai"}/survey/${token}`;
 
     if (!this.resend) {
+      this.assertNotProductionFallback("a survey invite link/token");
       this.log.debug(`DEV MODE — survey invite for ${recipientEmail}: ${link}`);
       return;
     }
@@ -111,6 +129,7 @@ export class EmailService {
     const link = `${process.env.WEB_URL || "https://broflo.ai"}/family-invite/${token}`;
 
     if (!this.resend) {
+      this.assertNotProductionFallback("a family invite link/token");
       this.log.debug(`DEV MODE — family invite for ${recipientEmail}: ${link}`);
       return;
     }

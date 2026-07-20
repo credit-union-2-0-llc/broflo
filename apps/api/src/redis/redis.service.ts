@@ -207,6 +207,45 @@ export class RedisService implements OnModuleDestroy {
     return { allowed, remaining: Math.max(0, limit - current) };
   }
 
+  // --- OTP verify-attempt lockout (per-email, independent of source IP) ---
+  //
+  // send-otp is capped at OTP_RATE_LIMIT_MAX per email above; verify-otp had
+  // no equivalent — only a per-IP throttle at the controller level, which a
+  // distributed client (many source IPs) sails past entirely. A 6-digit code
+  // is a 1-in-1,000,000 space, so a per-email cap on *wrong* guesses is the
+  // one thing that actually bounds a brute-force attempt against a single
+  // target inbox, regardless of how many IPs the attempt is spread across.
+  private readonly OTP_VERIFY_ATTEMPT_LIMIT = 10;
+  private readonly OTP_VERIFY_ATTEMPT_WINDOW_SECONDS = 300; // matches OTP TTL
+
+  async checkAndIncrementOtpVerifyAttempts(email: string): Promise<{ allowed: boolean }> {
+    const key = `otp-verify-attempts:${email.toLowerCase()}`;
+
+    if (!this.isConnected) {
+      const raw = this.memGet(key);
+      const count = raw ? parseInt(raw, 10) : 0;
+      if (count >= this.OTP_VERIFY_ATTEMPT_LIMIT) return { allowed: false };
+      this.memSet(key, String(count + 1), this.OTP_VERIFY_ATTEMPT_WINDOW_SECONDS);
+      return { allowed: true };
+    }
+
+    const client = this.getClient();
+    const current = await client.incr(key);
+    if (current === 1) {
+      await client.expire(key, this.OTP_VERIFY_ATTEMPT_WINDOW_SECONDS);
+    }
+    return { allowed: current <= this.OTP_VERIFY_ATTEMPT_LIMIT };
+  }
+
+  async clearOtpVerifyAttempts(email: string): Promise<void> {
+    const key = `otp-verify-attempts:${email.toLowerCase()}`;
+    if (!this.isConnected) {
+      this.memCache.delete(key);
+      return;
+    }
+    await this.getClient().del(key);
+  }
+
   // --- Recipient survey send rate limit (1 per person per 24h) ---
 
   private readonly SURVEY_SEND_RATE_LIMIT_SECONDS = 86400;
