@@ -29,6 +29,7 @@
   "pnpm": {
     "overrides": {
       "multer": ">=2.2.0 <3.0.0",
+      "body-parser": ">=2.3.0 <3.0.0",
       "qs": ">=6.15.2 <7.0.0",
       "protobufjs": ">=8.6.0 <9.0.0",
       "@protobufjs/utf8": ">=1.1.1",
