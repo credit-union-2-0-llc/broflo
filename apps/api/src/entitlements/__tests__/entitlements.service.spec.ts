@@ -239,6 +239,53 @@ describe("EntitlementsService", () => {
     });
   });
 
+  describe("getAllPlans — in-process cache (in front of Redis)", () => {
+    it("hits Redis on the first call", async () => {
+      redis.getCachedAllPlans.mockResolvedValue(JSON.stringify([FREE_PLAN, PRO_PLAN]));
+      await service.getAllPlans();
+      expect(redis.getCachedAllPlans).toHaveBeenCalledTimes(1);
+    });
+
+    it("serves subsequent calls from the in-process copy without touching Redis again", async () => {
+      redis.getCachedAllPlans.mockResolvedValue(JSON.stringify([FREE_PLAN, PRO_PLAN]));
+
+      const first = await service.getAllPlans();
+      const second = await service.getAllPlans();
+      const third = await service.getAllPlans();
+
+      expect(redis.getCachedAllPlans).toHaveBeenCalledTimes(1);
+      expect(second).toEqual(first);
+      expect(third).toEqual(first);
+    });
+
+    it("also caches in-process on a DB fallback (Redis cold, DB hit)", async () => {
+      redis.getCachedAllPlans.mockResolvedValue(null);
+      prisma.plan.findMany.mockResolvedValue([FREE_PLAN, PRO_PLAN]);
+
+      await service.getAllPlans();
+      await service.getAllPlans();
+
+      expect(prisma.plan.findMany).toHaveBeenCalledTimes(1);
+      expect(redis.getCachedAllPlans).toHaveBeenCalledTimes(1);
+    });
+
+    it("re-fetches from Redis after an admin write invalidates the cache", async () => {
+      redis.getCachedAllPlans.mockResolvedValue(JSON.stringify([FREE_PLAN]));
+      await service.getAllPlans();
+      expect(redis.getCachedAllPlans).toHaveBeenCalledTimes(1);
+
+      prisma.plan.findUniqueOrThrow.mockResolvedValue({ id: "plan-free", key: "free" });
+      prisma.planLimit.upsert.mockResolvedValue({});
+      await service.upsertPlanLimit("plan-free", "maxPeople", { type: "INTEGER", intValue: 5 }, "admin-1");
+
+      redis.getCachedAllPlans.mockResolvedValue(JSON.stringify([FREE_PLAN, PRO_PLAN]));
+      const afterInvalidation = await service.getAllPlans();
+
+      expect(redis.getCachedAllPlans).toHaveBeenCalledTimes(2);
+      expect(afterInvalidation).toHaveLength(2);
+    });
+  });
+
   describe("upsertPlanLimit", () => {
     it("invalidates both the specific plan cache and the all-plans cache", async () => {
       prisma.plan.findUniqueOrThrow.mockResolvedValue({ id: "plan-free", key: "free" });
