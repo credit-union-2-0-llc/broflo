@@ -24,9 +24,20 @@ export interface CreatePlanInput {
   sortOrder?: number;
 }
 
+// getAllPlans() is called on every request behind SubscriptionGuard (tier
+// checks) — a per-request Redis round-trip on top of that guard is real,
+// avoidable latency for data that changes only when an admin edits a plan.
+// A few seconds of staleness after such an edit is an accepted tradeoff
+// (the same tradeoff Redis's own cache already makes, just at a shorter
+// horizon) — this is a process-local layer in FRONT of Redis, not a
+// replacement for it, so multi-instance deploys stay consistent within
+// this short window regardless of which instance handles a given request.
+const ALL_PLANS_IN_PROCESS_TTL_MS = 5000;
+
 @Injectable()
 export class EntitlementsService {
   private readonly log = new Logger(EntitlementsService.name);
+  private allPlansCache: { data: PlanWithLimits[]; expiresAt: number } | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -48,8 +59,16 @@ export class EntitlementsService {
   }
 
   async getAllPlans(): Promise<PlanWithLimits[]> {
+    if (this.allPlansCache && this.allPlansCache.expiresAt > Date.now()) {
+      return this.allPlansCache.data;
+    }
+
     const cached = await this.redis.getCachedAllPlans();
-    if (cached) return JSON.parse(cached);
+    if (cached) {
+      const data = JSON.parse(cached);
+      this.allPlansCache = { data, expiresAt: Date.now() + ALL_PLANS_IN_PROCESS_TTL_MS };
+      return data;
+    }
 
     const plans = await this.prisma.plan.findMany({
       where: { isActive: true },
@@ -58,6 +77,7 @@ export class EntitlementsService {
     });
 
     await this.redis.setCachedAllPlans(JSON.stringify(plans));
+    this.allPlansCache = { data: plans, expiresAt: Date.now() + ALL_PLANS_IN_PROCESS_TTL_MS };
     return plans;
   }
 
@@ -189,5 +209,10 @@ export class EntitlementsService {
   private async invalidateCache(tierKey?: string): Promise<void> {
     if (tierKey) await this.redis.invalidatePlanCache(tierKey);
     await this.redis.invalidateAllPlansCache();
+    // Clears this instance's copy immediately rather than waiting out the
+    // short TTL — other instances still serve their own in-process copy for
+    // up to ALL_PLANS_IN_PROCESS_TTL_MS, same as the existing Redis-cache
+    // propagation delay this was already subject to across instances.
+    this.allPlansCache = null;
   }
 }

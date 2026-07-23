@@ -5,20 +5,29 @@ import { BillingService } from "../billing.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EmailService } from "../../email/email.service";
 import { FamilyService } from "../../family/family.service";
+import { EntitlementsService } from "../../entitlements/entitlements.service";
+
+// Real price->tier mapping now lives in, and is tested by,
+// EntitlementsService.tierFromPriceId (see entitlements.service.spec.ts) —
+// BillingService just calls it. Mirrors that method's real behavior so the
+// checkout/subscription-update tests below don't need to know it's a mock.
+function fakeTierFromPriceId(priceId: string | undefined): Promise<string> {
+  if (!priceId) return Promise.resolve("free");
+  if (priceId === "price_pro_monthly" || priceId === "price_pro_annual") return Promise.resolve("pro");
+  if (priceId === "price_elite_monthly" || priceId === "price_elite_annual") return Promise.resolve("elite");
+  return Promise.resolve("pro");
+}
 
 describe("BillingService", () => {
   let service: BillingService;
   let prisma: { user: { findFirst: jest.Mock; update: jest.Mock } };
   let email: { sendPaymentFailedEmail: jest.Mock };
   let family: { cascadeDowngradeIfOwnerLostFamilyTier: jest.Mock };
+  let entitlements: { tierFromPriceId: jest.Mock };
 
   beforeEach(async () => {
     process.env.STRIPE_SECRET_KEY = "sk_test_fake";
     process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
-    process.env.STRIPE_PRO_MONTHLY_PRICE_ID = "price_pro_monthly";
-    process.env.STRIPE_PRO_ANNUAL_PRICE_ID = "price_pro_annual";
-    process.env.STRIPE_ELITE_MONTHLY_PRICE_ID = "price_elite_monthly";
-    process.env.STRIPE_ELITE_ANNUAL_PRICE_ID = "price_elite_annual";
 
     prisma = {
       user: {
@@ -32,6 +41,9 @@ describe("BillingService", () => {
     family = {
       cascadeDowngradeIfOwnerLostFamilyTier: jest.fn().mockResolvedValue(undefined),
     };
+    entitlements = {
+      tierFromPriceId: jest.fn().mockImplementation(fakeTierFromPriceId),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -39,6 +51,7 @@ describe("BillingService", () => {
         { provide: PrismaService, useValue: prisma },
         { provide: EmailService, useValue: email },
         { provide: FamilyService, useValue: family },
+        { provide: EntitlementsService, useValue: entitlements },
       ],
     }).compile();
 
@@ -48,42 +61,6 @@ describe("BillingService", () => {
   afterEach(() => {
     delete process.env.STRIPE_SECRET_KEY;
     delete process.env.STRIPE_WEBHOOK_SECRET;
-    delete process.env.STRIPE_PRO_MONTHLY_PRICE_ID;
-    delete process.env.STRIPE_PRO_ANNUAL_PRICE_ID;
-    delete process.env.STRIPE_ELITE_MONTHLY_PRICE_ID;
-    delete process.env.STRIPE_ELITE_ANNUAL_PRICE_ID;
-  });
-
-  describe("tierFromPriceId", () => {
-    it("maps pro monthly price to pro", () => {
-      const tier = (service as any).tierFromPriceId("price_pro_monthly");
-      expect(tier).toBe("pro");
-    });
-
-    it("maps pro annual price to pro", () => {
-      const tier = (service as any).tierFromPriceId("price_pro_annual");
-      expect(tier).toBe("pro");
-    });
-
-    it("maps elite monthly price to elite", () => {
-      const tier = (service as any).tierFromPriceId("price_elite_monthly");
-      expect(tier).toBe("elite");
-    });
-
-    it("maps elite annual price to elite", () => {
-      const tier = (service as any).tierFromPriceId("price_elite_annual");
-      expect(tier).toBe("elite");
-    });
-
-    it("returns free for undefined price ID", () => {
-      const tier = (service as any).tierFromPriceId(undefined);
-      expect(tier).toBe("free");
-    });
-
-    it("defaults to pro for unknown price ID (current behavior)", () => {
-      const tier = (service as any).tierFromPriceId("price_unknown_xyz");
-      expect(tier).toBe("pro");
-    });
   });
 
   describe("handleSubscriptionDeleted", () => {
