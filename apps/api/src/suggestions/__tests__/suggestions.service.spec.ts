@@ -45,10 +45,11 @@ describe("SuggestionsService.generate — re-roll claim race condition", () => {
     user: { findUniqueOrThrow: jest.Mock };
     person: { findFirst: jest.Mock };
     event: { findFirst: jest.Mock };
-    giftSuggestion: { findMany: jest.Mock; create: jest.Mock };
+    giftSuggestion: { findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
     giftRecord: { findMany: jest.Mock };
     aiAuditLog: { create: jest.Mock };
     suggestionRequestClaim: { count: jest.Mock; create: jest.Mock; delete: jest.Mock };
+    $transaction: jest.Mock;
   };
   let redis: {
     checkRateLimit: jest.Mock;
@@ -91,6 +92,7 @@ describe("SuggestionsService.generate — re-roll claim race condition", () => {
       giftSuggestion: {
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ ...data, id: "sug-1", createdAt: new Date(), isSelected: false, isDismissed: false })),
+        update: jest.fn().mockResolvedValue({}),
       },
       giftRecord: { findMany: jest.fn().mockResolvedValue([]) },
       aiAuditLog: { create: jest.fn().mockResolvedValue({}) },
@@ -99,6 +101,7 @@ describe("SuggestionsService.generate — re-roll claim race condition", () => {
         create: jest.fn().mockResolvedValue({ id: "claim-1" }),
         delete: jest.fn().mockResolvedValue({}),
       },
+      $transaction: jest.fn().mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops)),
     };
     redis = {
       checkRateLimit: jest.fn().mockResolvedValue({ allowed: true }),
@@ -192,5 +195,42 @@ describe("SuggestionsService.generate — re-roll claim race condition", () => {
 
     expect(prisma.suggestionRequestClaim.create).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // Async image enrichment: the Exa product lookup is moved out of the request
+  // path so generation returns fast.
+  it("persists suggestions with null images and returns before the product lookup runs", async () => {
+    // Make the product lookup hang so it cannot possibly complete before the
+    // response — proving generate() no longer awaits it.
+    productSearch.searchProducts.mockReturnValue(new Promise(() => {}));
+
+    const res = await service.generate("u1", dto);
+
+    expect(prisma.giftSuggestion.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ imageUrl: null, productUrl: null, productSourcePriceCents: null }),
+      }),
+    );
+    expect(res.suggestions[0].imageUrl).toBeNull();
+  });
+
+  it("enriches images asynchronously after responding, patching the persisted rows", async () => {
+    productSearch.searchProducts.mockResolvedValue([
+      { imageUrl: "https://img/mug.jpg", productUrl: "https://shop/mug", priceCents: 1500 },
+    ]);
+
+    await service.generate("u1", dto);
+    // Flush the fire-and-forget enrichment microtasks.
+    await new Promise((r) => setImmediate(r));
+
+    expect(productSearch.searchProducts).toHaveBeenCalled();
+    expect(prisma.giftSuggestion.update).toHaveBeenCalledWith({
+      where: { id: "sug-1" },
+      data: {
+        imageUrl: "https://img/mug.jpg",
+        productUrl: "https://shop/mug",
+        productSourcePriceCents: 1500,
+      },
+    });
   });
 });

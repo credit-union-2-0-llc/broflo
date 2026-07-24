@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Gift, RefreshCw, Shuffle, Lock, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -96,6 +96,54 @@ export function SuggestionsView({
     })();
   }, [token, eventId, personId]);
 
+  // Product images are enriched server-side AFTER generate returns (so the Exa
+  // lookup doesn't block generation). Poll getEventSuggestions briefly to patch
+  // images in as they land. A monotonic token cancels a stale poll when a new
+  // generate/re-roll starts or the component unmounts.
+  const imagePollRef = useRef(0);
+  useEffect(() => () => { imagePollRef.current++; }, []);
+
+  const pollForImages = useCallback(
+    (targetEventId: string) => {
+      const pollId = ++imagePollRef.current;
+      let attempts = 0;
+      const tick = async () => {
+        if (pollId !== imagePollRef.current) return; // superseded
+        attempts++;
+        try {
+          const res = await api.getEventSuggestions(token, targetEventId);
+          if (pollId !== imagePollRef.current) return;
+          const byId = new Map(res.suggestions.map((s) => [s.id, s]));
+          setSuggestions((prev) =>
+            prev.map((s) => {
+              const fresh = byId.get(s.id);
+              if (fresh && (fresh.imageUrl || fresh.productUrl)) {
+                return {
+                  ...s,
+                  imageUrl: fresh.imageUrl,
+                  productUrl: fresh.productUrl,
+                  productSourcePriceCents: fresh.productSourcePriceCents,
+                };
+              }
+              return s;
+            }),
+          );
+          const allEnriched =
+            res.suggestions.length > 0 &&
+            res.suggestions.every((s) => s.imageUrl || s.productUrl);
+          if (!allEnriched && attempts < 5) {
+            setTimeout(tick, 1500);
+          }
+        } catch {
+          if (attempts < 5) setTimeout(tick, 1500);
+        }
+      };
+      // Small initial delay to let the async enrichment start.
+      setTimeout(tick, 1200);
+    },
+    [token],
+  );
+
   const generate = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -111,6 +159,10 @@ export function SuggestionsView({
       setHasGenerated(true);
       setShowGuidance(false);
       setGuidanceText("");
+      // Images arrive asynchronously — poll them in.
+      if (res.suggestions.some((s) => !s.imageUrl)) {
+        pollForImages(eventId);
+      }
       // Refresh meta
       const metaRes = await api.getSuggestionMeta(token, eventId);
       setMeta(metaRes);
@@ -120,7 +172,7 @@ export function SuggestionsView({
     } finally {
       setLoading(false);
     }
-  }, [token, personId, eventId, tier, surpriseFactor, guidanceText]);
+  }, [token, personId, eventId, tier, surpriseFactor, guidanceText, pollForImages]);
 
   const handleSelect = async (suggestionId: string) => {
     setSelecting(true);
