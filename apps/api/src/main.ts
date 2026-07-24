@@ -9,6 +9,7 @@ import { Logger, ValidationPipe } from "@nestjs/common";
 import { readFileSync } from "fs";
 import { join } from "path";
 import helmet from "helmet";
+import compression from "compression";
 import { AppModule } from "./app.module";
 import { GlobalExceptionFilter } from "./filters/global-exception.filter";
 import { RequestLoggerMiddleware } from "./middleware/request-logger.middleware";
@@ -57,6 +58,7 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   app.use(helmet());
+  app.use(compression());
 
   app.enableCors({
     origin: process.env.WEB_URL || "http://localhost:3000",
