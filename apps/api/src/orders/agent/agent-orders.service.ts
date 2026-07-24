@@ -181,10 +181,23 @@ export class AgentOrdersService {
   async place(user: User, dto: AgentPlaceDto) {
     await this._requireTier(user);
 
-    const job = await this.prisma.agentJob.findFirst({
+    // Atomic compare-and-swap: transition previewing → placing in a single
+    // write. Only one concurrent request can win the update, so a double-submit
+    // can never mint two virtual cards or run two real purchases (TOCTOU race).
+    const claim = await this.prisma.agentJob.updateMany({
       where: { id: dto.jobId, userId: user.id, status: 'previewing' },
+      data: { status: 'placing' },
     });
-    if (!job) throw new NotFoundException('Agent job not found or not in preview state');
+    if (claim.count !== 1) {
+      throw new BadRequestException(
+        'This order is already being placed or is no longer in preview. Check your Orders.',
+      );
+    }
+
+    const job = await this.prisma.agentJob.findFirst({
+      where: { id: dto.jobId, userId: user.id },
+    });
+    if (!job) throw new NotFoundException('Agent job not found');
 
     let personId: string | null = null;
     if (job.suggestionId) {
@@ -195,18 +208,30 @@ export class AgentOrdersService {
       personId = suggestion?.personId ?? null;
     }
 
-    // Create virtual card for this purchase
-    const virtualCard = await this.stripeIssuing.createVirtualCard({
-      amountCents: Math.round((job.foundProductPrice || job.maxBudgetCents) * 1.05), // 5% buffer
-      orderId: job.id,
-      userId: user.id,
-    });
+    // Create virtual card for this purchase. If the mint fails, no money has
+    // moved — release the job back to previewing so the user can retry cleanly.
+    let virtualCard: Awaited<
+      ReturnType<typeof this.stripeIssuing.createVirtualCard>
+    >;
+    try {
+      virtualCard = await this.stripeIssuing.createVirtualCard({
+        amountCents: Math.round((job.foundProductPrice || job.maxBudgetCents) * 1.05), // 5% buffer
+        orderId: job.id,
+        userId: user.id,
+      });
+    } catch (err) {
+      await this.prisma.agentJob.update({
+        where: { id: job.id },
+        data: { status: 'previewing' },
+      });
+      throw err;
+    }
 
     try {
+      // status is already 'placing' from the CAS above; just attach the card.
       await this.prisma.agentJob.update({
         where: { id: job.id },
         data: {
-          status: 'placing',
           stripeVirtualCardId: virtualCard.cardId,
         },
       });

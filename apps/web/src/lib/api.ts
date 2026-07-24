@@ -637,11 +637,12 @@ export const api = {
     shippingCity: string;
     shippingState: string;
     shippingZip: string;
-  }) =>
+  }, idempotencyKey?: string) =>
     apiFetch<Order>("/orders/place", {
       method: "POST",
       body: JSON.stringify(data),
       token,
+      headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
     }),
 
   cancelOrder: (token: string, orderId: string, reason?: string) =>

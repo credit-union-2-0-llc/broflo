@@ -6,6 +6,7 @@ import {
   Body,
   Param,
   Query,
+  Headers,
   UseGuards,
 } from '@nestjs/common';
 import type { User } from '@prisma/client';
@@ -34,8 +35,12 @@ export class OrdersController {
   @Post('place')
   @RequiresTier('pro', 'elite')
   @UseGuards(SubscriptionGuard)
-  async place(@CurrentUser() user: User, @Body() dto: PlaceOrderDto) {
-    return this.orders.place(user, dto);
+  async place(
+    @CurrentUser() user: User,
+    @Body() dto: PlaceOrderDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.orders.place(user, dto, idempotencyKey);
   }
 
   @Post(':id/cancel')
