@@ -205,6 +205,7 @@ model NeverAgainItem {
 
   person    Person   @relation(fields: [personId], references: [id])
 
+  @@index([personId], map: "idx_never_again_person")
   @@map("never_again_items")
 }
 
