@@ -274,6 +274,10 @@ model Event {
   date           DateTime       @db.Date
   isRecurring    Boolean        @default(false) @map("is_recurring")
   recurrenceRule RecurrenceRule @default(one_time) @map("recurrence_rule")
+  // Materialized next calendar occurrence (annual projection for recurring
+  // events, else the event date). Kept fresh on write + by a daily cron so
+  // upcoming() is a bounded, indexed query instead of a full-table JS scan.
+  nextOccurrence DateTime?      @map("next_occurrence") @db.Date
   budgetMinCents Int?           @map("budget_min_cents")
   budgetMaxCents Int?           @map("budget_max_cents")
   notes          String?
@@ -298,6 +302,7 @@ model Event {
   @@index([userId, date], map: "idx_events_user_date")
   @@index([personId], map: "idx_events_person")
   @@index([userId, occasionType], map: "idx_events_user_occasion")
+  @@index([userId, nextOccurrence], map: "idx_events_user_next_occurrence")
   @@map("events")
 }
 
