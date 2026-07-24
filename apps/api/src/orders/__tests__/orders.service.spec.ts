@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import type { User } from '@prisma/client';
 import { OrdersService } from '../orders.service';
+import { PlaceOrderDto } from '../dto/place-order.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderAuditService } from '../audit/order-audit.service';
 import { OrderStatusHistoryService } from '../order-status-history.service';
@@ -265,5 +268,109 @@ describe('OrdersService - cancel window', () => {
         data: expect.objectContaining({ deliveredAt: undefined }),
       });
     });
+  });
+});
+
+describe('OrdersService - place idempotency (B2)', () => {
+  let service: OrdersService;
+  let prisma: {
+    order: { findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
+    giftSuggestion: { findFirst: jest.Mock };
+  };
+  let adapter: { retailerKey: string; getProduct: jest.Mock; placeOrder: jest.Mock };
+  let stripeConnect: {
+    createCharge: jest.Mock;
+    calculateFeeCents: jest.Mock;
+    getConnectedAccountId: jest.Mock;
+    refund: jest.Mock;
+  };
+
+  const user = { id: 'user-123', stripePaymentMethodId: 'pm_1' } as unknown as User;
+  const key = 'idem-key-abc';
+  const dto: PlaceOrderDto = {
+    suggestionId: 'sug-1',
+    personId: 'per-1',
+    eventId: 'evt-1',
+    retailerProductId: 'prod-1',
+    shippingName: 'Alex',
+    shippingAddress1: '1 Main St',
+    shippingCity: 'Ashland',
+    shippingState: 'OR',
+    shippingZip: '97520',
+  };
+
+  beforeEach(async () => {
+    prisma = {
+      order: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
+      giftSuggestion: { findFirst: jest.fn() },
+    };
+    adapter = {
+      retailerKey: 'mock',
+      getProduct: jest.fn().mockResolvedValue({
+        id: 'prod-1',
+        title: 'A Gift',
+        description: 'desc',
+        imageUrl: null,
+        priceCents: 5000,
+      }),
+      placeOrder: jest.fn(),
+    };
+    stripeConnect = {
+      createCharge: jest.fn(),
+      calculateFeeCents: jest.fn().mockReturnValue(0),
+      getConnectedAccountId: jest.fn().mockReturnValue(null), // mock flow, no real charge
+      refund: jest.fn(),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrdersService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: 'RETAILER_ADAPTER', useValue: adapter },
+        { provide: OrderAuditService, useValue: { record: jest.fn().mockResolvedValue(undefined) } },
+        { provide: OrderStatusHistoryService, useValue: { record: jest.fn().mockResolvedValue(undefined) } },
+        { provide: StripeConnectService, useValue: stripeConnect },
+      ],
+    }).compile();
+
+    service = module.get<OrdersService>(OrdersService);
+  });
+
+  it('returns the existing order without creating or charging again when the key was already used by the same user', async () => {
+    const existing = { id: 'order-existing', userId: user.id, status: 'ordered' };
+    prisma.order.findUnique.mockResolvedValue(existing);
+
+    const result = await service.place(user, dto, key);
+
+    expect(result).toBe(existing);
+    expect(prisma.order.create).not.toHaveBeenCalled();
+    expect(adapter.getProduct).not.toHaveBeenCalled();
+    expect(stripeConnect.createCharge).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the idempotency key belongs to a different user', async () => {
+    prisma.order.findUnique.mockResolvedValue({ id: 'o', userId: 'someone-else' });
+
+    await expect(service.place(user, dto, key)).rejects.toThrow(BadRequestException);
+    expect(prisma.order.create).not.toHaveBeenCalled();
+  });
+
+  it('returns the race winner (no second charge) when create hits a P2002 unique violation', async () => {
+    const winner = { id: 'order-winner', userId: user.id, status: 'ordered' };
+    prisma.order.findUnique
+      .mockResolvedValueOnce(null) // first check: nothing yet
+      .mockResolvedValueOnce(winner); // after P2002: the concurrent winner
+    prisma.giftSuggestion.findFirst.mockResolvedValue({ id: dto.suggestionId });
+    prisma.order.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: 'test',
+      }),
+    );
+
+    const result = await service.place(user, dto, key);
+
+    expect(result).toBe(winner);
+    expect(stripeConnect.createCharge).not.toHaveBeenCalled();
   });
 });

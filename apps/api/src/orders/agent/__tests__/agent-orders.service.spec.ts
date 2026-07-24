@@ -15,7 +15,7 @@ import type { User } from '@prisma/client';
 describe('AgentOrdersService - place()', () => {
   let service: AgentOrdersService;
   let prisma: {
-    agentJob: { findFirst: jest.Mock; update: jest.Mock };
+    agentJob: { findFirst: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
     giftSuggestion: { findUnique: jest.Mock };
     order: { create: jest.Mock };
     failureReview: { create: jest.Mock };
@@ -60,6 +60,8 @@ describe('AgentOrdersService - place()', () => {
       agentJob: {
         findFirst: jest.fn().mockResolvedValue(makeJob()),
         update: jest.fn().mockResolvedValue({}),
+        // CAS claim previewing → placing wins by default (count: 1)
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       giftSuggestion: { findUnique: jest.fn().mockResolvedValue(null) },
       order: { create: jest.fn().mockResolvedValue({ id: 'order-1' }) },
@@ -161,6 +163,53 @@ describe('AgentOrdersService - place()', () => {
       userId,
       expect.objectContaining({ title: "That didn't work" }),
     );
+  });
+
+  // B2: TOCTOU double-submit protection on the real-money path.
+  it('rejects and mints no virtual card when the CAS claim finds no previewing job (double-submit / already placing)', async () => {
+    prisma.agentJob.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.place(makeUser(), { jobId })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(stripeIssuing.createVirtualCard).not.toHaveBeenCalled();
+    expect(agentClient.execute).not.toHaveBeenCalled();
+  });
+
+  it('only one of two concurrent place() calls wins the CAS claim; the loser mints no card', async () => {
+    // First claim wins (count 1), second finds nothing to claim (count 0).
+    prisma.agentJob.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    agentClient.execute.mockResolvedValue({
+      status: 'completed',
+      found_product_title: 'Cozy Blanket',
+      found_product_price: 4999,
+      confirmation_number: 'CONF-1',
+      steps: [],
+    });
+
+    const [winner, loser] = await Promise.allSettled([
+      service.place(makeUser(), { jobId }),
+      service.place(makeUser(), { jobId }),
+    ]);
+
+    expect(winner.status).toBe('fulfilled');
+    expect(loser.status).toBe('rejected');
+    // Exactly one purchase attempt — one card minted, not two.
+    expect(stripeIssuing.createVirtualCard).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the job back to previewing when virtual card creation fails (no money moved)', async () => {
+    stripeIssuing.createVirtualCard.mockRejectedValue(new Error('issuing down'));
+
+    await expect(service.place(makeUser(), { jobId })).rejects.toThrow('issuing down');
+
+    expect(prisma.agentJob.update).toHaveBeenCalledWith({
+      where: { id: jobId },
+      data: { status: 'previewing' },
+    });
+    expect(agentClient.execute).not.toHaveBeenCalled();
   });
 });
 

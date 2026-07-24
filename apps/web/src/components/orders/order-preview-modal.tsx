@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -53,6 +53,10 @@ export function OrderPreviewModal({
   const [loading, setLoading] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Stable per-preview idempotency key so a double-click / retry of "Order"
+  // reuses the same key and the API returns the existing order, never charges
+  // twice. Regenerated each time a fresh preview loads.
+  const idempotencyKey = useRef<string | null>(null);
 
   // Shipping address form state
   const [shippingName, setShippingName] = useState("");
@@ -67,6 +71,7 @@ export function OrderPreviewModal({
     setLoading(true);
     setError(null);
     setPreview(null);
+    idempotencyKey.current = crypto.randomUUID();
     api
       .previewOrder(token, { suggestionId, personId, eventId })
       .then((data) => {
@@ -100,7 +105,7 @@ export function OrderPreviewModal({
         shippingCity,
         shippingState,
         shippingZip,
-      });
+      }, idempotencyKey.current ?? undefined);
       toast.success(VOICE.orderSuccess);
       onOrderPlaced(order);
       onOpenChange(false);

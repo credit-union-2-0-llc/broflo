@@ -470,6 +470,7 @@ model Order {
   eventId               String?     @map("event_id")
   giftRecordId          String?     @unique @map("gift_record_id")
   suggestionId          String?     @map("suggestion_id")
+  idempotencyKey        String?     @unique @map("idempotency_key")
   retailerKey           String      @map("retailer_key")
   retailerProductId     String      @map("retailer_product_id")
   retailerOrderId       String?     @map("retailer_order_id")

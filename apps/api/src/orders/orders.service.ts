@@ -7,7 +7,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import type { User } from '@prisma/client';
-import { OrderStatus, StatusChangeSource } from '@prisma/client';
+import { OrderStatus, StatusChangeSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RetailerAdapter, RetailerOrderError } from './adapters/retailer.adapter';
 import { OrderAuditService } from './audit/order-audit.service';
@@ -79,11 +79,25 @@ export class OrdersService {
     };
   }
 
-  async place(user: User, dto: PlaceOrderDto) {
+  async place(user: User, dto: PlaceOrderDto, idempotencyKey?: string) {
     if (!user.stripePaymentMethodId) {
       throw new BadRequestException(
         'No payment method on file. Add one in Billing settings.',
       );
+    }
+
+    // Idempotency guard: a replayed key (double-click, network retry) must
+    // return the order already created for it — never place + charge twice.
+    if (idempotencyKey) {
+      const existing = await this.prisma.order.findUnique({
+        where: { idempotencyKey },
+      });
+      if (existing) {
+        if (existing.userId !== user.id) {
+          throw new BadRequestException('Idempotency key already in use.');
+        }
+        return existing;
+      }
     }
 
     const suggestion = await this.prisma.giftSuggestion.findFirst({
@@ -95,31 +109,49 @@ export class OrdersService {
 
     const product = await this.adapter.getProduct(dto.retailerProductId);
 
-    const order = await this.prisma.order.create({
-      data: {
-        userId: user.id,
-        personId: dto.personId,
-        eventId: dto.eventId,
-        giftRecordId: dto.giftRecordId ?? null,
-        suggestionId: dto.suggestionId,
-        retailerKey: this.adapter.retailerKey,
-        retailerProductId: dto.retailerProductId,
-        productTitle: product.title,
-        productDescription: product.description,
-        productImageUrl: product.imageUrl,
-        priceCents: product.priceCents,
-        platformFeeCents: this.stripeConnect.calculateFeeCents(product.priceCents),
-        stripePaymentIntentId: null,
-        status: 'pending',
-        shippingName: dto.shippingName,
-        shippingAddress1: dto.shippingAddress1,
-        shippingAddress2: dto.shippingAddress2 ?? null,
-        shippingCity: dto.shippingCity,
-        shippingState: dto.shippingState,
-        shippingZip: dto.shippingZip,
-        placedAt: new Date(),
-      },
-    });
+    let order: Awaited<ReturnType<typeof this.prisma.order.create>>;
+    try {
+      order = await this.prisma.order.create({
+        data: {
+          userId: user.id,
+          idempotencyKey: idempotencyKey ?? null,
+          personId: dto.personId,
+          eventId: dto.eventId,
+          giftRecordId: dto.giftRecordId ?? null,
+          suggestionId: dto.suggestionId,
+          retailerKey: this.adapter.retailerKey,
+          retailerProductId: dto.retailerProductId,
+          productTitle: product.title,
+          productDescription: product.description,
+          productImageUrl: product.imageUrl,
+          priceCents: product.priceCents,
+          platformFeeCents: this.stripeConnect.calculateFeeCents(product.priceCents),
+          stripePaymentIntentId: null,
+          status: 'pending',
+          shippingName: dto.shippingName,
+          shippingAddress1: dto.shippingAddress1,
+          shippingAddress2: dto.shippingAddress2 ?? null,
+          shippingCity: dto.shippingCity,
+          shippingState: dto.shippingState,
+          shippingZip: dto.shippingZip,
+          placedAt: new Date(),
+        },
+      });
+    } catch (err) {
+      // A concurrent request with the same key won the create race (unique
+      // violation on idempotency_key). Return its order instead of charging.
+      if (
+        idempotencyKey &&
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const existing = await this.prisma.order.findUnique({
+          where: { idempotencyKey },
+        });
+        if (existing) return existing;
+      }
+      throw err;
+    }
 
     await this.statusHistory.record(order.id, null, 'pending');
 
