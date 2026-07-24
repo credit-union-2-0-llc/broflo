@@ -260,20 +260,13 @@ export class SuggestionsService {
         clearTimeout(timeout);
       }
 
-      // Enrich suggestions with product images
-      const productResults = await this.productSearch.searchProducts(
-        aiResponse.suggestions.map((s: Record<string, unknown>) => ({
-          title: s.title as string,
-          retailerHint: (s.retailer_hint as string) || null,
-          estimatedPriceMinCents: s.estimated_price_min_cents as number,
-          estimatedPriceMaxCents: s.estimated_price_max_cents as number,
-        })),
-      );
-
-      // Persist suggestions
+      // Persist suggestions immediately with no images. Product-image lookup
+      // (Exa, up to ~5s) runs asynchronously after we respond, so it no longer
+      // sits in the request path; the frontend polls getEventSuggestions to
+      // fill images in once enrichment completes.
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       const created = await Promise.all(
-        aiResponse.suggestions.map((s: Record<string, unknown>, i: number) =>
+        aiResponse.suggestions.map((s: Record<string, unknown>) =>
           this.prisma.giftSuggestion.create({
             data: {
               personId: dto.personId,
@@ -289,9 +282,9 @@ export class SuggestionsService {
               noveltyScore: s.novelty_score as number,
               retailerHint: (s.retailer_hint as string) || null,
               suggestedMessage: (s.suggested_message as string) || null,
-              imageUrl: productResults[i]?.imageUrl || null,
-              productUrl: productResults[i]?.productUrl || null,
-              productSourcePriceCents: productResults[i]?.priceCents || null,
+              imageUrl: null,
+              productUrl: null,
+              productSourcePriceCents: null,
               modelVersion: aiResponse.model,
               promptTokens: aiResponse.input_tokens,
               completionTokens: aiResponse.output_tokens,
@@ -372,10 +365,64 @@ export class SuggestionsService {
       // Cache response
       await this.redis.setCachedSuggestions(cacheKey, JSON.stringify(response));
 
+      // Fire-and-forget: enrich product images out of the request path.
+      void this.enrichSuggestionImages(
+        created.map((s) => ({
+          id: s.id,
+          title: s.title,
+          retailerHint: s.retailerHint,
+          estimatedPriceMinCents: s.estimatedPriceMinCents,
+          estimatedPriceMaxCents: s.estimatedPriceMaxCents,
+        })),
+      );
+
       return response;
     } catch (err) {
       await this.prisma.suggestionRequestClaim.delete({ where: { id: claim.id } }).catch(() => {});
       throw err;
+    }
+  }
+
+  /**
+   * Look up product images/links for freshly-created suggestions and patch
+   * them onto the rows. Runs after the response is sent (not awaited), so the
+   * Exa lookup latency never blocks generation. Best-effort — failures are
+   * logged and leave the suggestions image-less rather than erroring the
+   * (already-returned) request.
+   */
+  private async enrichSuggestionImages(
+    items: {
+      id: string;
+      title: string;
+      retailerHint: string | null;
+      estimatedPriceMinCents: number;
+      estimatedPriceMaxCents: number;
+    }[],
+  ): Promise<void> {
+    if (items.length === 0) return;
+    try {
+      const results = await this.productSearch.searchProducts(
+        items.map((it) => ({
+          title: it.title,
+          retailerHint: it.retailerHint,
+          estimatedPriceMinCents: it.estimatedPriceMinCents,
+          estimatedPriceMaxCents: it.estimatedPriceMaxCents,
+        })),
+      );
+      await this.prisma.$transaction(
+        items.map((it, i) =>
+          this.prisma.giftSuggestion.update({
+            where: { id: it.id },
+            data: {
+              imageUrl: results[i]?.imageUrl || null,
+              productUrl: results[i]?.productUrl || null,
+              productSourcePriceCents: results[i]?.priceCents || null,
+            },
+          }),
+        ),
+      );
+    } catch (err) {
+      this.logger.warn(`Async suggestion image enrichment failed: ${err}`);
     }
   }
 
