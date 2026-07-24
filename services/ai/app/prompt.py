@@ -4,6 +4,7 @@ import json
 
 from .schemas import SuggestRequest, SurpriseFactor, SubscriptionTier
 from .sanitize import sanitize_prompt_field
+from .gandalf_playbook import lessons_block
 
 SUGGESTION_JSON_SCHEMA = {
     "type": "array",
@@ -197,6 +198,19 @@ def build_user_message(req: SuggestRequest) -> str:
         if sanitized_guidance:
             guidance_block = f"\nADDITIONAL GUIDANCE: {sanitized_guidance}"
 
+    # Gandalf learned lessons (off by default; fails closed → "" when disabled,
+    # unreachable, or the playbook isn't gated ready_for_prod). Injected here in
+    # the USER message — NOT the cached system prompt — because lessons are
+    # per-recipient (top-k relevant), so putting them in the ephemeral-cached
+    # system prompt would bust prompt caching on every request.
+    learned_block = ""
+    learned = lessons_block(p.model_dump())
+    if learned:
+        learned_block = (
+            "\nLEARNED LESSONS (proven across many recipients — apply where relevant):\n"
+            f"{learned}"
+        )
+
     # When dossier is thin, push the AI to be distinctive rather than generic
     sparse_block = ""
     if dossier_is_sparse:
@@ -222,7 +236,7 @@ NEVER-AGAIN LIST:
 {na_block}
 
 GIFT HISTORY:
-{history_block}{dismissed_block}{guidance_block}{sparse_block}
+{history_block}{dismissed_block}{guidance_block}{sparse_block}{learned_block}
 
 MODE: {req.surprise_factor.value}
 COUNT: {req.count}
