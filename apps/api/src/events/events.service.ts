@@ -27,15 +27,17 @@ export class EventsService {
 
     this.validateBudget(dto.budgetMinCents, dto.budgetMaxCents);
 
+    const eventDate = new Date(dto.date);
     return this.prisma.event.create({
       data: {
         userId,
         personId,
         name: dto.name,
         occasionType,
-        date: new Date(dto.date),
+        date: eventDate,
         isRecurring,
         recurrenceRule,
+        nextOccurrence: this.computeNextOccurrence(eventDate, isRecurring, this.todayStart()),
         budgetMinCents: dto.budgetMinCents ?? null,
         budgetMaxCents: dto.budgetMaxCents ?? null,
         notes: dto.notes ?? null,
@@ -51,37 +53,44 @@ export class EventsService {
     limit: number,
     days: number,
   ) {
-    const events = await this.prisma.event.findMany({
-      where: { userId },
-      include: { person: { select: { name: true, deletedAt: true } } },
-    });
-
-    // UTC, not local — `date` is a @db.Date column with no time component,
-    // read back as UTC midnight. Comparing it against a *local*-midnight
-    // "today" shifts the result by a day in any timezone behind UTC (see
-    // computeNextOccurrence).
+    // Bounded, indexed query on the materialized next_occurrence column
+    // (idx_events_user_next_occurrence) instead of loading every event and
+    // projecting occurrences in JS. `next_occurrence <= today + days`
+    // reproduces the old `daysUntil <= days` filter (recurring events always
+    // project forward, so only overdue one-time events sit before today), and
+    // ordering by it matches the old daysUntil ascending sort.
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
+    const horizon = new Date(today);
+    horizon.setUTCDate(horizon.getUTCDate() + days);
 
-    const enriched = events
-      .filter((e) => !e.person.deletedAt)
-      .map((e) => {
-        const nextOccurrence = this.computeNextOccurrence(e.date, e.isRecurring, today);
-        const daysUntil = this.computeDaysUntil(nextOccurrence, today);
-        return {
-          ...e,
-          personName: e.person.name,
-          nextOccurrence: nextOccurrence.toISOString().split("T")[0],
-          daysUntil,
-          person: undefined,
-        };
-      })
-      .filter((e) => e.daysUntil <= days)
-      .sort((a, b) => a.daysUntil - b.daysUntil);
+    const where = {
+      userId,
+      person: { deletedAt: null },
+      nextOccurrence: { lte: horizon },
+    };
 
-    const total = enriched.length;
-    const start = (page - 1) * limit;
-    const data = enriched.slice(start, start + limit);
+    const [total, events] = await Promise.all([
+      this.prisma.event.count({ where }),
+      this.prisma.event.findMany({
+        where,
+        include: { person: { select: { name: true } } },
+        orderBy: { nextOccurrence: "asc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    const data = events.map((e) => {
+      const nextOccurrence = e.nextOccurrence ?? e.date;
+      return {
+        ...e,
+        personName: e.person.name,
+        nextOccurrence: nextOccurrence.toISOString().split("T")[0],
+        daysUntil: this.computeDaysUntil(nextOccurrence, today),
+        person: undefined,
+      };
+    });
 
     return {
       data,
@@ -113,6 +122,19 @@ export class EventsService {
     if (dto.budgetMaxCents !== undefined) data.budgetMaxCents = dto.budgetMaxCents;
     if (dto.notes !== undefined) data.notes = dto.notes;
     if (dto.sharedWithFamily !== undefined) data.sharedWithFamily = dto.sharedWithFamily;
+
+    // Recompute the materialized next occurrence if the date or recurrence
+    // changed (either alone changes when the event next lands).
+    if (dto.date !== undefined || dto.isRecurring !== undefined) {
+      const effDate = dto.date !== undefined ? new Date(dto.date) : event.date;
+      const effRecurring =
+        dto.isRecurring !== undefined ? dto.isRecurring : event.isRecurring;
+      data.nextOccurrence = this.computeNextOccurrence(
+        effDate,
+        effRecurring,
+        this.todayStart(),
+      );
+    }
 
     if (event.isAutoCreated) {
       data.userModified = true;
@@ -198,12 +220,14 @@ export class EventsService {
     const label =
       occasionType === OccasionType.birthday ? "Birthday" : "Anniversary";
 
+    const nextOccurrence = this.computeNextOccurrence(newDate, true, this.todayStart());
+
     if (existing) {
       // Only update if user hasn't manually modified the event
       if (!existing.userModified) {
         await this.prisma.event.update({
           where: { id: existing.id },
-          data: { date: newDate },
+          data: { date: newDate, nextOccurrence },
         });
       }
     } else {
@@ -217,13 +241,48 @@ export class EventsService {
           date: newDate,
           isRecurring: true,
           recurrenceRule: RecurrenceRule.annual,
+          nextOccurrence,
           isAutoCreated: true,
         },
       });
     }
   }
 
+  /**
+   * Roll recurring events whose materialized next_occurrence has slipped into
+   * the past (or was never set) forward to their next annual occurrence.
+   * Run daily by EventsScheduler so upcoming() stays correct without the old
+   * per-read recomputation. Returns the number of events refreshed.
+   */
+  async refreshStaleRecurring(): Promise<number> {
+    const today = this.todayStart();
+    const stale = await this.prisma.event.findMany({
+      where: {
+        isRecurring: true,
+        OR: [{ nextOccurrence: { lt: today } }, { nextOccurrence: null }],
+      },
+      select: { id: true, date: true },
+    });
+    if (stale.length === 0) return 0;
+
+    await this.prisma.$transaction(
+      stale.map((e) =>
+        this.prisma.event.update({
+          where: { id: e.id },
+          data: { nextOccurrence: this.computeNextOccurrence(e.date, true, today) },
+        }),
+      ),
+    );
+    return stale.length;
+  }
+
   // --- Helpers ---
+
+  private todayStart(): Date {
+    const t = new Date();
+    t.setUTCHours(0, 0, 0, 0);
+    return t;
+  }
 
   // Everything here runs in UTC, never local time. `eventDate` comes from a
   // @db.Date column (UTC midnight, no real time component) and `today` is
