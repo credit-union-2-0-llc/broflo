@@ -113,17 +113,51 @@ jobs:
           cp -rL .next/standalone/node_modules deploy/node_modules
           # Hoist packages from pnpm virtual store to top level
           if [ -d ".next/standalone/node_modules/.pnpm/node_modules" ]; then
-            cp -rLn .next/standalone/node_modules/.pnpm/node_modules/* deploy/node_modules/ 2>/dev/null || true
+            cp -rLn .next/standalone/node_modules/.pnpm/node_modules/* deploy/node_modules/ 2>/dev/null || true  # theater-ok: `cp -n` exits non-zero merely for SKIPPING an existing file, so its status cannot mean "the hoist failed"; the deploy package is asserted as a whole below
           fi
           # Merge workspace node_modules
-          cp -rLn .next/standalone/apps/web/node_modules/* deploy/node_modules/ 2>/dev/null || true
-          cp .next/standalone/package.json deploy/package.json 2>/dev/null || true
+          cp -rLn .next/standalone/apps/web/node_modules/* deploy/node_modules/ 2>/dev/null || true  # theater-ok: as the hoist above -- `cp -n` skips rather than fails, and the glob is legitimately empty when the app has no workspace-local deps; the package assertion below is the real check
+          # NOTE: `cp .next/standalone/package.json deploy/package.json || true` used
+          # to sit here and had NEVER copied anything. Next 16 with output:
+          # 'standalone' in a monorepo writes no `.next/standalone/package.json` --
+          # the app's manifest is at `.next/standalone/apps/web/package.json`. Proven
+          # from the shipped artifact: the zip listing of Deploy Web job 89556600916
+          # contains 4198 node_modules/ entries, 519 .next/ entries and server.js,
+          # and ZERO top-level package.json. `|| true` is why that was invisible.
+          # Removed rather than repointed: broflo-web runs server.js directly and has
+          # never had a package.json in the package, so adding one now would change
+          # what a live App Service receives. If one is wanted, that is a deliberate
+          # follow-up using the apps/web path above.
           # Server + compiled pages from workspace
           cp .next/standalone/apps/web/server.js deploy/
-          cp -r .next/standalone/apps/web/.next/* deploy/.next/ 2>/dev/null || true
+          cp -r .next/standalone/apps/web/.next/* deploy/.next/ 2>/dev/null || true  # theater-ok: this is the compiled app, and it is exactly what the "Verify deploy package" assertion below checks for (BUILD_ID + a non-empty .next/server), so a silent failure here now fails the build
           # Static assets
           cp -r .next/static deploy/.next/static
-          cp -r public deploy/public 2>/dev/null || true
+          cp -r public deploy/public 2>/dev/null || true  # theater-ok: apps/web has no public/ directory, so this is a genuine no-op; it exists only so adding one later needs no workflow change
+
+      # "The copies ran" is not "the package is complete". Five of the copies above
+      # tolerate failure, and two of them were silently doing nothing. Assert the
+      # END STATE of the artifact instead of trusting eight exit codes -- every
+      # value below was confirmed present in the real shipped zip (Deploy Web job
+      # 89556600916), so this cannot red-line a deploy that would have worked.
+      - name: Verify deploy package before zipping
+        run: |
+          set -euo pipefail
+          cd apps/web/deploy
+          fail=0
+          req() {
+            if [ ! -s "$1" ]; then echo "::error::deploy package is missing $1 -- $2"; fail=1; fi
+          }
+          req server.js            "the Next standalone entrypoint; App Service starts this directly"
+          req .next/BUILD_ID       "the build fingerprint; without it the .next copy did not land"
+          for d in .next/server .next/static node_modules/next; do
+            if [ ! -d "$d" ] || [ -z "$(ls -A "$d" 2>/dev/null)" ]; then
+              echo "::error::deploy package has no $d -- the app would deploy without its compiled output"
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] || { echo "::error::refusing to zip and deploy an incomplete package"; exit 1; }
+          echo "deploy package verified: server.js, .next/BUILD_ID, .next/server, .next/static, node_modules/next all present."
 
       - name: Zip deploy package
         run: cd apps/web/deploy && zip -r ../../../deploy-web.zip . -x '*.map'
@@ -238,7 +272,7 @@ jobs:
           az containerapp secret remove \
             --name broflo-ai \
             --resource-group rg-broflo \
-            --secret-names anthropic-api-key || true
+            --secret-names anthropic-api-key || true  # theater-ok: single-name idempotent cleanup of the pre-gateway orphan (confirmed absent on broflo-ai 2026-07-30); the ANTHROPIC_BASE_URL + litellm-api-key secretRef end state is asserted immediately below and does exit 1
           env_json=$(az containerapp show \
             --name broflo-ai \
             --resource-group rg-broflo \
