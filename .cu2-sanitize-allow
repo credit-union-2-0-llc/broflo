@@ -1,0 +1,108 @@
+# .cu2-sanitize-allow — narrow, documented exceptions for cu2_sanitize_scan.py
+# See tools/sanitize/README.md in credit-union-2-0-llc/cu-agent-standards for
+# the tier model, the two profiles, and the rules of the road for this file.
+
+# ---------------------------------------------------------------------------
+# Functionally required Azure deploy targets. rg-broflo / cu2registry / the
+# ACR login server are the actual resource names this repo's own CI/CD
+# deploys to via `az` CLI commands below — they cannot be scrubbed without
+# breaking the deploy pipeline itself, same reasoning as the private
+# cu2-shared-lib dependency below. Reviewed 2026-08-04; accepted, not fixed.
+# ---------------------------------------------------------------------------
+line:ACR_LOGIN_SERVER: cu2registry\.azurecr\.io
+line:--resource-group rg-broflo
+line:SP scoped to rg-broflo, can't reach cu2registry in rg-cu2-shared yet
+
+# ---------------------------------------------------------------------------
+# LiteLLM gateway routing enforcement. The hardcoded hostname here is a known,
+# separate finding (not yet remediated) -- moving it to a repo variable is a
+# real fix but touches a live production deploy step, so it was deliberately
+# NOT bundled into this pass. Flagged as a follow-up, not silently allowed
+# forever: revisit before the next time this file is touched.
+# ---------------------------------------------------------------------------
+line:ANTHROPIC_BASE_URL=https://ca-litellm-gateway\.wittyflower-1831f2a2\.westus2\.azurecontainerapps\.io
+
+# ---------------------------------------------------------------------------
+# Public GitHub repo self-references. credit-union-2-0-llc/broflo is THIS
+# repo (already public by definition); credit-union-2-0-llc/cu-agent-standards
+# is also public and is the documented reusable-workflow consumption pattern
+# from its own README. Neither discloses a private repo.
+# ---------------------------------------------------------------------------
+line:\*\*Repo:\*\* `credit-union-2-0-llc/broflo`
+line:# CODEBASE\.md — credit-union-2-0-llc/broflo
+line:# github\.com/credit-union-2-0-llc/cu-agent-standards
+line:uses: credit-union-2-0-llc/cu-agent-standards/\.github/workflows/reusable-theater\.yml@main
+path:^ops-config\.yml$
+
+# ---------------------------------------------------------------------------
+# Private cu2-shared-lib dependency. broflo fetches @cu2/shared-lib directly
+# via a git dependency (github: protocol) -- the private repo slug appearing
+# in package.json/pnpm-lock.yaml is a functional requirement of how the
+# package is currently distributed, not a leak of anything else. Accepted
+# 2026-08-04; a private npm registry would remove this but is a bigger,
+# separate project.
+# ---------------------------------------------------------------------------
+line:"@cu2/shared-lib": "github:credit-union-2-0-llc/cu2-shared-lib"
+line:specifier: github:credit-union-2-0-llc/cu2-shared-lib
+path:^pnpm-lock\.yaml$
+
+# ---------------------------------------------------------------------------
+# ACR image reference in docs -- same accepted class as the CI ACR references
+# above, just in prose form.
+# ---------------------------------------------------------------------------
+line:ACR image: `cu2registry\.azurecr\.io/broflo-ai`
+
+# ---------------------------------------------------------------------------
+# Fictional tenant used in a multi-tenant white-label acceptance-test
+# scenario (docs/slices/S13-S16-growth.md). "Rogue Credit Union" / rogue-cu
+# is an invented name to demonstrate tenant isolation, not a real client.
+# ---------------------------------------------------------------------------
+line:Create tenant: "Rogue Credit Union", slug: rogue-cu
+
+# ---------------------------------------------------------------------------
+# Stripe's own published, universally-known test card number. Appears in
+# docs (acceptance test steps) and as a mock-mode fallback value in
+# stripe-issuing.service.ts when no real cardholder exists yet.
+# ---------------------------------------------------------------------------
+line:Complete checkout with test card 4242 4242 4242 4242
+line:cardNumber: '4242424242424242'
+
+# ---------------------------------------------------------------------------
+# Fake test-fixture emails / tokens / job-listing digit IDs. Not real people,
+# not real credentials, not real member/account IDs.
+# ---------------------------------------------------------------------------
+line:email: "a@b\.com"
+line:const token = authHeader\.slice\(7\);
+line:return \{ token: res\.body\.accessToken, userId: res\.body\.user\.id \};
+path:^apps/api/test/auth\.e2e-spec\.ts$
+line:the zip listing of Deploy Web job
+line:so this cannot red-line a deploy that would have worked
+
+# ---------------------------------------------------------------------------
+# Anthropic/Browserbase client construction reading a key from the
+# environment, not a hardcoded secret. Same shape at every call site.
+# ---------------------------------------------------------------------------
+line:anthropic\.Anthropic\(api_key=ANTHROPIC_API_KEY, max_retries=0\)
+line:client = anthropic\.AsyncAnthropic\(api_key=ANTHROPIC_API_KEY\)
+line:self\._client = anthropic\.Anthropic\(api_key=ANTHROPIC_API_KEY\)
+line:self\._client = Browserbase\(api_key=BROWSERBASE_API_KEY\)
+
+# ---------------------------------------------------------------------------
+# The RFC 6598 CGNAT range constant (100.64.0.0/10), used defensively inside
+# this repo's own SSRF-prevention blocklist -- not a real internal address.
+# ---------------------------------------------------------------------------
+line:ipaddress\.ip_network\("100\.64\.0\.0/10"\)
+
+# ---------------------------------------------------------------------------
+# Legitimate binary test fixtures (upload validation / EXIF-stripping /
+# malicious-file-rejection tests need real image and PDF bytes to test
+# against). Reviewed 2026-08-04, contents are synthetic/known-safe.
+# ---------------------------------------------------------------------------
+path:^apps/api/test/fixtures/fake-document\.pdf$
+path:^apps/api/test/fixtures/gps-tagged\.jpg$
+path:^apps/api/test/fixtures/spoofed-script\.jpg$
+path:^apps/api/test/fixtures/valid-100x100\.jpg$
+path:^apps/api/test/fixtures/valid-2000x2000\.jpg$
+path:^apps/api/test/fixtures/valid-50x50\.png$
+path:^apps/web/src/app/favicon\.ico$
+path:^tests/e2e/fixtures/photos/test-room\.jpg$

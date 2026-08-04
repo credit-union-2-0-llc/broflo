@@ -77,7 +77,7 @@ Stand up the full deployment pipeline, cloud infrastructure, and project scaffol
 
 ### Infrastructure
 ```
-- Azure Resource Group: rg-broflo
+- Azure Resource Group: <dedicated resource group>
 - Azure Database for PostgreSQL Flexible Server
 - Azure App Service Plan (B2 minimum for dev, P1v3 for prod)
 - Azure Key Vault: cu2-apps-kv (existing) — add broflo secrets

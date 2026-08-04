@@ -102,8 +102,6 @@ jobs:
 
       - name: Build standalone
         run: pnpm build:web
-        env:
-          NEXT_PUBLIC_API_URL: https://broflo-api.azurewebsites.net
 
       - name: Prepare deploy package
         run: |

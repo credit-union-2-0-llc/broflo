@@ -7,14 +7,14 @@ Gandalf's gift curve is gated true AND `PLAYBOOK_ENABLED=true` is set in the env
 """
 import os, json, urllib.request
 
-GANDALF_URL = os.environ.get("GANDALF_URL", "https://ca-gandalf-protocol.wittyflower-1831f2a2.westus2.azurecontainerapps.io")
+GANDALF_URL = os.environ.get("GANDALF_URL", "")   # required in the environment; no built-in default
 GANDALF_DOMAIN = os.environ.get("GANDALF_DOMAIN", "gifts")   # Broflo=gifts, fantasy app=fantasy-football, travel app=travel
 PLAYBOOK_ENABLED = os.environ.get("PLAYBOOK_ENABLED", "false").lower() == "true"
 
 
 def fetch_playbook() -> dict | None:
     """Fetch the current Gandalf playbook for THIS app's domain. Returns None on any failure."""
-    if not PLAYBOOK_ENABLED:
+    if not PLAYBOOK_ENABLED or not GANDALF_URL:
         return None
     try:
         with urllib.request.urlopen(f"{GANDALF_URL}/api/playbook?domain={GANDALF_DOMAIN}", timeout=3) as r:
