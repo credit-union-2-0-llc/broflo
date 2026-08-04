@@ -1,6 +1,6 @@
 # CLAUDE.md — Broflo
 
-> **Standards:** Read `/Users/kirkdrake/Documents/cu2-standards/CLAUDE.md` for all global CU2 standards.
+> **Standards:** Read `~/Documents/cu2-standards/CLAUDE.md` for all global CU2 standards.
 > This file contains Broflo-specific overrides and context only.
 
 ---

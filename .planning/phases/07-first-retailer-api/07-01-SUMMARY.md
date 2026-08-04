@@ -136,7 +136,7 @@ OrdersService: 4 tests (cancel expired window, cancel valid, cancel wrong status
 **4. [Rule 3 - Blocking] Worktree missing node_modules**
 - **Found during:** Task 1 TypeScript compilation attempt
 - **Issue:** Git worktree does not inherit node_modules from the main repo
-- **Fix:** Symlinked `/Users/kirkdrake/broflo/apps/api/node_modules` into the worktree api directory
+- **Fix:** Symlinked `~/broflo/apps/api/node_modules` into the worktree api directory
 - **Impact:** None — symlink approach is standard for pnpm monorepo worktrees
 
 ## Known Stubs
