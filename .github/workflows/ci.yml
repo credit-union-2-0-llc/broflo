@@ -234,7 +234,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ci, changes]
     if: needs.changes.outputs.ai == 'true'
-    continue-on-error: true  # SP scoped to rg-broflo, can't reach cu2registry in rg-cu2-shared yet
+    continue-on-error: true  # theater-ok: SP scoped to rg-broflo cannot pull from cu2registry in rg-cu2-shared yet; deploy-ai is intentionally optional until the cross-RG ACR pull permission is provisioned; tracked in the broflo ACR permission backlog
     environment: production
     steps:
       - uses: actions/checkout@v4
