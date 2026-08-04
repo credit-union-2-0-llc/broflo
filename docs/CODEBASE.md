@@ -3,7 +3,7 @@ id: broflo
 description: AI-powered subscription gift concierge that tracks people, curates gift ideas, and executes purchases automatically on the user's behalf
 status: active
 stack: [Next.js 14, NestJS, FastAPI, Prisma, PostgreSQL, TypeScript, Python, Tailwind CSS, shadcn/ui, Stripe, NextAuth.js, Anthropic SDK, Firebase Cloud Messaging, pnpm workspaces, Azure Container Apps, Azure App Service]
-live_url: "https://broflo-web.azurewebsites.net"
+live_url: "https://broflo.ai"
 patterns_used: []
 connectors_used: []
 last_updated: 2026-07-14
