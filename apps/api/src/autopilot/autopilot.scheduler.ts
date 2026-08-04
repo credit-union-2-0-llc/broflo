@@ -78,7 +78,7 @@ export class AutopilotScheduler {
         await this.processRule(rule, today);
         processed++;
       } catch (err) {
-        this.log.error(`Autopilot failed for rule ${rule.id}: ${err}`);
+        this.log.error(`Autopilot failed for rule ${rule.id}: ${err}`); // theater-ok: one rule's failure must not abort the whole cron batch — each AutopilotRun row for this rule already records its own status inside processRule, and the log line above surfaces failures that happened before any row could be written; tomorrow's cron retries this rule
       }
     }
 
@@ -268,7 +268,7 @@ export class AutopilotScheduler {
         try {
           await this.maybeNudgeFamilyPool(rule, suggestion);
         } catch (err) {
-          this.log.error(`Family-pool nudge failed for rule ${rule.id}: ${err}`);
+          this.log.error(`Family-pool nudge failed for rule ${rule.id}: ${err}`); // theater-ok: per the comment above, the nudge is a side effect of an already-successful pick — the AutopilotRun row for this rule was already written as 'ready_for_review' before this block runs, so a nudge failure has nothing left to invalidate; logged here for diagnosis
         }
       } catch (err) {
         await this.prisma.autopilotRun.create({

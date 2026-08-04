@@ -78,22 +78,25 @@ export default async function EventDetailPage({
   try {
     const giftsRes = await api.getPersonGifts(session.accessToken, event.personId, { limit: 100 });
     allPersonGifts = giftsRes.data;
-  } catch {
-    // Non-critical — the rest of the page still renders without gift history.
+  } catch (err) {
+    console.error(`Failed to load gift history for person ${event.personId}:`, err); // theater-ok: non-critical — eventGifts/recentGifts below default to [] and the rest of the page still renders without gift history; logged here since this catch would otherwise be completely silent
   }
   const eventGifts = allPersonGifts.filter((g) => g.eventId === event.id);
   const recentGifts = [...allPersonGifts]
     .sort((a, b) => new Date(b.givenAt).getTime() - new Date(a.givenAt).getTime())
     .slice(0, 3);
 
-  const person = await api.getPerson(session.accessToken, event.personId).catch(() => null);
+  const person = await api.getPerson(session.accessToken, event.personId).catch((err) => {
+    console.error(`Failed to load person ${event.personId}:`, err); // theater-ok: person is optional page context — `{person && (...)}` below just skips rendering the person-context sidebar instead of breaking the page; logged here since this catch would otherwise be completely silent
+    return null;
+  });
 
   let autopilotRule: AutopilotRule | null = null;
   try {
     const rules = await api.listRules(session.accessToken);
     autopilotRule = rules.find((r) => r.personId === event.personId) ?? null;
-  } catch {
-    // Non-critical — sidebar shows "no rule set up"
+  } catch (err) {
+    console.error(`Failed to load autopilot rules for person ${event.personId}:`, err); // theater-ok: non-critical — autopilotRule stays null and the sidebar renders its existing "no rule set up" state; logged here since this catch would otherwise be completely silent
   }
 
   const budgetStr =

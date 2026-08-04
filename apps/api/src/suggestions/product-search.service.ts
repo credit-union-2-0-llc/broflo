@@ -311,7 +311,7 @@ export class ProductSearchService {
 
       if (!res.ok) {
         this.logger.warn(`Exa returned ${res.status} for "${query}"`);
-        return null;
+        return null; // theater-ok: null is a distinct sentinel from the empty-but-successful [] returned below — every caller (searchProduct, findBuyOptions) checks "=== null" / truthiness explicitly to treat a failed Exa call as no-result rather than confusing it with a genuine zero-match search, and the warn() above is what surfaces the failure
       }
 
       const data = await res.json();

@@ -82,7 +82,7 @@ export function SurveySection({ personId, personName, recipientEmail, tier }: Su
         for (const r of res) initialSelection[r.id] = new Set(Object.keys(r.answers));
         setSelectedFields(initialSelection);
       })
-      .catch(() => {})
+      .catch((err) => console.error("Failed to load survey responses:", err)) // theater-ok: responses/selectedFields stay at their initial empty state on failure, which the section already renders correctly (an empty survey-response list); logged for visibility
       .finally(() => setLoadingResponses(false));
   }, [session?.accessToken, personId]);
 

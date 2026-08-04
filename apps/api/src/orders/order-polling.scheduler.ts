@@ -65,7 +65,7 @@ export class OrderPollingScheduler {
         );
       }
     } catch (err) {
-      this.log.error(`Polling failed for order ${order.id}: ${err}`);
+      this.log.error(`Polling failed for order ${order.id}: ${err}`); // theater-ok: this runs per-order inside Promise.allSettled above, so one order's polling failure must not abort the rest of the batch; the next @Cron tick (every 15 min) retries this order, and the log line surfaces the failure in the interim
     }
   }
 }

@@ -80,7 +80,7 @@ export function GiftHistorySection({
         }
         setOrderByGiftId(map);
       })
-      .catch(() => {});
+      .catch((err) => console.error("Failed to load orders for gift history:", err)); // theater-ok: orderByGiftId stays at its initial empty Map on failure, which just omits order-status badges from otherwise-correctly-rendered gift history rather than breaking the section; logged for visibility
   }, [token]);
 
   // Collect available years for filter

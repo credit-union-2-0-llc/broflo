@@ -378,7 +378,7 @@ export class SuggestionsService {
 
       return response;
     } catch (err) {
-      await this.prisma.suggestionRequestClaim.delete({ where: { id: claim.id } }).catch(() => {});
+      await this.prisma.suggestionRequestClaim.delete({ where: { id: claim.id } }).catch(() => {}); // theater-ok: best-effort cleanup of the claim row on the failure path — the real error is rethrown unconditionally on the next line regardless of whether this delete succeeds, so its own outcome carries no verdict
       throw err;
     }
   }
@@ -422,7 +422,7 @@ export class SuggestionsService {
         ),
       );
     } catch (err) {
-      this.logger.warn(`Async suggestion image enrichment failed: ${err}`);
+      this.logger.warn(`Async suggestion image enrichment failed: ${err}`); // theater-ok: per the docstring above, this runs fire-and-forget after the suggestion response has already been sent — there is no request left to fail, and the suggestions simply stay image-less; the warn() above is what tracks the failure
     }
   }
 
