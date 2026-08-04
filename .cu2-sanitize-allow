@@ -32,6 +32,7 @@ line:\*\*Repo:\*\* `credit-union-2-0-llc/broflo`
 line:# CODEBASE\.md — credit-union-2-0-llc/broflo
 line:# github\.com/credit-union-2-0-llc/cu-agent-standards
 line:uses: credit-union-2-0-llc/cu-agent-standards/\.github/workflows/reusable-theater\.yml@main
+line:uses: credit-union-2-0-llc/cu-agent-standards/\.github/workflows/reusable-sanitize\.yml@main
 path:^ops-config\.yml$
 
 # ---------------------------------------------------------------------------
