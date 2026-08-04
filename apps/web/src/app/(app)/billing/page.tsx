@@ -53,7 +53,7 @@ function BillingContent() {
     api
       .getSubscription(session.accessToken)
       .then((sub) => setDevOverrideEnabled(sub.devTierOverrideEnabled))
-      .catch(() => {});
+      .catch((err) => console.error("Failed to load subscription (dev override check):", err)); // theater-ok: devOverrideEnabled stays at its default `false` on failure, which just hides the dev-only override control — the real subscription tier used for gating comes from the session, not this call; logged for visibility
   }, [session?.accessToken]);
 
   async function handleDevSwitch(newTier: "free" | "pro" | "elite" | "family") {

@@ -38,7 +38,7 @@ export function RecentGiftsWidget({ token, initialGifts }: RecentGiftsWidgetProp
     api
       .getRecentGifts(token)
       .then((res) => setGifts(res.gifts as RecentGift[]))
-      .catch(() => {})
+      .catch((err) => console.error("Failed to load recent gifts:", err)) // theater-ok: gifts stays at its initial value (initialGifts or []) on failure, which renders the same as genuinely no recent gifts; logged for visibility
       .finally(() => setLoading(false));
   }, [token, initialGifts]);
 
@@ -57,7 +57,7 @@ export function RecentGiftsWidget({ token, initialGifts }: RecentGiftsWidgetProp
         }
         setRecentOrders(orderMap);
       })
-      .catch(() => {});
+      .catch((err) => console.error("Failed to load recent orders:", err)); // theater-ok: recentOrders stays at its initial empty Map on failure, which just omits the "cancel window" badge from otherwise-correctly-rendered gifts rather than breaking the widget; logged for visibility
   }, [token]);
 
   async function handleNailedIt(gift: RecentGift) {

@@ -149,3 +149,44 @@ async def test_failure_after_confirm_click_is_never_retried():
     # Must never be retried — a second attempt would risk a second real
     # checkout against the same retailer with the same virtual card.
     assert create_session_spy.call_count == 1
+
+
+class FailingCloseBrowser(FakeBrowser):
+    """A browser whose close() itself raises — exercises the finally-block
+    best-effort teardown, which must not let a cleanup failure clobber the
+    already-decided AgentResult from the try/except blocks above it."""
+
+    async def close(self):
+        raise RuntimeError("cdp connection already gone")
+
+
+class FakePlaywrightContextManagerWithFailingClose(FakePlaywrightContextManager):
+    async def start(self):
+        return FakePlaywright(FailingCloseBrowser(self._page))
+
+
+@pytest.mark.asyncio
+async def test_browser_close_failure_does_not_break_the_result(caplog):
+    page = FakePage()
+    agent = BrowserOrderAgent(provider=MockProvider())
+    _stub_common_steps(agent)
+    # Fails during add-to-cart — well before the "Place Order" click, same
+    # as test_failure_before_confirm_click_is_retried — the only variable
+    # under test here is that browser.close() also raises during cleanup.
+    agent._add_to_cart = AsyncMock(side_effect=RuntimeError("boom"))
+
+    with (
+        patch(
+            "app.agent.browser_order_agent.async_playwright",
+            lambda: FakePlaywrightContextManagerWithFailingClose(page),
+        ),
+        patch("asyncio.sleep", new=AsyncMock()),
+        caplog.at_level("WARNING", logger="broflo-browser-agent.agent"),
+    ):
+        result = await agent.execute(make_request(ExecuteMode.place))
+
+    # The real result (from the add-to-cart failure) must survive a
+    # cleanup-time browser.close() failure untouched.
+    assert result.failure_reason == "unknown"
+    assert result.job_id == "job-1"
+    assert any("browser.close() failed" in rec.message for rec in caplog.records)

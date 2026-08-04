@@ -366,8 +366,8 @@ class BrowserOrderAgent:
             if browser:
                 try:
                     await browser.close()
-                except Exception:
-                    pass
+                except Exception as close_err:
+                    logger.warning("browser.close() failed for job %s during cleanup: %s", req.job_id, close_err)  # theater-ok: best-effort teardown after the job outcome (order placed/failed/timed out) is already decided above; the AgentResult returned from the try/except blocks carries the real verdict, and close_session below still runs to release the remote session regardless of this close() outcome
             if session:
                 await self._provider.close_session(session.session_id)
 

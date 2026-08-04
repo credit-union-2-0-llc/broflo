@@ -41,8 +41,8 @@ export function NotificationBell() {
       try {
         const res = await api.getUnreadCount(token);
         setUnread(res.count);
-      } catch {
-        // silent
+      } catch (err) {
+        console.error("Failed to load unread notification count:", err); // theater-ok: unread stays at its last-known value on failure (initial 0, or whatever the previous poll set) — the next 30s interval tick retries; logged for visibility since this catch would otherwise be completely silent
       }
     }
     fetchUnread();
@@ -55,7 +55,7 @@ export function NotificationBell() {
     if (nextOpen && session?.accessToken) {
       api.listNotifications(session.accessToken, { limit: 10 })
         .then((res) => setNotifications(res.data))
-        .catch(() => {});
+        .catch((err) => console.error("Failed to load notifications list:", err)); // theater-ok: notifications stays at its initial empty array on failure — the dropdown just shows no notifications rather than breaking on open; the unread badge count is fetched independently above, so this failure doesn't hide new-notification signal; logged for visibility
     }
   }
 

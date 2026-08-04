@@ -36,7 +36,7 @@ export function SharedCalendarSection({ token }: { token: string }) {
     api
       .getSharedEvents(token)
       .then(setEvents)
-      .catch(() => {})
+      .catch((err) => console.error("Failed to load shared calendar events:", err)) // theater-ok: events stays at its initial empty array on failure, which renders the same as a genuinely empty shared calendar; logged for visibility
       .finally(() => setLoading(false));
   }, [token]);
 
