@@ -14,15 +14,6 @@ line:--resource-group rg-broflo
 line:SP scoped to rg-broflo, can't reach cu2registry in rg-cu2-shared yet
 
 # ---------------------------------------------------------------------------
-# LiteLLM gateway routing enforcement. The hardcoded hostname here is a known,
-# separate finding (not yet remediated) -- moving it to a repo variable is a
-# real fix but touches a live production deploy step, so it was deliberately
-# NOT bundled into this pass. Flagged as a follow-up, not silently allowed
-# forever: revisit before the next time this file is touched.
-# ---------------------------------------------------------------------------
-line:ANTHROPIC_BASE_URL=https://ca-litellm-gateway\.wittyflower-1831f2a2\.westus2\.azurecontainerapps\.io
-
-# ---------------------------------------------------------------------------
 # Public GitHub repo self-references. credit-union-2-0-llc/broflo is THIS
 # repo (already public by definition); credit-union-2-0-llc/cu-agent-standards
 # is also public and is the documented reusable-workflow consumption pattern
