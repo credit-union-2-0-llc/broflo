@@ -11,7 +11,7 @@
 # ---------------------------------------------------------------------------
 line:ACR_LOGIN_SERVER: cu2registry\.azurecr\.io
 line:--resource-group rg-broflo
-line:SP scoped to rg-broflo, can't reach cu2registry in rg-cu2-shared yet
+line:SP scoped to rg-broflo cannot pull from cu2registry in rg-cu2-shared yet
 
 # ---------------------------------------------------------------------------
 # Public GitHub repo self-references. credit-union-2-0-llc/broflo is THIS
