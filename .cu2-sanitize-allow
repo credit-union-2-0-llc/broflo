@@ -98,3 +98,16 @@ path:^apps/api/test/fixtures/valid-2000x2000\.jpg$
 path:^apps/api/test/fixtures/valid-50x50\.png$
 path:^apps/web/src/app/favicon\.ico$
 path:^tests/e2e/fixtures/photos/test-room\.jpg$
+
+# ---------------------------------------------------------------------------
+# Hardcoded test-user passwords in e2e specs. These create throwaway accounts
+# against a test database; none is a real credential. Same accepted class as
+# apps/api/test/auth.e2e-spec.ts above, which was allowlisted 2026-08-04 for
+# exactly this reason -- these two files were simply not yet reachable by the
+# gate, because the sanitizer's generic-secret rule could not see a value
+# containing punctuation until cu-agent-standards fixed that (its ledger row 21).
+# Landed BEFORE that fix ships so this repo never goes red on it.
+# Reviewed 2026-08-05; accepted, not fixed.
+# ---------------------------------------------------------------------------
+path:^apps/api/test/persons\.e2e-spec\.ts$
+path:^apps/api/test/photos\.e2e-spec\.ts$
