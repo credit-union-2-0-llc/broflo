@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { VOICE } from "@broflo/shared/copy/voice";
 import { api } from "@/lib/api";
+import { compressImageForUpload } from "@/lib/image-compress";
 import { PhotoUploadTrigger } from "./photo-upload-trigger";
 import { PhotoCategoryPicker } from "./photo-category-picker";
 import { PhotoGallery } from "./photo-gallery";
@@ -102,7 +103,8 @@ export function PhotoSection({ personId, tier }: PhotoSectionProps) {
       let successCount = 0;
       for (const file of pendingFiles) {
         try {
-          await api.uploadPhoto(token, personId, file, category);
+          const uploadFile = await compressImageForUpload(file);
+          await api.uploadPhoto(token, personId, uploadFile, category);
           successCount++;
         } catch (err: unknown) {
           const errObj = err as Record<string, unknown>;
