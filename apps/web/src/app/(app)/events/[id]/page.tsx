@@ -72,32 +72,38 @@ export default async function EventDetailPage({
   const event = events.find((e) => e.id === id);
   if (!event) notFound();
 
-  // S-5 shipped after this page was first built — it was never wired up to
-  // actually show gifts scoped to this event, just left as a placeholder.
-  let allPersonGifts: GiftRecord[] = [];
-  try {
-    const giftsRes = await api.getPersonGifts(session.accessToken, event.personId, { limit: 100 });
-    allPersonGifts = giftsRes.data;
-  } catch (err) {
-    console.error(`Failed to load gift history for person ${event.personId}:`, err); // theater-ok: non-critical — eventGifts/recentGifts below default to [] and the rest of the page still renders without gift history; logged here since this catch would otherwise be completely silent
-  }
+  // Gift history, person context, and the autopilot rule all depend only on
+  // event.personId (or nothing) — none depends on another — so fetch them
+  // concurrently instead of three serial round-trips on the render path. Each
+  // keeps its own catch so one failing degrades just its own section, exactly
+  // as before (this used to be three sequential try/catch blocks).
+  // S-5 note: gift history was never wired to show gifts scoped to this event,
+  // just left as a placeholder.
+  const [allPersonGifts, person, autopilotRule] = await Promise.all([
+    api
+      .getPersonGifts(session.accessToken, event.personId, { limit: 100 })
+      .then((giftsRes) => giftsRes.data)
+      .catch((err) => {
+        console.error(`Failed to load gift history for person ${event.personId}:`, err); // theater-ok: non-critical — eventGifts/recentGifts below default to [] and the rest of the page still renders without gift history; logged here since this catch would otherwise be completely silent
+        return [] as GiftRecord[];
+      }),
+    api.getPerson(session.accessToken, event.personId).catch((err) => {
+      console.error(`Failed to load person ${event.personId}:`, err); // theater-ok: person is optional page context — `{person && (...)}` below just skips rendering the person-context sidebar instead of breaking the page; logged here since this catch would otherwise be completely silent
+      return null;
+    }),
+    api
+      .listRules(session.accessToken)
+      .then((rules) => rules.find((r) => r.personId === event.personId) ?? null)
+      .catch((err) => {
+        console.error(`Failed to load autopilot rules for person ${event.personId}:`, err); // theater-ok: non-critical — autopilotRule stays null and the sidebar renders its existing "no rule set up" state; logged here since this catch would otherwise be completely silent
+        return null as AutopilotRule | null;
+      }),
+  ]);
+
   const eventGifts = allPersonGifts.filter((g) => g.eventId === event.id);
   const recentGifts = [...allPersonGifts]
     .sort((a, b) => new Date(b.givenAt).getTime() - new Date(a.givenAt).getTime())
     .slice(0, 3);
-
-  const person = await api.getPerson(session.accessToken, event.personId).catch((err) => {
-    console.error(`Failed to load person ${event.personId}:`, err); // theater-ok: person is optional page context — `{person && (...)}` below just skips rendering the person-context sidebar instead of breaking the page; logged here since this catch would otherwise be completely silent
-    return null;
-  });
-
-  let autopilotRule: AutopilotRule | null = null;
-  try {
-    const rules = await api.listRules(session.accessToken);
-    autopilotRule = rules.find((r) => r.personId === event.personId) ?? null;
-  } catch (err) {
-    console.error(`Failed to load autopilot rules for person ${event.personId}:`, err); // theater-ok: non-critical — autopilotRule stays null and the sidebar renders its existing "no rule set up" state; logged here since this catch would otherwise be completely silent
-  }
 
   const budgetStr =
     event.budgetMinCents || event.budgetMaxCents
