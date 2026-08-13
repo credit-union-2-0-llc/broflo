@@ -21,19 +21,22 @@ export default async function DashboardPage() {
   let flightTotal = 0;
 
   try {
-    const [eventsRes, remindersRes, recentGiftsRes, ordered, processing, shipped] = await Promise.all([
+    // "In-flight" = ordered/processing/shipped. One query with all three
+    // statuses instead of three separate calls: fewer round-trips and DB
+    // queries on the landing page, and correctly the 3 most-recent across all
+    // three statuses (the old "3 of each, then slice(0,3)" could drop a newer
+    // shipped order behind three older ordered ones).
+    const [eventsRes, remindersRes, recentGiftsRes, inFlight] = await Promise.all([
       api.getUpcomingEvents(session.accessToken, { limit: 10 }),
       api.getReminders(session.accessToken),
       api.getRecentGifts(session.accessToken),
-      api.getOrders(session.accessToken, { status: "ordered", limit: 3 }),
-      api.getOrders(session.accessToken, { status: "processing", limit: 3 }),
-      api.getOrders(session.accessToken, { status: "shipped", limit: 3 }),
+      api.getOrders(session.accessToken, { status: "ordered,processing,shipped", limit: 3 }),
     ]);
     events = eventsRes.data;
     reminders = remindersRes;
     recentGifts = recentGiftsRes.gifts;
-    flightOrders = [...ordered.data, ...processing.data, ...shipped.data].slice(0, 3);
-    flightTotal = ordered.meta.total + processing.meta.total + shipped.meta.total;
+    flightOrders = inFlight.data;
+    flightTotal = inFlight.meta.total;
   } catch {
     // Graceful degradation — widgets show empty state
   }

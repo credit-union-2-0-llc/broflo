@@ -374,3 +374,62 @@ describe('OrdersService - place idempotency (B2)', () => {
     expect(stripeConnect.createCharge).not.toHaveBeenCalled();
   });
 });
+
+describe('OrdersService - list() status filtering', () => {
+  let service: OrdersService;
+  let prisma: { order: { count: jest.Mock; findMany: jest.Mock } };
+
+  beforeEach(async () => {
+    prisma = {
+      order: {
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrdersService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: 'RETAILER_ADAPTER', useValue: {} },
+        { provide: OrderAuditService, useValue: { record: jest.fn() } },
+        { provide: OrderStatusHistoryService, useValue: { record: jest.fn() } },
+        { provide: StripeConnectService, useValue: {} },
+      ],
+    }).compile();
+
+    service = module.get<OrdersService>(OrdersService);
+  });
+
+  const userId = 'user-1';
+
+  it('filters by a single status with equality', async () => {
+    await service.list(userId, { status: 'shipped' });
+    expect(prisma.order.findMany.mock.calls[0][0].where.status).toBe('shipped');
+  });
+
+  it('filters by a comma-separated list with an `in` clause (the dashboard in-flight widget)', async () => {
+    await service.list(userId, { status: 'ordered,processing,shipped' });
+    expect(prisma.order.findMany.mock.calls[0][0].where.status).toEqual({
+      in: ['ordered', 'processing', 'shipped'],
+    });
+    // count uses the same where so meta.total spans all three statuses
+    expect(prisma.order.count.mock.calls[0][0].where.status).toEqual({
+      in: ['ordered', 'processing', 'shipped'],
+    });
+  });
+
+  it('drops unknown statuses and never falls back to returning every order', async () => {
+    await service.list(userId, { status: 'shipped,bogus' });
+    expect(prisma.order.findMany.mock.calls[0][0].where.status).toBe('shipped');
+
+    await service.list(userId, { status: 'bogus,nonsense' });
+    // all invalid -> in:[] -> no rows, not an unfiltered "all orders" query
+    expect(prisma.order.findMany.mock.calls[1][0].where.status).toEqual({ in: [] });
+  });
+
+  it('applies no status filter when none is given', async () => {
+    await service.list(userId, {});
+    expect(prisma.order.findMany.mock.calls[0][0].where.status).toBeUndefined();
+  });
+});

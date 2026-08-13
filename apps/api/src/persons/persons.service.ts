@@ -25,9 +25,13 @@ export class PersonsService {
   ) {}
 
   async list(userId: string) {
+    // Only `tags` is rendered by list consumers (people list, and the layout
+    // just counts). neverAgainItems is loaded on the detail endpoint where the
+    // person-context sidebar actually reads it — including it here was a join
+    // per person on every list fetch whose data nothing on the list side uses.
     return this.prisma.person.findMany({
       where: { userId, deletedAt: null },
-      include: { neverAgainItems: true, tags: true },
+      include: { tags: true },
       orderBy: { createdAt: "desc" },
     });
   }
