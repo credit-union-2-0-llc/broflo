@@ -39,7 +39,10 @@ describe('AgentOrdersService - place()', () => {
       id: jobId,
       userId,
       status: 'previewing',
-      suggestionId: null,
+      // A real job always carries the suggestionId it was previewed from
+      // (the DTO requires it); it only goes null if the suggestion is later
+      // deleted, which place() now guards against explicitly.
+      suggestionId: 'sug-1',
       retailerDomain: 'example.com',
       retailerUrl: 'https://example.com',
       searchTerms: 'cozy blanket',
@@ -63,7 +66,7 @@ describe('AgentOrdersService - place()', () => {
         // CAS claim previewing → placing wins by default (count: 1)
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
-      giftSuggestion: { findUnique: jest.fn().mockResolvedValue(null) },
+      giftSuggestion: { findUnique: jest.fn().mockResolvedValue({ personId: 'person-1' }) },
       order: { create: jest.fn().mockResolvedValue({ id: 'order-1' }) },
       failureReview: { create: jest.fn().mockResolvedValue({}) },
     };
@@ -198,6 +201,21 @@ describe('AgentOrdersService - place()', () => {
     expect(loser.status).toBe('rejected');
     // Exactly one purchase attempt — one card minted, not two.
     expect(stripeIssuing.createVirtualCard).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses to charge when the suggestion was deleted between preview and place (personId unresolvable)', async () => {
+    // Suggestion gone → findUnique returns null → personId can't be resolved.
+    // place() must bail BEFORE minting a card, not silently degrade the
+    // required Person FK to a name string and lose the order after charging.
+    prisma.giftSuggestion.findUnique.mockResolvedValue(null);
+
+    await expect(service.place(makeUser(), { jobId })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+
+    expect(stripeIssuing.createVirtualCard).not.toHaveBeenCalled();
+    expect(agentClient.execute).not.toHaveBeenCalled();
+    expect(prisma.order.create).not.toHaveBeenCalled();
   });
 
   it('releases the job back to previewing when virtual card creation fails (no money moved)', async () => {
