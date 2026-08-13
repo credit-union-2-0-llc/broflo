@@ -100,6 +100,24 @@ describe("EventsService — next_occurrence materialization", () => {
       expect(prisma.event.count.mock.calls[0][0].where.nextOccurrence.lte).toBeInstanceOf(Date);
     });
 
+    it("maps days to a today+days horizon and returns the count via meta.total (the header due-soon badge relies on days=1)", async () => {
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+      const expectedHorizon = new Date(today);
+      expectedHorizon.setUTCDate(expectedHorizon.getUTCDate() + 1);
+      prisma.event.count.mockResolvedValue(3);
+      prisma.event.findMany.mockResolvedValue([]);
+
+      const res = await service.upcoming(userId, 1, 1, 1);
+
+      const countWhere = prisma.event.count.mock.calls[0][0].where;
+      expect((countWhere.nextOccurrence.lte as Date).getTime()).toBe(expectedHorizon.getTime());
+      // No lower bound — overdue events are counted too, matching the old
+      // client-side `daysUntil <= 1` filter the layout used to do.
+      expect(countWhere.nextOccurrence.gte).toBeUndefined();
+      expect(res.meta.total).toBe(3);
+    });
+
     it("maps rows to personName + daysUntil and drops the person relation", async () => {
       const today = new Date();
       today.setUTCHours(0, 0, 0, 0);
