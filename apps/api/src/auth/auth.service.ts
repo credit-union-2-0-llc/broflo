@@ -101,11 +101,33 @@ export class AuthService {
       throw new UnauthorizedException("Invalid refresh token");
     }
 
-    // Rotate: this specific token is single-use. Other devices' rows are
-    // untouched — that's the whole point of per-device tokens.
-    await this.prisma.refreshToken.delete({ where: { id: stored.id } });
+    // Deliberately NOT single-use/rotated. NextAuth's JWT session strategy
+    // means the refresh token lives in an encrypted cookie the browser
+    // sends on every request — a single page load fires several requests
+    // that all carry the SAME cookie snapshot, so more than one of them can
+    // legitimately reach here with the same still-valid token before any
+    // response has had a chance to hand back a new one. Rotating on every
+    // use meant whichever request won invalidated the token out from under
+    // every other concurrent request using that identical, still-good
+    // cookie — which is exactly what was happening. Sliding the expiry
+    // forward keeps long-idle tokens from accumulating forever without
+    // that race.
+    await this.prisma.refreshToken.update({
+      where: { id: stored.id },
+      data: { expiresAt: new Date(Date.now() + this.REFRESH_TOKEN_TTL_MS) },
+    });
 
-    return this.issueTokens(stored.user);
+    return {
+      accessToken: this.signAccessToken(stored.user),
+      refreshToken,
+      user: {
+        id: stored.user.id,
+        email: stored.user.email,
+        name: stored.user.name,
+        avatarUrl: stored.user.avatarUrl,
+        subscriptionTier: stored.user.subscriptionTier,
+      },
+    };
   }
 
   async logout(userId: string, jti: string, exp: number) {
@@ -123,11 +145,13 @@ export class AuthService {
     await this.prisma.refreshToken.deleteMany({ where: { userId } });
   }
 
-  private async issueTokens(user: User) {
-    const jti = uuidv4();
-    const payload = { sub: user.id, email: user.email, jti };
+  private signAccessToken(user: User): string {
+    const payload = { sub: user.id, email: user.email, jti: uuidv4() };
+    return this.jwt.sign(payload, { expiresIn: "15m" });
+  }
 
-    const accessToken = this.jwt.sign(payload, { expiresIn: "15m" });
+  private async issueTokens(user: User) {
+    const accessToken = this.signAccessToken(user);
     const refreshToken = uuidv4();
 
     await this.prisma.refreshToken.create({

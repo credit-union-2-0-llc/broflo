@@ -13,6 +13,7 @@ describe("AuthService", () => {
     refreshToken: {
       create: jest.Mock;
       findUnique: jest.Mock;
+      update: jest.Mock;
       delete: jest.Mock;
       deleteMany: jest.Mock;
     };
@@ -64,6 +65,12 @@ describe("AuthService", () => {
         findUnique: jest.fn(({ where }) => {
           const row = refreshTokenStore.get(where.tokenHash);
           return Promise.resolve(row ? { ...row, user: USER } : null);
+        }),
+        update: jest.fn(({ where, data }) => {
+          for (const row of refreshTokenStore.values()) {
+            if (row.id === where.id) Object.assign(row, data);
+          }
+          return Promise.resolve({});
         }),
         delete: jest.fn(({ where }) => {
           for (const [hash, row] of refreshTokenStore) {
@@ -167,13 +174,34 @@ describe("AuthService", () => {
       await expect(service.refresh(login2.refreshToken)).resolves.toBeDefined();
     });
 
-    it("rotates the refresh token — the old one can't be reused after a refresh", async () => {
+    it("does NOT rotate — the same refresh token stays valid across repeated use", async () => {
+      // Deliberately not single-use: NextAuth's session cookie means one
+      // page load can fire several requests that all carry the same
+      // pre-refresh cookie, so more than one legitimately reaches here with
+      // the same token before any response updates it. Rotating on first
+      // use invalidated the token out from under every other concurrent
+      // request using that identical, still-good cookie — this is the
+      // actual bug that caused "people disappeared" to reappear even after
+      // the per-device fix.
       const login = await service.verifyOtp({ email: EMAIL, code: "123456" });
-      await service.refresh(login.refreshToken);
 
-      await expect(service.refresh(login.refreshToken)).rejects.toBeInstanceOf(
-        UnauthorizedException,
-      );
+      await service.refresh(login.refreshToken);
+      await expect(service.refresh(login.refreshToken)).resolves.toBeDefined();
+      await expect(service.refresh(login.refreshToken)).resolves.toBeDefined();
+    });
+
+    it("simulates several concurrent requests from one page load reusing the same stale cookie", async () => {
+      const login = await service.verifyOtp({ email: EMAIL, code: "123456" });
+
+      // Same token, fired concurrently — exactly what several parallel
+      // Server Component data fetches on one page load do.
+      const results = await Promise.all([
+        service.refresh(login.refreshToken),
+        service.refresh(login.refreshToken),
+        service.refresh(login.refreshToken),
+      ]);
+
+      for (const r of results) expect(r).toBeDefined();
     });
 
     it("rejects an unrecognized refresh token", async () => {
