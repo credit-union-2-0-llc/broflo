@@ -102,6 +102,14 @@ jobs:
 
       - name: Build standalone
         run: pnpm build:web
+        env:
+          # NEXT_PUBLIC_* vars are inlined into the client JS at build time --
+          # setting them on the App Service only affects server-side runtime
+          # code, never the already-built browser bundle. Without this, every
+          # deploy silently baked in api.ts's "|| http://localhost:3001"
+          # fallback, so every browser's client-side calls (login, photo
+          # upload) tried to reach the visitor's own machine and failed.
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
 
       - name: Prepare deploy package
         run: |
