@@ -426,9 +426,19 @@ export class OrdersService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 
-    const where: { userId: string; status?: OrderStatus } = { userId };
+    const where: { userId: string; status?: OrderStatus | { in: OrderStatus[] } } = { userId };
     if (query.status) {
-      where.status = query.status as OrderStatus;
+      // Accept a comma-separated list so a caller can pull several statuses in
+      // one query (e.g. the dashboard's ordered/processing/shipped "in-flight"
+      // widget) instead of one request per status. Unknown values are dropped;
+      // a status filter that resolves to nothing returns no rows (in: []),
+      // never silently every order.
+      const valid = new Set<string>(Object.values(OrderStatus));
+      const requested = query.status
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s): s is OrderStatus => valid.has(s));
+      where.status = requested.length === 1 ? requested[0] : { in: requested };
     }
 
     const sortField = query.sortBy ?? 'createdAt';
