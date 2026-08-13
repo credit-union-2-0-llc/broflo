@@ -128,13 +128,20 @@ export class EnrichmentService {
       tier: user.subscriptionTier,
     })) as ParseWishlistResult;
 
-    // Persist parsed items
-    const created = [];
+    // Persist parsed items — run the creates concurrently instead of one
+    // sequential round trip per product.
+    const toCreate: { urlResult: ParseWishlistResult["results"][number]; product: ParsedProduct }[] = [];
     for (const urlResult of result.results || []) {
       if (urlResult.error) continue;
       for (const product of urlResult.products || []) {
         if (product.confidence < 0.3) continue; // skip low confidence
-        const item = await this.prisma.wishlistItem.create({
+        toCreate.push({ urlResult, product });
+      }
+    }
+
+    const created = await Promise.all(
+      toCreate.map(({ urlResult, product }) =>
+        this.prisma.wishlistItem.create({
           data: {
             personId: person.id,
             sourceUrl: urlResult.url,
@@ -143,10 +150,9 @@ export class EnrichmentService {
             brand: product.brand?.slice(0, 200) || null,
             priceRange: this.formatPriceRange(product),
           },
-        });
-        created.push(item);
-      }
-    }
+        }),
+      ),
+    );
 
     return { parsed: result.results, persisted: created };
   }
@@ -201,23 +207,27 @@ export class EnrichmentService {
       bounded.map((title) => ({ title })),
     );
 
-    const created = [];
-    let notFoundCount = 0;
-    for (let i = 0; i < bounded.length; i++) {
-      const result = results[i];
-      if (!result.productUrl) notFoundCount++;
-      const item = await this.prisma.wishlistItem.create({
-        data: {
-          personId: person.id,
-          eventId: event.id,
-          sourceUrl: result.productUrl,
-          productName: bounded[i],
-          priceRange: result.priceCents ? `$${(result.priceCents / 100).toFixed(2)}` : null,
-          imageUrl: result.imageUrl,
-        },
-      });
-      created.push(item);
-    }
+    // Run the creates concurrently instead of one sequential round trip per
+    // line (bounded to MAX_GIFT_LIST_ITEMS, so this is still a small batch).
+    const notFoundCount = bounded.reduce(
+      (count, _, i) => count + (results[i].productUrl ? 0 : 1),
+      0,
+    );
+    const created = await Promise.all(
+      bounded.map((title, i) => {
+        const result = results[i];
+        return this.prisma.wishlistItem.create({
+          data: {
+            personId: person.id,
+            eventId: event.id,
+            sourceUrl: result.productUrl,
+            productName: title,
+            priceRange: result.priceCents ? `$${(result.priceCents / 100).toFixed(2)}` : null,
+            imageUrl: result.imageUrl,
+          },
+        });
+      }),
+    );
 
     return {
       items: created,
@@ -282,17 +292,17 @@ export class EnrichmentService {
       where: { personId, source: "ai" },
     });
 
-    const tags = [];
-    for (const t of result.tags || []) {
-      const tag = await this.prisma.personTag.create({
-        data: {
-          personId,
-          tag: t.label.slice(0, 100),
-          source: "ai",
-        },
-      });
-      tags.push(tag);
-    }
+    const tags = await Promise.all(
+      (result.tags || []).map((t) =>
+        this.prisma.personTag.create({
+          data: {
+            personId,
+            tag: t.label.slice(0, 100),
+            source: "ai",
+          },
+        }),
+      ),
+    );
 
     // Set debounce
     await this.redis.setCachedSuggestions(debounceKey, "1", TAG_DEBOUNCE_S);
