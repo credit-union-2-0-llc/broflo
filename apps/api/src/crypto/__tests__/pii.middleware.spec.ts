@@ -64,6 +64,20 @@ describe("pii.middleware", () => {
       expect((rows[1].nested as { deep: string }).deep).toBe("Deep");
     });
 
+    it("decrypts encrypted string elements inside array PII fields (allergens/dietaryRestrictions)", () => {
+      const person = {
+        name: encrypt("Sam"),
+        allergens: [encrypt("peanuts"), encrypt("shellfish")],
+        dietaryRestrictions: [encrypt("vegan")],
+        hobbies: ["hiking", "reading"], // plaintext, non-PII array — untouched
+      };
+      decryptResult(person);
+      expect(person.name).toBe("Sam");
+      expect(person.allergens).toEqual(["peanuts", "shellfish"]);
+      expect(person.dietaryRestrictions).toEqual(["vegan"]);
+      expect(person.hobbies).toEqual(["hiking", "reading"]);
+    });
+
     it("is a no-op on null and primitives", () => {
       expect(() => decryptResult(null)).not.toThrow();
       expect(() => decryptResult("str")).not.toThrow();
@@ -104,6 +118,48 @@ describe("pii.middleware", () => {
       };
       expect(read.shippingName).toBe("Alex");
       expect(read.person.name).toBe("Sam");
+    });
+
+    it("encrypts PII written inside an interactive $transaction (the tx-client bypass)", async () => {
+      // Prisma hands a $transaction(async (tx) => …) callback a FRESH tx
+      // client whose delegates are distinct from the top-level ones — so a
+      // naive top-level-only patch leaves tx.person.create writing plaintext.
+      // This models that: the tx client's person delegate writes to its own
+      // sink, and the top-level patch must reach it via the $transaction wrap.
+      const makePersonDelegate = (sink: Record<string, unknown>) => ({
+        count: jest.fn(async () => 0),
+        create: jest.fn(async (args: { data: Record<string, unknown> }) => {
+          Object.assign(sink, args.data);
+          return { ...args.data };
+        }),
+      });
+
+      const txSink: Record<string, unknown> = {};
+      const txClient = { person: makePersonDelegate(txSink) };
+
+      const client = {
+        person: makePersonDelegate({}),
+        $transaction: (arg: unknown) =>
+          typeof arg === "function"
+            ? (arg as (tx: unknown) => unknown)(txClient)
+            : Promise.all(arg as unknown[]),
+      } as unknown as PrismaClient;
+
+      piiExtension(client);
+
+      const created = (await (client.$transaction as (fn: (tx: unknown) => unknown) => Promise<unknown>)(
+        (tx: unknown) =>
+          (tx as { person: { create: (a: unknown) => unknown } }).person.create({
+            data: { name: "Alex", notes: "secret note" },
+          }),
+      )) as Record<string, unknown>;
+
+      // What actually hit the DB inside the transaction is ciphertext...
+      expect(isEncrypted(txSink.name as string)).toBe(true);
+      expect(isEncrypted(txSink.notes as string)).toBe(true);
+      // ...but the caller still gets plaintext back.
+      expect(created.name).toBe("Alex");
+      expect(created.notes).toBe("secret note");
     });
   });
 });

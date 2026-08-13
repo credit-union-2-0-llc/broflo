@@ -5,7 +5,7 @@ import { encrypt, decrypt, isEncrypted, hasKey } from "./crypto";
 // PII-owning models below — never add a name that also exists as a
 // non-PII column on those models (it would be stored as ciphertext and
 // break equality filters).
-const PII_STRING_FIELDS = [
+export const PII_STRING_FIELDS = [
   "name",
   "notes",
   "foodPreferences",
@@ -18,11 +18,11 @@ const PII_STRING_FIELDS = [
   "shippingZip",
 ] as const;
 
-const PII_ARRAY_FIELDS = ["allergens", "dietaryRestrictions"] as const;
+export const PII_ARRAY_FIELDS = ["allergens", "dietaryRestrictions"] as const;
 
 // Models whose writes carry the PII fields above and must be encrypted.
 // Person (dossier), Order (recipient shipping), AgentJob (recipient shipping).
-const PII_WRITE_MODELS = ["person", "order", "agentJob"] as const;
+export const PII_WRITE_MODELS = ["person", "order", "agentJob"] as const;
 
 const WRITE_METHODS = ["create", "update", "upsert", "createMany"] as const;
 const READ_METHODS = [
@@ -60,7 +60,18 @@ export function encryptData(data: Record<string, unknown>): void {
 export function decryptResult(result: unknown, depth = 0): void {
   if (result == null || depth > MAX_DEPTH) return;
   if (Array.isArray(result)) {
-    for (const item of result) decryptResult(item, depth + 1);
+    // Decrypt encrypted string elements in place (e.g. Person.allergens /
+    // dietaryRestrictions, which encryptData stores as arrays of "enc:" values).
+    // Recursing per-item into a bare string would no-op — decryptResult only
+    // rewrites strings found as OBJECT values — so handle string elements here.
+    for (let i = 0; i < result.length; i++) {
+      const item = result[i];
+      if (typeof item === "string") {
+        if (isEncrypted(item)) result[i] = decrypt(item);
+      } else {
+        decryptResult(item, depth + 1);
+      }
+    }
     return;
   }
   if (typeof result !== "object") return;
@@ -121,16 +132,15 @@ function patchReadMethods(delegate: Record<string, unknown>): void {
 }
 
 /**
- * Register PII encryption on the Prisma client (in place; Prisma 6 removed
- * $use). Writes are encrypted only on the PII-owning models; reads are
- * decrypted on every model so PII surfaces correctly even when pulled through
- * a relation on a non-PII model.
+ * Patch a Prisma client (or interactive-transaction client) in place: encrypt
+ * writes on the PII-owning models, decrypt reads on every model so PII
+ * surfaces correctly even when pulled through a relation on a non-PII model.
+ * Works on both the long-lived PrismaClient and the short-lived `tx` client a
+ * `$transaction(async (tx) => …)` callback receives — the latter is a
+ * freshly-built object each call, so patching it is scoped to that one
+ * transaction.
  */
-export function piiExtension(prisma: PrismaClient): void {
-  if (!hasKey()) return;
-
-  const client = prisma as unknown as Record<string, Record<string, unknown>>;
-
+function applyPiiPatches(client: Record<string, Record<string, unknown>>): void {
   for (const modelKey of PII_WRITE_MODELS) {
     const delegate = client[modelKey];
     if (delegate) patchWriteMethods(delegate);
@@ -141,4 +151,37 @@ export function piiExtension(prisma: PrismaClient): void {
     const delegate = client[modelKey];
     if (delegate) patchReadMethods(delegate);
   }
+}
+
+/**
+ * Register PII encryption on the Prisma client (in place; Prisma 6 removed
+ * $use). Writes are encrypted only on the PII-owning models; reads are
+ * decrypted on every model so PII surfaces correctly even when pulled through
+ * a relation on a non-PII model.
+ */
+export function piiExtension(prisma: PrismaClient): void {
+  if (!hasKey()) return;
+
+  applyPiiPatches(prisma as unknown as Record<string, Record<string, unknown>>);
+
+  // An interactive $transaction hands its callback a FRESH tx client whose
+  // model delegates are NOT the ones patched above (verified: tx.person !==
+  // prisma.person), so any PII write via tx.person/order/agentJob.create|update
+  // inside a transaction would silently persist plaintext. Wrap $transaction so
+  // the tx client gets the same patches before the caller's callback runs. The
+  // array/sequential form builds its promises from the already-patched
+  // top-level delegates, so it's left untouched.
+  const self = prisma as unknown as Record<string, unknown>;
+  if (typeof self.$transaction !== "function") return;
+  const originalTx = (self.$transaction as (...a: unknown[]) => unknown).bind(prisma);
+  self.$transaction = (arg: unknown, ...rest: unknown[]) => {
+    if (typeof arg === "function") {
+      const cb = arg as (tx: unknown) => unknown;
+      return originalTx((tx: unknown) => {
+        applyPiiPatches(tx as Record<string, Record<string, unknown>>);
+        return cb(tx);
+      }, ...rest);
+    }
+    return originalTx(arg, ...rest);
+  };
 }
