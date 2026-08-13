@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { api } from "@/lib/api";
 import { ScoreboardStrip } from "@/components/layout/ScoreboardStrip";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -6,6 +7,14 @@ import { BottomTabBar } from "@/components/layout/BottomTabBar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
+
+  // A refresh token that's genuinely invalid (revoked, or from before a
+  // migration that couldn't carry old sessions forward) can never succeed
+  // on its own — every page load just fails the same way forever with no
+  // way out. Force a real re-login instead of leaving the user stuck.
+  if (session?.error === "RefreshTokenError") {
+    redirect("/login");
+  }
 
   let peopleCount = 0;
   let dueSoonCount = 0;
