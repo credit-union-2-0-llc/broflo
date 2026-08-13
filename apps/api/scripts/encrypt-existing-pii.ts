@@ -16,9 +16,13 @@
  *
  * Usage:
  *   Dry run (default — reports counts, writes nothing):
- *     PII_ENCRYPTION_KEY=<hex> DATABASE_URL=<url> npx tsx scripts/encrypt-existing-pii.ts
+ *     PII_ENCRYPTION_KEY=<hex> DATABASE_URL=<url> pnpm exec ts-node scripts/encrypt-existing-pii.ts
  *   Apply:
- *     PII_ENCRYPTION_KEY=<hex> DATABASE_URL=<url> npx tsx scripts/encrypt-existing-pii.ts --apply
+ *     PII_ENCRYPTION_KEY=<hex> DATABASE_URL=<url> pnpm exec ts-node scripts/encrypt-existing-pii.ts --apply
+ *
+ * In production, run via the "Backfill PII encryption (one-time)" GitHub
+ * Actions workflow rather than by hand — it has prod DATABASE_URL + fetches
+ * PII_ENCRYPTION_KEY from broflo-api's App Service settings.
  *
  * Safe to run multiple times — only ever encrypts values that aren't already
  * "enc:"-prefixed, so re-running is a no-op on already-migrated rows. Uses a

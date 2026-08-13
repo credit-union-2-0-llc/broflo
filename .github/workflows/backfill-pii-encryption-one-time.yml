@@ -1,0 +1,87 @@
+name: Backfill PII encryption (one-time)
+
+# One-off remediation for the PII-in-transactions fix (PR #115). PII writes
+# used to silently no-op inside Prisma interactive transactions, so the primary
+# add-a-person path and agent-order preview persisted PLAINTEXT name/notes/
+# shipping/allergens. The middleware fix encrypts everything going forward;
+# this backfills the plaintext rows that already exist on Person/Order/AgentJob.
+#
+# Runs scripts/encrypt-existing-pii.ts, which:
+#   - only ever encrypts values not already "enc:"-prefixed (idempotent — safe
+#     to run more than once; re-runs report 0 rows changed)
+#   - is DRY RUN by default; writes only when mode=apply
+#   - reads its own DATABASE_URL (secret) and fetches PII_ENCRYPTION_KEY from
+#     broflo-api's App Service settings at runtime (masked, never logged), so
+#     it encrypts with the exact key the app decrypts with.
+#
+# Recommended: dispatch once with mode=dry-run and read the counts, THEN
+# dispatch again with mode=apply. Delete this workflow file once it's been
+# run successfully in production.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry-run (report counts, write nothing) or apply (encrypt)"
+        required: true
+        type: choice
+        default: dry-run
+        options:
+          - dry-run
+          - apply
+
+permissions:
+  contents: read
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm exec prisma generate
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Backfill PII encryption
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          # Fetch the live key so we encrypt with exactly what the app decrypts
+          # with. Assigned straight to a var and masked — never echoed. The
+          # rg-broflo-scoped SP (AZURE_CREDENTIALS) can read this app setting.
+          KEY=$(az webapp config appsettings list \
+            --name broflo-api --resource-group rg-broflo \
+            --query "[?name=='PII_ENCRYPTION_KEY'].value | [0]" -o tsv)
+          if [ -z "$KEY" ]; then
+            echo "::error::PII_ENCRYPTION_KEY is not set on broflo-api — cannot backfill"
+            exit 1
+          fi
+          echo "::add-mask::$KEY"
+          if [ "$MODE" = "apply" ]; then
+            PII_ENCRYPTION_KEY="$KEY" pnpm exec ts-node scripts/encrypt-existing-pii.ts --apply
+          else
+            PII_ENCRYPTION_KEY="$KEY" pnpm exec ts-node scripts/encrypt-existing-pii.ts
+          fi
