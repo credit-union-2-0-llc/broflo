@@ -4,16 +4,12 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { EventsService } from "../events/events.service";
 
 const LEAD_DAYS = [30, 7, 1] as const;
 
 @Injectable()
 export class RemindersService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly eventsService: EventsService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async listActive(userId: string) {
     const today = new Date();
@@ -62,20 +58,29 @@ export class RemindersService {
     const horizon = new Date(today);
     horizon.setUTCDate(horizon.getUTCDate() + 30);
 
-    // Fetch all events for all users, including person for deletedAt check
+    // Reuses the same materialized next_occurrence column + index that
+    // EventsService.upcoming() queries on, instead of loading every event in
+    // the system and recomputing occurrences in JS. Safe: EventsScheduler's
+    // 1am refreshStaleRecurring() always runs before this 6am job, so
+    // next_occurrence is already rolled forward for every recurring event by
+    // the time this reads it.
     const events = await this.prisma.event.findMany({
-      include: { person: { select: { deletedAt: true } } },
+      where: {
+        nextOccurrence: { lte: horizon },
+        person: { deletedAt: null },
+      },
+      select: { id: true, userId: true, date: true, nextOccurrence: true },
     });
 
-    for (const event of events) {
-      // Skip events for soft-deleted persons
-      if (event.person.deletedAt) continue;
+    const rows: {
+      eventId: string;
+      userId: string;
+      leadDays: number;
+      scheduledFor: Date;
+    }[] = [];
 
-      const nextOcc = this.eventsService.computeNextOccurrence(
-        event.date,
-        event.isRecurring,
-        today,
-      );
+    for (const event of events) {
+      const nextOcc = event.nextOccurrence ?? event.date;
 
       for (const lead of LEAD_DAYS) {
         const scheduledFor = new Date(nextOcc);
@@ -84,28 +89,19 @@ export class RemindersService {
         // Only create reminders that are within the 30-day window from today
         if (scheduledFor < today || scheduledFor > horizon) continue;
 
-        // Upsert to avoid duplicates (unique constraint handles race conditions)
-        try {
-          await this.prisma.reminder.upsert({
-            where: {
-              eventId_leadDays_scheduledFor: {
-                eventId: event.id,
-                leadDays: lead,
-                scheduledFor,
-              },
-            },
-            update: {},
-            create: {
-              eventId: event.id,
-              userId: event.userId,
-              leadDays: lead,
-              scheduledFor,
-            },
-          });
-        } catch {
-          // Unique constraint violation on concurrent runs -- safe to ignore
-        }
+        rows.push({ eventId: event.id, userId: event.userId, leadDays: lead, scheduledFor });
       }
     }
+
+    if (rows.length === 0) return;
+
+    // skipDuplicates does the same job the old upsert's no-op `update: {}`
+    // body did (create-if-missing, ignore if the unique constraint already
+    // has this row) — one batched insert instead of up to events.length * 3
+    // sequential round trips.
+    await this.prisma.reminder.createMany({
+      data: rows,
+      skipDuplicates: true,
+    });
   }
 }
