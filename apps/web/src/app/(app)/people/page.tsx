@@ -12,10 +12,31 @@ export default async function PeoplePage() {
   if (!session) redirect("/login");
 
   let people: Awaited<ReturnType<typeof api.listPersons>> = [];
+  let error = false;
   try {
     people = await api.listPersons(session.accessToken);
   } catch {
-    // token may be expired — show empty state
+    error = true;
+  }
+
+  if (error) {
+    return (
+      <>
+        <SectionHeader
+          title="Assets"
+          count={0}
+          countLabel="people"
+          actionLabel="Add Asset +"
+          actionHref="/people/new"
+        />
+        <div className="text-center py-12">
+          <p className="text-sm text-destructive">{VOICE.errors.peopleLoad}</p>
+          <Link href="/people" className="text-sm text-amber hover:underline mt-2 inline-block">
+            Try Again
+          </Link>
+        </div>
+      </>
+    );
   }
 
   return (

@@ -91,6 +91,7 @@ export const VOICE = {
 
   errors: {
     eventsLoad: "Something went wrong loading your events. Try again.",
+    peopleLoad: "Something went wrong loading your people. Try again.",
     generic: "Something went wrong. Try again.",
     aiTimeout:
       "The gift oracle is temporarily offline. Even we have bad days.",

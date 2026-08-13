@@ -44,7 +44,15 @@ export class AuthController {
     return this.auth.verifyOtp(dto);
   }
 
+  // Refresh has no side effects on failure (no email, no account lockout)
+  // and a single page load can legitimately trigger several near-simultaneous
+  // refresh attempts (parallel data-fetching requests that all notice the
+  // same expired token). The shared global default (10/min per IP) was
+  // getting exhausted by ordinary usage, cascading into every subsequent
+  // request failing 401 for the rest of the window — indistinguishable from
+  // "you have no data" on screens that swallow fetch errors.
   @Public()
+  @Throttle({ short: { ttl: 60000, limit: parseInt(process.env.THROTTLE_REFRESH_LIMIT || "30", 10) } })
   @Post("refresh")
   @HttpCode(HttpStatus.OK)
   async refresh(@Body() dto: RefreshDto) {
