@@ -1,5 +1,6 @@
 """Broflo Browser Agent Service — purchases from any retailer via managed browser sessions."""
 
+import hmac
 import logging
 
 from fastapi import FastAPI, HTTPException, Header
@@ -31,7 +32,9 @@ else:
 
 
 def _verify_key(key: str) -> None:
-    if key != SERVICE_KEY:
+    # Constant-time compare so a timing side channel can't leak the key; reject
+    # outright when unconfigured rather than passing an empty-vs-empty compare.
+    if not SERVICE_KEY or not hmac.compare_digest(key, SERVICE_KEY):
         raise HTTPException(403, "Invalid service key")
 
 

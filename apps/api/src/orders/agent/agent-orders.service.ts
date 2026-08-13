@@ -53,7 +53,7 @@ export class AgentOrdersService {
       throw new BadRequestException('No retailer URL available for this suggestion');
     }
 
-    const retailerDomain = new URL(retailerUrl).hostname.replace('www.', '');
+    const retailerDomain = new URL(retailerUrl).hostname.replace(/^www\./, '');
 
     // Check if retailer is supported
     const supported = await this.retailerProfile.isSupported(retailerDomain);
@@ -208,6 +208,19 @@ export class AgentOrdersService {
       personId = suggestion?.personId ?? null;
     }
 
+    // personId is a required FK to Person.id and is only recoverable via the
+    // suggestion. If the suggestion was deleted between preview and place,
+    // there is no person to attribute the order to — bail out NOW, before the
+    // virtual card is minted and money moves. The old fallback shoved
+    // job.shippingName (a person's NAME, not a UUID) into personId, which
+    // failed the FK constraint on order.create AFTER the purchase completed,
+    // silently losing the order record for a charge that already went through.
+    if (!personId) {
+      throw new BadRequestException(
+        'The gift suggestion this order was based on no longer exists. Nothing was charged — recreate the suggestion and try again.',
+      );
+    }
+
     // Create virtual card for this purchase. If the mint fails, no money has
     // moved — release the job back to previewing so the user can retry cleanly.
     let virtualCard: Awaited<
@@ -263,7 +276,7 @@ export class AgentOrdersService {
         const order = await this.prisma.order.create({
           data: {
             userId: user.id,
-            personId: personId || job.shippingName,
+            personId,
             eventId: null,
             retailerKey: 'browser-agent',
             retailerProductId: result.found_product_url || job.retailerUrl,

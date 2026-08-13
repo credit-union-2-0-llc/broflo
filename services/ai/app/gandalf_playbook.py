@@ -7,6 +7,8 @@ Gandalf's gift curve is gated true AND `PLAYBOOK_ENABLED=true` is set in the env
 """
 import os, json, urllib.request
 
+from .sanitize import sanitize_scraped_field
+
 GANDALF_URL = os.environ.get("GANDALF_URL", "")   # required in the environment; no built-in default
 GANDALF_DOMAIN = os.environ.get("GANDALF_DOMAIN", "gifts")   # Broflo=gifts, fantasy app=fantasy-football, travel app=travel
 PLAYBOOK_ENABLED = os.environ.get("PLAYBOOK_ENABLED", "false").lower() == "true"
@@ -34,4 +36,13 @@ def lessons_block(profile: dict, k: int = 6) -> str:
     ranked = sorted(pb["lessons"],
                     key=lambda l: (len(words & set(l["text"].lower().split())), l.get("confidence", 0)),
                     reverse=True)
-    return "\n".join(f"- {l['text']}" for l in ranked[:k])
+    # Gandalf lessons are external content spliced verbatim into the LLM prompt
+    # ("apply where relevant"), so they get the same T3/T7 scrubbing every other
+    # untrusted free-text source in prompt.py gets — a compromised or malformed
+    # Gandalf instance shouldn't be able to inject instructions via a lesson.
+    lines = []
+    for l in ranked[:k]:
+        clean = sanitize_scraped_field(l["text"], max_length=300)
+        if clean:
+            lines.append(f"- {clean}")
+    return "\n".join(lines)

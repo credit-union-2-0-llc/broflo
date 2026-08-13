@@ -1,5 +1,6 @@
 """Broflo AI Service — Gift Brain suggestion + enrichment endpoints."""
 
+import hmac
 import json
 import time
 import logging
@@ -37,6 +38,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _verify_service_key(key: str) -> None:
+    # Constant-time compare so a timing side channel can't be used to recover
+    # the key byte by byte. Rejects outright when the key is unconfigured
+    # rather than letting an empty-vs-empty comparison pass.
+    if not SERVICE_KEY or not hmac.compare_digest(key, SERVICE_KEY):
+        raise HTTPException(403, "Invalid service key")
 
 
 def _get_client() -> anthropic.Anthropic:
@@ -96,8 +105,7 @@ async def suggest(
     x_service_key: str = Header(alias="X-Service-Key"),
 ) -> SuggestResponse:
     """Generate AI gift suggestions."""
-    if x_service_key != SERVICE_KEY:
-        raise HTTPException(403, "Invalid service key")
+    _verify_service_key(x_service_key)
 
     model = TIER_MODELS[req.tier]
     system_prompt = build_system_prompt(req)
@@ -164,8 +172,7 @@ async def parse_wishlist_endpoint(
     x_service_key: str = Header(alias="X-Service-Key"),
 ) -> ParseWishlistResponse:
     """Parse wishlist/product URLs and extract structured product data."""
-    if x_service_key != SERVICE_KEY:
-        raise HTTPException(403, "Invalid service key")
+    _verify_service_key(x_service_key)
     try:
         return await parse_wishlist(req)
     except anthropic.APITimeoutError:
@@ -183,8 +190,7 @@ async def generate_tags_endpoint(
     x_service_key: str = Header(alias="X-Service-Key"),
 ) -> GenerateTagsResponse:
     """Generate interest tags from dossier text fields."""
-    if x_service_key != SERVICE_KEY:
-        raise HTTPException(403, "Invalid service key")
+    _verify_service_key(x_service_key)
     try:
         return await generate_tags(req)
     except (json.JSONDecodeError, ValueError, KeyError) as e:
@@ -205,8 +211,7 @@ async def generate_insight_endpoint(
     x_service_key: str = Header(alias="X-Service-Key"),
 ) -> GenerateInsightResponse:
     """Generate a Gift Profile insight paragraph (Elite tier only)."""
-    if x_service_key != SERVICE_KEY:
-        raise HTTPException(403, "Invalid service key")
+    _verify_service_key(x_service_key)
     try:
         return await generate_insight(req)
     except ValueError as e:
@@ -232,8 +237,7 @@ async def analyze_photo_endpoint(
     x_service_key: str = Header(alias="X-Service-Key"),
 ) -> AnalyzePhotoResponse:
     """Analyze a photo using Claude Vision to extract gift signals."""
-    if x_service_key != SERVICE_KEY:
-        raise HTTPException(403, "Invalid service key")
+    _verify_service_key(x_service_key)
     try:
         return await analyze_photo(req)
     except ValueError as e:
