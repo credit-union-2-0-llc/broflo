@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Users, Plus } from "lucide-react";
 import { SectionHeader } from "@/components/radar/SectionHeader";
 import { PlayerCard } from "@/components/dossier/PlayerCard";
+import { RetryButton } from "@/components/ui/retry-button";
 
 export default async function PeoplePage() {
   const session = await auth();
@@ -31,9 +32,7 @@ export default async function PeoplePage() {
         />
         <div className="text-center py-12">
           <p className="text-sm text-destructive">{VOICE.errors.peopleLoad}</p>
-          <Link href="/people" className="text-sm text-amber hover:underline mt-2 inline-block">
-            Try Again
-          </Link>
+          <RetryButton className="text-sm text-amber hover:underline mt-2 inline-block" />
         </div>
       </>
     );
