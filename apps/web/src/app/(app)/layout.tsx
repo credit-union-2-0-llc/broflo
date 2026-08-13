@@ -21,12 +21,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (session?.accessToken) {
     try {
-      const [people, eventsRes] = await Promise.all([
+      // This layout wraps every authenticated page, so these run on every
+      // navigation. The header only needs the due-soon COUNT, so ask the API
+      // for exactly that (days=1 → meta.total) instead of pulling up to 100
+      // event rows and filtering them in JS every time. days=1 matches the old
+      // `daysUntil <= 1` filter: upcoming() bounds on `nextOccurrence <= today
+      // + days` with no lower bound, so overdue events are counted the same way.
+      const [people, dueSoonRes] = await Promise.all([
         api.listPersons(session.accessToken),
-        api.getUpcomingEvents(session.accessToken, { limit: 100 }),
+        api.getUpcomingEvents(session.accessToken, { days: 1, limit: 1 }),
       ]);
       peopleCount = people.length;
-      dueSoonCount = eventsRes.data.filter((e) => e.daysUntil <= 1).length;
+      dueSoonCount = dueSoonRes.meta.total;
     } catch {
       // Graceful degradation — header shows zero counts
     }
