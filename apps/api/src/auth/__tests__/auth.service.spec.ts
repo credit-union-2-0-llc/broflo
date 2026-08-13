@@ -10,6 +10,13 @@ describe("AuthService", () => {
   let service: AuthService;
   let prisma: {
     user: { findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
+    refreshToken: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      delete: jest.Mock;
+      deleteMany: jest.Mock;
+    };
+    revokedToken: { create: jest.Mock };
   };
   let redis: {
     getOtp: jest.Mock;
@@ -23,21 +30,55 @@ describe("AuthService", () => {
   let email: { sendOtpCode: jest.Mock };
 
   const EMAIL = "user@example.com";
+  const USER = {
+    id: "user-1",
+    email: EMAIL,
+    isActive: true,
+    name: null,
+    avatarUrl: null,
+    subscriptionTier: "free",
+  };
+
+  // Real in-memory store keyed by tokenHash, so create/findUnique/delete
+  // across multiple issueTokens()/refresh() calls in one test behave like
+  // an actual table with real rows instead of independently-stubbed calls —
+  // that's the only way to catch "does refreshing device A touch device B".
+  let refreshTokenStore: Map<string, { id: string; userId: string; tokenHash: string; expiresAt: Date }>;
 
   beforeEach(async () => {
+    refreshTokenStore = new Map();
+    let nextId = 1;
+
     prisma = {
       user: {
-        findUnique: jest.fn().mockResolvedValue({
-          id: "user-1",
-          email: EMAIL,
-          isActive: true,
-          name: null,
-          avatarUrl: null,
-          subscriptionTier: "free",
-        }),
+        findUnique: jest.fn().mockResolvedValue(USER),
         create: jest.fn(),
         update: jest.fn().mockResolvedValue({}),
       },
+      refreshToken: {
+        create: jest.fn(({ data }) => {
+          const row = { id: `rt-${nextId++}`, userId: data.userId, tokenHash: data.tokenHash, expiresAt: data.expiresAt };
+          refreshTokenStore.set(row.tokenHash, row);
+          return Promise.resolve(row);
+        }),
+        findUnique: jest.fn(({ where }) => {
+          const row = refreshTokenStore.get(where.tokenHash);
+          return Promise.resolve(row ? { ...row, user: USER } : null);
+        }),
+        delete: jest.fn(({ where }) => {
+          for (const [hash, row] of refreshTokenStore) {
+            if (row.id === where.id) refreshTokenStore.delete(hash);
+          }
+          return Promise.resolve({});
+        }),
+        deleteMany: jest.fn(({ where }) => {
+          for (const [hash, row] of refreshTokenStore) {
+            if (row.userId === where.userId) refreshTokenStore.delete(hash);
+          }
+          return Promise.resolve({ count: 0 });
+        }),
+      },
+      revokedToken: { create: jest.fn().mockResolvedValue({}) },
     };
     redis = {
       getOtp: jest.fn().mockResolvedValue("123456"),
@@ -101,6 +142,44 @@ describe("AuthService", () => {
       await expect(
         service.verifyOtp({ email: EMAIL, code: "123456" }),
       ).rejects.toThrow(/Invalid or expired code/);
+    });
+  });
+
+  describe("refresh — per-device tokens", () => {
+    it("lets two independent logins (e.g. web + mobile) both keep working", async () => {
+      const login1 = await service.verifyOtp({ email: EMAIL, code: "123456" });
+      const login2 = await service.verifyOtp({ email: EMAIL, code: "123456" });
+
+      // Logging in a second time must not invalidate the first device's
+      // refresh token — this is exactly the bug: a single refreshTokenHash
+      // column meant the second login silently kicked the first one out.
+      await expect(service.refresh(login1.refreshToken)).resolves.toBeDefined();
+      await expect(service.refresh(login2.refreshToken)).resolves.toBeDefined();
+    });
+
+    it("refreshing one device's token does not invalidate a different device's token", async () => {
+      const login1 = await service.verifyOtp({ email: EMAIL, code: "123456" });
+      const login2 = await service.verifyOtp({ email: EMAIL, code: "123456" });
+
+      await service.refresh(login1.refreshToken);
+
+      // login2's token was never touched by login1's refresh — must still work.
+      await expect(service.refresh(login2.refreshToken)).resolves.toBeDefined();
+    });
+
+    it("rotates the refresh token — the old one can't be reused after a refresh", async () => {
+      const login = await service.verifyOtp({ email: EMAIL, code: "123456" });
+      await service.refresh(login.refreshToken);
+
+      await expect(service.refresh(login.refreshToken)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+    });
+
+    it("rejects an unrecognized refresh token", async () => {
+      await expect(service.refresh("not-a-real-token")).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
     });
   });
 });

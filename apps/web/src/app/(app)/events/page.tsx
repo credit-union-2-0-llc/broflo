@@ -1,12 +1,12 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { api } from "@/lib/api";
 import type { UpcomingEvent } from "@/lib/api";
 import { VOICE } from "@broflo/shared";
 import { Calendar } from "lucide-react";
 import { EventCard } from "@/components/event-card";
 import { EventsPageClient } from "./events-page-client";
+import { RetryButton } from "@/components/ui/retry-button";
 
 export default async function EventsPage() {
   const session = await auth();
@@ -41,9 +41,7 @@ export default async function EventsPage() {
           </div>
           <div className="text-center py-12">
             <p className="text-sm text-destructive">{VOICE.errors.eventsLoad}</p>
-            <Link href="/events" className="text-sm text-amber hover:underline mt-2 inline-block">
-              Try Again
-            </Link>
+            <RetryButton className="text-sm text-amber hover:underline mt-2 inline-block" />
           </div>
         </div>
       </div>

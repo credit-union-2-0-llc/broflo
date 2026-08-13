@@ -89,16 +89,23 @@ export class AuthService {
     return crypto.createHash("sha256").update(token).digest("hex");
   }
 
+  private readonly REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
   async refresh(refreshToken: string) {
     const hash = this.hashToken(refreshToken);
-    const user = await this.prisma.user.findFirst({
-      where: { refreshTokenHash: hash },
+    const stored = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash: hash },
+      include: { user: true },
     });
-    if (!user || !user.isActive) {
+    if (!stored || stored.expiresAt < new Date() || !stored.user.isActive) {
       throw new UnauthorizedException("Invalid refresh token");
     }
 
-    return this.issueTokens(user);
+    // Rotate: this specific token is single-use. Other devices' rows are
+    // untouched — that's the whole point of per-device tokens.
+    await this.prisma.refreshToken.delete({ where: { id: stored.id } });
+
+    return this.issueTokens(stored.user);
   }
 
   async logout(userId: string, jti: string, exp: number) {
@@ -109,10 +116,11 @@ export class AuthService {
       },
     });
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { refreshTokenHash: null },
-    });
+    // Logout only has the access token's claims, not which specific refresh
+    // token belongs to this device, so this still logs out every device —
+    // same behavior as before. Narrowing this to just the current device
+    // would need the client to also send its refresh token on logout.
+    await this.prisma.refreshToken.deleteMany({ where: { userId } });
   }
 
   private async issueTokens(user: User) {
@@ -122,9 +130,12 @@ export class AuthService {
     const accessToken = this.jwt.sign(payload, { expiresIn: "15m" });
     const refreshToken = uuidv4();
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { refreshTokenHash: this.hashToken(refreshToken) },
+    await this.prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: this.hashToken(refreshToken),
+        expiresAt: new Date(Date.now() + this.REFRESH_TOKEN_TTL_MS),
+      },
     });
 
     return {

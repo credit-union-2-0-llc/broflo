@@ -12,7 +12,6 @@ model User {
   id               String    @id @default(uuid())
   email            String    @unique
   name             String?
-  refreshTokenHash String?   @map("refresh_token_hash")
   avatarUrl        String?   @map("avatar_url")
   subscriptionTier      String    @default("free") @map("subscription_tier")
   stripeCustomerId      String?   @unique @map("stripe_customer_id")
@@ -39,8 +38,26 @@ model User {
   personPhotos     PersonPhoto[]
   familyGroupOwned FamilyGroup?
   familyMembership FamilyMembership?
+  refreshTokens    RefreshToken[]
 
   @@map("users")
+}
+
+// One row per logged-in device/browser, not one column per user — a single
+// refreshTokenHash on User meant logging in on a second device silently
+// invalidated every other device's session the moment it refreshed, since
+// each login/refresh overwrote the same slot.
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
 }
 
 model RevokedToken {
