@@ -239,23 +239,37 @@ describe("AuthService", () => {
     });
 
     describe("signup", () => {
-      it("creates a new user with a hashed password and sends a verification email", async () => {
+      it("does NOT persist the password at signup — it rides the verify token (pre-hijack defense)", async () => {
         prisma.user.findUnique.mockResolvedValue(null);
         await service.signup(EMAIL, "correct-horse");
 
-        const created = prisma.user.create.mock.calls[0][0].data;
-        expect(created.email).toBe(EMAIL);
-        expect(created.passwordHash).toBeDefined();
-        expect(created.passwordHash).not.toBe("correct-horse"); // hashed, not plaintext
-        expect(created.emailVerifiedAt).toBeUndefined(); // starts unverified
-        expect(email.sendVerificationEmail).toHaveBeenCalled();
+        // No account write happens at signup at all.
+        expect(prisma.user.create).not.toHaveBeenCalled();
+        expect(prisma.user.update).not.toHaveBeenCalled();
+
+        // The pending (hashed, not plaintext) password is stashed in the token.
+        const [, payloadRaw] = redis.setEmailVerifyToken.mock.calls[0];
+        const payload = JSON.parse(payloadRaw);
+        expect(payload.email).toBe(EMAIL);
+        expect(payload.passwordHash).toBeDefined();
+        expect(payload.passwordHash).not.toBe("correct-horse");
       });
 
-      it("is enumeration-safe: an existing email neither errors nor overwrites the password", async () => {
+      it("does not write the attacker's password onto an existing UNVERIFIED account", async () => {
+        // The core pre-hijack case: signing up someone else's unverified email
+        // must not leave a password on the account they don't control.
+        prisma.user.findUnique.mockResolvedValue({ ...USER, passwordHash: null, emailVerifiedAt: null });
+        await expect(service.signup(EMAIL, "attacker-chosen")).resolves.toEqual({ ok: true });
+        expect(prisma.user.update).not.toHaveBeenCalled();
+        expect(prisma.user.create).not.toHaveBeenCalled();
+      });
+
+      it("is enumeration-safe: an existing VERIFIED email neither errors nor sends anything", async () => {
         prisma.user.findUnique.mockResolvedValue({ ...USER, passwordHash: "existing" });
         await expect(service.signup(EMAIL, "attacker-chosen")).resolves.toEqual({ ok: true });
         expect(prisma.user.create).not.toHaveBeenCalled();
         expect(prisma.user.update).not.toHaveBeenCalled();
+        expect(redis.setEmailVerifyToken).not.toHaveBeenCalled();
       });
     });
 
@@ -301,13 +315,34 @@ describe("AuthService", () => {
     });
 
     describe("verifyEmail", () => {
-      it("marks the account verified for a valid token and rejects an invalid one", async () => {
-        redis.consumeEmailVerifyToken.mockResolvedValue(EMAIL);
-        await expect(service.verifyEmail("good-token")).resolves.toEqual({ verified: true, email: EMAIL });
-        expect(prisma.user.updateMany).toHaveBeenCalledWith(
-          expect.objectContaining({ where: { email: EMAIL, emailVerifiedAt: null } }),
+      it("creates a brand-new account with the pending password when the link is clicked", async () => {
+        const pendingHash = await hashOf("correct-horse");
+        redis.consumeEmailVerifyToken.mockResolvedValue(
+          JSON.stringify({ email: EMAIL, passwordHash: pendingHash }),
         );
+        prisma.user.findUnique.mockResolvedValue(null); // no account yet
 
+        await expect(service.verifyEmail("good-token")).resolves.toEqual({ verified: true, email: EMAIL });
+        const created = prisma.user.create.mock.calls.at(-1)![0].data;
+        expect(created.email).toBe(EMAIL);
+        expect(created.passwordHash).toBe(pendingHash);
+        expect(created.emailVerifiedAt).toEqual(expect.any(Date));
+      });
+
+      it("applies the pending password to an existing unverified account on verify", async () => {
+        const pendingHash = await hashOf("correct-horse");
+        redis.consumeEmailVerifyToken.mockResolvedValue(
+          JSON.stringify({ email: EMAIL, passwordHash: pendingHash }),
+        );
+        prisma.user.findUnique.mockResolvedValue({ ...USER, passwordHash: null, emailVerifiedAt: null });
+
+        await service.verifyEmail("good-token");
+        const data = prisma.user.update.mock.calls.at(-1)![0].data;
+        expect(data.passwordHash).toBe(pendingHash);
+        expect(data.emailVerifiedAt).toEqual(expect.any(Date));
+      });
+
+      it("rejects an invalid/expired token", async () => {
         redis.consumeEmailVerifyToken.mockResolvedValue(null);
         await expect(service.verifyEmail("bad-token")).rejects.toThrow(/invalid or has expired/i);
       });

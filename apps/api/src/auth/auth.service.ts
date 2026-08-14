@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   UnauthorizedException,
   BadRequestException,
   ForbiddenException,
@@ -27,6 +28,8 @@ function webUrl(): string {
 
 @Injectable()
 export class AuthService {
+  private readonly log = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -40,24 +43,27 @@ export class AuthService {
 
   async signup(email: string, password: string): Promise<{ ok: true }> {
     const emailLower = email.toLowerCase();
+
+    // Always hash (even when we won't use it) so response time doesn't reveal
+    // whether the account already exists — same reason login uses DUMMY_HASH.
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+
     const existing = await this.prisma.user.findUnique({ where: { email: emailLower } });
 
-    // Enumeration-safe: always return the same shape. Never overwrite an
-    // existing account's password here (that would be account takeover) — an
-    // existing user who wants a password uses forgot-password instead. We just
-    // (re)send a verification link for genuinely new, unverified accounts.
-    if (existing) {
-      if (!existing.emailVerifiedAt) {
-        await this.sendVerification(emailLower);
-      }
+    // Account pre-hijack defense: the password is NEVER written to the account
+    // at signup. It rides inside the (inbox-delivered) verification token and is
+    // only applied in verifyEmail — so an attacker who signs up someone else's
+    // address can't leave a password sitting on the account they don't control.
+    // Enumeration-safe: identical response and (fire-and-forget) email timing
+    // regardless of whether the account exists.
+    if (existing?.emailVerifiedAt) {
+      // Already a real, verified account. Do nothing (don't reveal it, don't
+      // touch the password — they log in or use forgot-password).
       return { ok: true };
     }
-
-    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-    await this.prisma.user.create({
-      data: { email: emailLower, passwordHash },
-    });
-    await this.sendVerification(emailLower);
+    // New email, or an existing-but-unverified one: send a verification link
+    // that will set THIS password when the real inbox owner clicks it.
+    this.sendVerification(emailLower, passwordHash);
     return { ok: true };
   }
 
@@ -87,7 +93,10 @@ export class AuthService {
 
     // Verify-before-login: the account exists and the password is correct, so
     // telling them to verify is safe and actionable (not an enumeration leak).
+    // The password was RIGHT, so clear the lockout counter first — otherwise a
+    // legit unverified user self-locks after 10 tries and can't even see this.
     if (!user.emailVerifiedAt) {
+      await this.redis.clearLoginAttempts(emailLower);
       throw new ForbiddenException(
         "Please verify your email first — check your inbox for the confirmation link.",
       );
@@ -114,24 +123,48 @@ export class AuthService {
   // Email verification
   // ─────────────────────────────────────────────────────────────
 
-  private async sendVerification(emailLower: string): Promise<void> {
+  // Fire-and-forget on purpose: the response returns before delivery, so its
+  // timing never depends on whether an email was actually sent (enumeration).
+  // Delivery failures are logged, not surfaced.
+  private sendVerification(emailLower: string, pendingPasswordHash?: string): void {
     const token = crypto.randomBytes(32).toString("hex");
-    await this.redis.setEmailVerifyToken(token, emailLower);
-    await this.email.sendVerificationEmail(
-      emailLower,
-      `${webUrl()}/verify-email?token=${token}`,
-    );
+    const payload = JSON.stringify({ email: emailLower, passwordHash: pendingPasswordHash ?? null });
+    void this.redis
+      .setEmailVerifyToken(token, payload)
+      .then(() =>
+        this.email.sendVerificationEmail(emailLower, `${webUrl()}/verify-email?token=${token}`),
+      )
+      .catch((err) => this.log.error(`Verification email to ${emailLower} failed: ${err}`));
   }
 
   async verifyEmail(token: string): Promise<{ verified: true; email: string }> {
-    const emailLower = await this.redis.consumeEmailVerifyToken(token);
-    if (!emailLower) {
+    const raw = await this.redis.consumeEmailVerifyToken(token);
+    if (!raw) {
       throw new BadRequestException("This link is invalid or has expired.");
     }
-    await this.prisma.user.updateMany({
-      where: { email: emailLower, emailVerifiedAt: null },
-      data: { emailVerifiedAt: new Date() },
-    });
+    const { email: emailLower, passwordHash } = JSON.parse(raw) as {
+      email: string;
+      passwordHash: string | null;
+    };
+
+    // Apply the pending password (if any) only now — email ownership is proven.
+    // Create the account here for a brand-new signup, or verify + set the
+    // password on a pre-existing unverified one.
+    const existing = await this.prisma.user.findUnique({ where: { email: emailLower } });
+    if (!existing) {
+      await this.prisma.user.create({
+        data: { email: emailLower, passwordHash, emailVerifiedAt: new Date() },
+      });
+    } else {
+      await this.prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          emailVerifiedAt: existing.emailVerifiedAt ?? new Date(),
+          // Only set the password from a signup token; never null an existing one.
+          ...(passwordHash ? { passwordHash } : {}),
+        },
+      });
+    }
     return { verified: true, email: emailLower };
   }
 
@@ -139,9 +172,10 @@ export class AuthService {
     const emailLower = email.toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email: emailLower } });
     // Enumeration-safe: only actually send if the account exists and isn't
-    // already verified, but always return the same response.
+    // already verified (fire-and-forget, so timing doesn't leak either way).
+    // No pending password — a resend just re-confirms the address.
     if (user && !user.emailVerifiedAt) {
-      await this.sendVerification(emailLower);
+      this.sendVerification(emailLower);
     }
     return { ok: true };
   }
@@ -155,11 +189,14 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { email: emailLower } });
     if (user) {
       const token = crypto.randomBytes(32).toString("hex");
-      await this.redis.setPasswordResetToken(token, user.id);
-      await this.email.sendPasswordResetEmail(
-        emailLower,
-        `${webUrl()}/reset-password?token=${token}`,
-      );
+      // Fire-and-forget so response timing doesn't reveal whether the account
+      // exists (the send only happens when it does).
+      void this.redis
+        .setPasswordResetToken(token, user.id)
+        .then(() =>
+          this.email.sendPasswordResetEmail(emailLower, `${webUrl()}/reset-password?token=${token}`),
+        )
+        .catch((err) => this.log.error(`Password-reset email to ${emailLower} failed: ${err}`));
     }
     // Always the same response, whether or not the email exists.
     return { ok: true };
