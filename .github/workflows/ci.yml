@@ -110,6 +110,19 @@ jobs:
           # fallback, so every browser's client-side calls (login, photo
           # upload) tried to reach the visitor's own machine and failed.
           NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          # Same build-time-inlining rule for the Stripe price IDs the /upgrade
+          # page passes to /billing/checkout-session. These are set on the
+          # broflo-web App Service, but that's runtime-only — without them here
+          # the client bundle baked in `undefined`, so every "Get Pro/Elite"
+          # button hit the `!priceId` guard and toasted "not available for
+          # checkout", i.e. checkout was dead for ALL tiers. Price IDs are
+          # public identifiers (they ship in client JS by design), so they live
+          # as plain repo vars, not secrets. (No Family price IDs exist yet, so
+          # the Family card stays hidden until they're added.)
+          NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID: ${{ vars.NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID }}
+          NEXT_PUBLIC_STRIPE_PRO_ANNUAL_PRICE_ID: ${{ vars.NEXT_PUBLIC_STRIPE_PRO_ANNUAL_PRICE_ID }}
+          NEXT_PUBLIC_STRIPE_ELITE_MONTHLY_PRICE_ID: ${{ vars.NEXT_PUBLIC_STRIPE_ELITE_MONTHLY_PRICE_ID }}
+          NEXT_PUBLIC_STRIPE_ELITE_ANNUAL_PRICE_ID: ${{ vars.NEXT_PUBLIC_STRIPE_ELITE_ANNUAL_PRICE_ID }}
 
       - name: Prepare deploy package
         run: |

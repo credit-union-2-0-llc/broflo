@@ -71,6 +71,14 @@ const ANNUAL_PRICE_ID_ENV: Record<string, string | undefined> = {
   family: process.env.NEXT_PUBLIC_STRIPE_FAMILY_ANNUAL_PRICE_ID,
 };
 
+// Only show tiers a user can actually buy. Family has no Stripe price IDs yet,
+// so its checkout dead-ends ("not available, contact support") — hide the card
+// until those env vars exist. Self-healing: add the Family price IDs and the
+// card reappears with no code change.
+const VISIBLE_TIERS = (["free", "pro", "elite", "family"] as const).filter(
+  (t) => t !== "family" || Boolean(MONTHLY_PRICE_ID_ENV.family || ANNUAL_PRICE_ID_ENV.family),
+);
+
 async function startCheckout(priceId: string, token: string) {
   const res = await fetch(`${API_URL}/billing/checkout-session`, {
     method: "POST",
@@ -148,8 +156,11 @@ function UpgradeContent() {
         )}
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {(["free", "pro", "elite", "family"] as const).map((tier) => {
+      <div className={cn(
+        "grid gap-6 sm:grid-cols-2",
+        VISIBLE_TIERS.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3",
+      )}>
+        {VISIBLE_TIERS.map((tier) => {
           const plan = SUBSCRIPTION_PLANS[tier];
           const isCurrent = currentTier === tier;
           const isHighlighted = tier === "pro";

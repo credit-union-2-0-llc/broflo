@@ -142,7 +142,20 @@ export class EntitlementsService {
     const match = plans.find(
       (p) => p.stripePriceIdMonthly === priceId || p.stripePriceIdAnnual === priceId,
     );
-    return match?.key ?? "pro";
+    if (!match) {
+      // An unrecognized price must never silently grant a paid tier. This used
+      // to fall through to "pro", so a real Elite (or future Family) purchase
+      // whose price ID wasn't seeded into Plan would be mis-tiered down to Pro
+      // — the buyer pays for one tier and quietly gets another. Fail safe to
+      // "free" and log loudly so the misconfiguration surfaces (a shortchanged
+      // customer + an error log) instead of hiding as a wrong-but-plausible tier.
+      this.log.error(
+        `tierFromPriceId: no Plan matches Stripe price ${priceId} — defaulting to "free". ` +
+          `Check that Plan.stripePriceId* rows are seeded from the STRIPE_*_PRICE_ID env vars.`,
+      );
+      return "free";
+    }
+    return match.key;
   }
 
   // --- Admin writes ---

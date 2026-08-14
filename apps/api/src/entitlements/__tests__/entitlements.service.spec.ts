@@ -205,9 +205,11 @@ describe("EntitlementsService", () => {
       expect(await service.tierFromPriceId(undefined)).toBe("free");
     });
 
-    it("falls back to pro for an unrecognized price ID (matches today's tierFromPriceId behavior)", async () => {
+    it("fails safe to free (never a paid tier) for an unrecognized price ID", async () => {
       prisma.plan.findMany.mockResolvedValue([FREE_PLAN, PRO_PLAN, ELITE_PLAN]);
-      expect(await service.tierFromPriceId("price_totally_unknown")).toBe("pro");
+      // An unknown price must not silently grant a paid tier — it used to
+      // fall through to "pro", mis-tiering a real purchase.
+      expect(await service.tierFromPriceId("price_totally_unknown")).toBe("free");
     });
   });
 
