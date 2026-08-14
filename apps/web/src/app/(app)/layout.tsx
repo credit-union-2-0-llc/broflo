@@ -16,6 +16,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect("/login");
   }
 
+  // Accounts created via OTP have no password. Force them to set one before
+  // using the app (the set-password page lives outside this (app) group, so
+  // this doesn't loop). hasPassword is threaded through the session from the
+  // API's auth payload.
+  if (session && session.user?.hasPassword === false) {
+    redirect("/set-password");
+  }
+
   let peopleCount = 0;
   let dueSoonCount = 0;
 

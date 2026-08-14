@@ -19,6 +19,7 @@ declare module "next-auth" {
       name: string | null;
       avatarUrl: string | null;
       subscriptionTier: string;
+      hasPassword: boolean;
     };
   }
 }
@@ -35,6 +36,7 @@ declare module "next-auth" {
       name: string | null;
       avatarUrl: string | null;
       subscriptionTier: string;
+      hasPassword: boolean;
     };
   }
 }
@@ -54,14 +56,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     Credentials({
       credentials: {
         email: {},
+        password: {},
         code: {},
       },
       async authorize(credentials) {
         try {
-          const result = await api.verifyOtp(
-            credentials.email as string,
-            credentials.code as string,
-          );
+          const email = credentials.email as string;
+          // Password is the primary path; an OTP code is the "email me a code
+          // instead" fallback. Whichever field the form sent decides.
+          const result = credentials.password
+            ? await api.login(email, credentials.password as string)
+            : await api.verifyOtp(email, credentials.code as string);
 
           return {
             id: result.user.id as string,
@@ -71,6 +76,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             refreshToken: result.refreshToken,
             avatarUrl: result.user.avatarUrl as string | null,
             subscriptionTier: result.user.subscriptionTier as string,
+            hasPassword: result.user.hasPassword as boolean,
           };
         } catch {
           return null;
@@ -94,6 +100,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           name: u.name as string | null,
           avatarUrl: u.avatarUrl as string | null,
           subscriptionTier: u.subscriptionTier as string,
+          hasPassword: u.hasPassword as boolean,
         };
       }
 
@@ -118,8 +125,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
 
       if (trigger === "update") {
-        const suppliedTier = (session as { user?: { subscriptionTier?: string } } | undefined)
-          ?.user?.subscriptionTier;
+        const supplied = (session as { user?: { subscriptionTier?: string; hasPassword?: boolean } } | undefined)?.user;
+        // After the "set a password" step, the client pushes hasPassword: true
+        // so the set-password gate stops redirecting without a full re-login.
+        if (supplied?.hasPassword !== undefined) {
+          (token.user as { hasPassword: boolean }).hasPassword = supplied.hasPassword;
+        }
+        const suppliedTier = supplied?.subscriptionTier;
         if (suppliedTier) {
           // Fast path: the caller already knows the new tier (e.g. right
           // after a dev-tier-override switch or a family-invite accept) —

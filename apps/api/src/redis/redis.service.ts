@@ -246,6 +246,92 @@ export class RedisService implements OnModuleDestroy {
     await this.getClient().del(key);
   }
 
+  // --- Single-use, expiring email tokens (verification + password reset) ---
+  //
+  // Keyed by the token itself (a 256-bit random hex value from crypto), so the
+  // key is unguessable; the value is the account identifier the token grants.
+  // Single-use is enforced by deleting on consume. Same in-memory fallback as
+  // OTP so local/dev without Redis still works.
+  private readonly EMAIL_VERIFY_TTL_SECONDS = 24 * 60 * 60; // 24h
+  private readonly PASSWORD_RESET_TTL_SECONDS = 60 * 60; // 1h
+
+  async setEmailVerifyToken(token: string, email: string): Promise<void> {
+    const key = `email-verify:${token}`;
+    if (!this.isConnected) {
+      this.memSet(key, email.toLowerCase(), this.EMAIL_VERIFY_TTL_SECONDS);
+      return;
+    }
+    await this.getClient().setex(key, this.EMAIL_VERIFY_TTL_SECONDS, email.toLowerCase());
+  }
+
+  async consumeEmailVerifyToken(token: string): Promise<string | null> {
+    const key = `email-verify:${token}`;
+    if (!this.isConnected) {
+      const v = this.memGet(key);
+      if (v) this.memCache.delete(key);
+      return v;
+    }
+    const client = this.getClient();
+    const v = await client.get(key);
+    if (v) await client.del(key);
+    return v;
+  }
+
+  async setPasswordResetToken(token: string, userId: string): Promise<void> {
+    const key = `pw-reset:${token}`;
+    if (!this.isConnected) {
+      this.memSet(key, userId, this.PASSWORD_RESET_TTL_SECONDS);
+      return;
+    }
+    await this.getClient().setex(key, this.PASSWORD_RESET_TTL_SECONDS, userId);
+  }
+
+  async consumePasswordResetToken(token: string): Promise<string | null> {
+    const key = `pw-reset:${token}`;
+    if (!this.isConnected) {
+      const v = this.memGet(key);
+      if (v) this.memCache.delete(key);
+      return v;
+    }
+    const client = this.getClient();
+    const v = await client.get(key);
+    if (v) await client.del(key);
+    return v;
+  }
+
+  // --- Password login-attempt lockout (per-email, like the OTP verify one) ---
+  // A password is far higher-entropy than a 6-digit OTP, but a per-email cap on
+  // wrong attempts still bounds online brute-force / credential-stuffing against
+  // a single account regardless of source IP.
+  private readonly LOGIN_ATTEMPT_LIMIT = 10;
+  private readonly LOGIN_ATTEMPT_WINDOW_SECONDS = 900; // 15 min
+
+  async checkAndIncrementLoginAttempts(email: string): Promise<{ allowed: boolean }> {
+    const key = `login-attempts:${email.toLowerCase()}`;
+    if (!this.isConnected) {
+      const raw = this.memGet(key);
+      const count = raw ? parseInt(raw, 10) : 0;
+      if (count >= this.LOGIN_ATTEMPT_LIMIT) return { allowed: false };
+      this.memSet(key, String(count + 1), this.LOGIN_ATTEMPT_WINDOW_SECONDS);
+      return { allowed: true };
+    }
+    const client = this.getClient();
+    const current = await client.incr(key);
+    if (current === 1) {
+      await client.expire(key, this.LOGIN_ATTEMPT_WINDOW_SECONDS);
+    }
+    return { allowed: current <= this.LOGIN_ATTEMPT_LIMIT };
+  }
+
+  async clearLoginAttempts(email: string): Promise<void> {
+    const key = `login-attempts:${email.toLowerCase()}`;
+    if (!this.isConnected) {
+      this.memCache.delete(key);
+      return;
+    }
+    await this.getClient().del(key);
+  }
+
   // --- Recipient survey send rate limit (1 per person per 24h) ---
 
   private readonly SURVEY_SEND_RATE_LIMIT_SECONDS = 86400;
