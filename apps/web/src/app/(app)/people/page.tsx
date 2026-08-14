@@ -24,10 +24,10 @@ export default async function PeoplePage() {
     return (
       <>
         <SectionHeader
-          title="Assets"
+          title="People"
           count={0}
           countLabel="people"
-          actionLabel="Add Asset +"
+          actionLabel="Add Person +"
           actionHref="/people/new"
         />
         <div className="text-center py-12">
@@ -41,10 +41,10 @@ export default async function PeoplePage() {
   return (
     <>
       <SectionHeader
-        title="Assets"
+        title="People"
         count={people.length}
         countLabel="people"
-        actionLabel="Add Asset +"
+        actionLabel="Add Person +"
         actionHref="/people/new"
       />
 
