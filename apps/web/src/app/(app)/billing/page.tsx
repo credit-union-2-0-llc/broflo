@@ -41,6 +41,11 @@ function BillingContent() {
   const [devOverrideEnabled, setDevOverrideEnabled] = useState(false);
   const [switching, setSwitching] = useState<string | null>(null);
   const [openingPortal, setOpeningPortal] = useState(false);
+  // null = not yet loaded. The Stripe billing portal only exists for accounts
+  // with a real Stripe customer — a Family tier from a family-group membership
+  // (or a test override) has no stripeCustomerId, so "Manage Billing" would
+  // always error. Gate the button on this instead of just on isPaid.
+  const [hasStripeBilling, setHasStripeBilling] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (success) {
@@ -52,8 +57,13 @@ function BillingContent() {
     if (!session?.accessToken) return;
     api
       .getSubscription(session.accessToken)
-      .then((sub) => setDevOverrideEnabled(sub.devTierOverrideEnabled))
-      .catch((err) => console.error("Failed to load subscription (dev override check):", err)); // theater-ok: devOverrideEnabled stays at its default `false` on failure, which just hides the dev-only override control — the real subscription tier used for gating comes from the session, not this call; logged for visibility
+      .then((sub) => {
+        setDevOverrideEnabled(sub.devTierOverrideEnabled);
+        setHasStripeBilling(Boolean(sub.stripeCustomerId));
+      })
+      .catch((err) => {
+        console.error("Failed to load subscription:", err); // theater-ok: on failure devOverrideEnabled stays false (hides the test control) and hasStripeBilling stays null (shows neither the portal button nor a wrong message); the tier used for gating comes from the session, not this call
+      });
   }, [session?.accessToken]);
 
   async function handleDevSwitch(newTier: "free" | "pro" | "elite" | "family") {
@@ -98,7 +108,7 @@ function BillingContent() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {isPaid ? (
+          {isPaid && hasStripeBilling ? (
             <>
               <p className="text-sm text-muted-foreground">
                 Manage your subscription, update payment method, or cancel
@@ -122,6 +132,20 @@ function BillingContent() {
                 <ExternalLink className="ml-2 h-4 w-4" />
               </Button>
             </>
+          ) : isPaid && hasStripeBilling === false ? (
+            // Paid tier, but not through Stripe (e.g. Family via a family-group
+            // membership, or a test override) — there's no Stripe customer, so
+            // no portal to open. Explain instead of showing a button that errors.
+            <p className="text-sm text-muted-foreground">
+              Your <span className="font-medium text-foreground">{tier}</span> plan isn&apos;t billed
+              through Stripe, so there&apos;s no billing portal to manage here.
+              {tier === "family"
+                ? " Family plans are managed through your family group."
+                : ""}
+            </p>
+          ) : isPaid ? (
+            // Subscription still loading — avoid flashing the wrong state.
+            <p className="text-sm text-muted-foreground">Loading your billing details…</p>
           ) : (
             <>
               <p className="text-sm text-muted-foreground">
