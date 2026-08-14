@@ -255,13 +255,16 @@ export class RedisService implements OnModuleDestroy {
   private readonly EMAIL_VERIFY_TTL_SECONDS = 24 * 60 * 60; // 24h
   private readonly PASSWORD_RESET_TTL_SECONDS = 60 * 60; // 1h
 
-  async setEmailVerifyToken(token: string, email: string): Promise<void> {
+  // Value is an opaque string (auth stores a JSON payload of the email plus the
+  // pending password hash, so a signup password is only ever applied once the
+  // emailed link is clicked — never persisted to the account before then).
+  async setEmailVerifyToken(token: string, value: string): Promise<void> {
     const key = `email-verify:${token}`;
     if (!this.isConnected) {
-      this.memSet(key, email.toLowerCase(), this.EMAIL_VERIFY_TTL_SECONDS);
+      this.memSet(key, value, this.EMAIL_VERIFY_TTL_SECONDS);
       return;
     }
-    await this.getClient().setex(key, this.EMAIL_VERIFY_TTL_SECONDS, email.toLowerCase());
+    await this.getClient().setex(key, this.EMAIL_VERIFY_TTL_SECONDS, value);
   }
 
   async consumeEmailVerifyToken(token: string): Promise<string | null> {
