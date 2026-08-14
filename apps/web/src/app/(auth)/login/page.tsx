@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,145 +16,62 @@ import {
 } from "@/components/ui/card";
 import { api } from "@/lib/api";
 
-const emailSchema = z.object({
-  email: z.string().email("Enter a valid email"),
-});
-
-const codeSchema = z.object({
-  code: z.string().length(6, "Enter the 6-digit code"),
-});
-
-type EmailForm = z.infer<typeof emailSchema>;
-type CodeForm = z.infer<typeof codeSchema>;
+type Mode = "password" | "otp-email" | "otp-code";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"email" | "code">("email");
+  const [mode, setMode] = useState<Mode>("password");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const codeInputRef = useRef<HTMLInputElement | null>(null);
 
-  const emailForm = useForm<EmailForm>({
-    resolver: zodResolver(emailSchema),
-  });
-
-  const codeForm = useForm<CodeForm>({
-    resolver: zodResolver(codeSchema),
-  });
-
-  useEffect(() => {
-    if (step === "code" && codeInputRef.current) {
-      codeInputRef.current.focus();
-    }
-  }, [step]);
-
-  async function onSendCode(data: EmailForm) {
+  async function onPasswordLogin(e: React.FormEvent) {
+    e.preventDefault();
     setLoading(true);
     setError(null);
-
-    try {
-      await api.sendOtp(data.email);
-      setEmail(data.email);
-      setStep("code");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send code");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function onVerifyCode(data: CodeForm) {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const result = await signIn("credentials", {
-        email,
-        code: data.code,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setError("Invalid or expired code.");
-      } else {
-        router.push("/dashboard");
+    const result = await signIn("credentials", { email, password, redirect: false });
+    if (result?.error) {
+      // authorize() can only signal pass/fail, so re-run login to surface the
+      // specific reason (e.g. "verify your email first") for the message.
+      try {
+        await api.login(email, password);
+        setError("Something went wrong signing you in. Try again.");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Invalid email or password.");
       }
-    } catch {
-      setError("Something went wrong signing you in. Try again.");
+      setLoading(false);
+      return;
+    }
+    router.push("/dashboard");
+  }
+
+  async function onSendCode(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      await api.sendOtp(email);
+      setMode("otp-code");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't send a code. Try again.");
     } finally {
       setLoading(false);
     }
   }
 
-  if (step === "code") {
-    const codeRegister = codeForm.register("code");
-
-    return (
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">broflo.</CardTitle>
-          <CardDescription>
-            We sent a code to <span className="font-medium text-foreground">{email}</span>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={codeForm.handleSubmit(onVerifyCode)} className="space-y-4">
-            {error && (
-              <p className="text-sm text-destructive text-center">{error}</p>
-            )}
-            {/*
-              Without a dedicated username field, Chrome/Safari sometimes guess
-              that the visible OTP input is the "username" field left over from
-              the previous step and autofill it with the saved email instead.
-              A hidden field with autoComplete="username" gives them the
-              correct target so they leave the code input alone.
-            */}
-            <input type="hidden" autoComplete="username" value={email} readOnly />
-            <div className="space-y-2">
-              <Label htmlFor="code">6-digit code</Label>
-              <Input
-                id="code"
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                placeholder="000000"
-                className="text-center text-2xl tracking-[0.3em] font-mono"
-                {...codeRegister}
-                onChange={(e) => {
-                  e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
-                  codeRegister.onChange(e);
-                }}
-                ref={(e) => {
-                  codeRegister.ref(e);
-                  codeInputRef.current = e;
-                }}
-              />
-              {codeForm.formState.errors.code && (
-                <p className="text-sm text-destructive">
-                  {codeForm.formState.errors.code.message}
-                </p>
-              )}
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Verifying..." : "Sign in"}
-            </Button>
-          </form>
-          <button
-            type="button"
-            className="mt-4 w-full text-center text-sm text-muted-foreground hover:text-foreground"
-            onClick={() => {
-              setStep("email");
-              setError(null);
-              codeForm.reset();
-            }}
-          >
-            Use a different email
-          </button>
-        </CardContent>
-      </Card>
-    );
+  async function onVerifyCode(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    const result = await signIn("credentials", { email, code, redirect: false });
+    if (result?.error) {
+      setError("Invalid or expired code.");
+      setLoading(false);
+      return;
+    }
+    router.push("/dashboard");
   }
 
   return (
@@ -164,33 +79,86 @@ export default function LoginPage() {
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-bold">broflo.</CardTitle>
         <CardDescription>
-          Sign in with your email
+          {mode === "otp-code" ? (
+            <>We sent a code to <span className="font-medium text-foreground">{email}</span></>
+          ) : (
+            "Sign in to your account"
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={emailForm.handleSubmit(onSendCode)} className="space-y-4">
-          {error && (
-            <p className="text-sm text-destructive text-center">{error}</p>
+        {error && <p className="mb-4 text-sm text-destructive text-center">{error}</p>}
+
+        {mode === "password" && (
+          <form onSubmit={onPasswordLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" autoComplete="email" placeholder="you@example.com"
+                value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground">
+                  Forgot password?
+                </Link>
+              </div>
+              <Input id="password" type="password" autoComplete="current-password"
+                value={password} onChange={(e) => setPassword(e.target.value)} required />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Signing in..." : "Sign in"}
+            </Button>
+          </form>
+        )}
+
+        {mode === "otp-email" && (
+          <form onSubmit={onSendCode} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="otp-email">Email</Label>
+              <Input id="otp-email" type="email" autoComplete="email" placeholder="you@example.com"
+                value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Sending code..." : "Send code"}
+            </Button>
+          </form>
+        )}
+
+        {mode === "otp-code" && (
+          <form onSubmit={onVerifyCode} className="space-y-4">
+            <input type="hidden" autoComplete="username" value={email} readOnly />
+            <div className="space-y-2">
+              <Label htmlFor="code">6-digit code</Label>
+              <Input id="code" type="text" inputMode="numeric" autoComplete="one-time-code"
+                maxLength={6} placeholder="000000"
+                className="text-center text-2xl tracking-[0.3em] font-mono"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Verifying..." : "Sign in"}
+            </Button>
+          </form>
+        )}
+
+        <div className="mt-4 space-y-2 text-center text-sm">
+          {mode === "password" ? (
+            <button type="button" onClick={() => { setMode("otp-email"); setError(null); }}
+              className="text-muted-foreground hover:text-foreground">
+              Email me a code instead
+            </button>
+          ) : (
+            <button type="button" onClick={() => { setMode("password"); setError(null); }}
+              className="text-muted-foreground hover:text-foreground">
+              Use a password instead
+            </button>
           )}
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-              {...emailForm.register("email")}
-            />
-            {emailForm.formState.errors.email && (
-              <p className="text-sm text-destructive">
-                {emailForm.formState.errors.email.message}
-              </p>
-            )}
-          </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Sending code..." : "Send code"}
-          </Button>
-        </form>
+          <p className="text-muted-foreground">
+            Don&apos;t have an account?{" "}
+            <Link href="/signup" className="font-medium text-foreground hover:underline">Sign up</Link>
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

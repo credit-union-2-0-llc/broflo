@@ -13,12 +13,84 @@ import type { User } from "@prisma/client";
 import { AuthService } from "./auth.service";
 import { Public } from "./decorators/public.decorator";
 import { CurrentUser } from "./decorators/current-user.decorator";
-import { SendOtpDto, VerifyOtpDto, RefreshDto } from "./dto/auth.dto";
+import {
+  SendOtpDto,
+  VerifyOtpDto,
+  RefreshDto,
+  SignupDto,
+  LoginDto,
+  VerifyEmailDto,
+  ResendVerificationDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  SetPasswordDto,
+} from "./dto/auth.dto";
 import { isE2EHatchRequest } from "./util/e2e-hatch";
 
 @Controller("auth")
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
+
+  // ── Email + password (primary) ──────────────────────────────
+
+  // Sends a verification email, so keep the per-IP cap tight (same as send-otp).
+  @Public()
+  @Throttle({ short: { ttl: 60000, limit: parseInt(process.env.THROTTLE_SIGNUP_LIMIT || "5", 10) } })
+  @Post("signup")
+  @HttpCode(HttpStatus.OK)
+  async signup(@Body() dto: SignupDto) {
+    return this.auth.signup(dto.email, dto.password);
+  }
+
+  // No email/side-effect on failure, but it's the brute-force target — the
+  // per-email lockout lives in AuthService; this is the per-IP backstop.
+  @Public()
+  @Throttle({ short: { ttl: 60000, limit: parseInt(process.env.THROTTLE_LOGIN_LIMIT || "15", 10) } })
+  @Post("login")
+  @HttpCode(HttpStatus.OK)
+  async login(@Body() dto: LoginDto) {
+    return this.auth.login(dto.email, dto.password);
+  }
+
+  @Public()
+  @Throttle({ short: { ttl: 60000, limit: parseInt(process.env.THROTTLE_VERIFY_EMAIL_LIMIT || "15", 10) } })
+  @Post("verify-email")
+  @HttpCode(HttpStatus.OK)
+  async verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.auth.verifyEmail(dto.token);
+  }
+
+  @Public()
+  @Throttle({ short: { ttl: 60000, limit: parseInt(process.env.THROTTLE_RESEND_VERIFY_LIMIT || "3", 10) } })
+  @Post("resend-verification")
+  @HttpCode(HttpStatus.OK)
+  async resendVerification(@Body() dto: ResendVerificationDto) {
+    return this.auth.resendVerification(dto.email);
+  }
+
+  @Public()
+  @Throttle({ short: { ttl: 60000, limit: parseInt(process.env.THROTTLE_FORGOT_PW_LIMIT || "3", 10) } })
+  @Post("forgot-password")
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.auth.forgotPassword(dto.email);
+  }
+
+  @Public()
+  @Throttle({ short: { ttl: 60000, limit: parseInt(process.env.THROTTLE_RESET_PW_LIMIT || "10", 10) } })
+  @Post("reset-password")
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.auth.resetPassword(dto.token, dto.password);
+  }
+
+  // Authenticated — the "set a password" step forced on OTP-created accounts
+  // that have none, and change-password for anyone logged in.
+  @Post("set-password")
+  @HttpCode(HttpStatus.OK)
+  async setPassword(@CurrentUser() user: User, @Body() dto: SetPasswordDto) {
+    return this.auth.setPassword(user.id, dto.password);
+  }
 
   // Tight limit — sending an OTP triggers a real email. (The Redis-backed
   // checkOtpRateLimit inside AuthService is a second, independent cap of

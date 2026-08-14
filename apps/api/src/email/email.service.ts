@@ -87,6 +87,62 @@ export class EmailService {
     this.assertSent(result, "payment-failed notice");
   }
 
+  async sendVerificationEmail(email: string, link: string): Promise<void> {
+    if (!this.resend) {
+      this.assertNotProductionFallback("an email-verification link");
+      this.log.debug(`DEV MODE — verify link for ${email}: ${link}`);
+      return;
+    }
+
+    const result = await this.resend.emails.send({
+      from: process.env.EMAIL_FROM || "Broflo <noreply@broflo.ai>",
+      to: email,
+      subject: "Confirm your email for Broflo",
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #18181b;">Confirm your email</h2>
+          <p>Welcome to Broflo. Confirm this is your email to finish setting up your account.</p>
+          <p style="margin: 24px 0;"><a href="${link}" style="background: #e8a422; color: #000; font-weight: bold; text-decoration: none; padding: 12px 20px; border-radius: 8px;">Confirm email</a></p>
+          <p style="color: #a1a1aa; font-size: 12px;">Or paste this link into your browser: ${link}</p>
+          <p style="color: #a1a1aa; font-size: 12px;">This link expires in 24 hours.</p>
+          <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 24px 0;" />
+          <p style="color: #a1a1aa; font-size: 12px;">If you didn't create a Broflo account, you can safely ignore this email.</p>
+          <p style="color: #a1a1aa; font-size: 12px;">broflo. — You're busy. We remembered.</p>
+        </div>
+      `,
+      text: `Welcome to Broflo. Confirm your email to finish setting up your account:\n\n${link}\n\nThis link expires in 24 hours. If you didn't create a Broflo account, ignore this email.`,
+    });
+    this.assertSent(result, "email verification");
+  }
+
+  async sendPasswordResetEmail(email: string, link: string): Promise<void> {
+    if (!this.resend) {
+      this.assertNotProductionFallback("a password-reset link");
+      this.log.debug(`DEV MODE — reset link for ${email}: ${link}`);
+      return;
+    }
+
+    const result = await this.resend.emails.send({
+      from: process.env.EMAIL_FROM || "Broflo <noreply@broflo.ai>",
+      to: email,
+      subject: "Reset your Broflo password",
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #18181b;">Reset your password</h2>
+          <p>We got a request to reset your Broflo password. Click below to choose a new one.</p>
+          <p style="margin: 24px 0;"><a href="${link}" style="background: #e8a422; color: #000; font-weight: bold; text-decoration: none; padding: 12px 20px; border-radius: 8px;">Reset password</a></p>
+          <p style="color: #a1a1aa; font-size: 12px;">Or paste this link into your browser: ${link}</p>
+          <p style="color: #a1a1aa; font-size: 12px;">This link expires in 1 hour.</p>
+          <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 24px 0;" />
+          <p style="color: #a1a1aa; font-size: 12px;">If you didn't request this, you can safely ignore this email — your password won't change.</p>
+          <p style="color: #a1a1aa; font-size: 12px;">broflo. — You're busy. We remembered.</p>
+        </div>
+      `,
+      text: `We got a request to reset your Broflo password. Choose a new one here:\n\n${link}\n\nThis link expires in 1 hour. If you didn't request this, ignore this email — your password won't change.`,
+    });
+    this.assertSent(result, "password reset");
+  }
+
   async sendSurveyInvite(
     recipientEmail: string,
     giverName: string,

@@ -13,6 +13,8 @@ model User {
   email            String    @unique
   name             String?
   avatarUrl        String?   @map("avatar_url")
+  passwordHash          String?   @map("password_hash")
+  emailVerifiedAt       DateTime? @map("email_verified_at")
   subscriptionTier      String    @default("free") @map("subscription_tier")
   stripeCustomerId      String?   @unique @map("stripe_customer_id")
   stripeSubscriptionId  String?   @unique @map("stripe_subscription_id")
