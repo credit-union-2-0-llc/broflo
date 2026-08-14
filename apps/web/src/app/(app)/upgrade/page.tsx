@@ -34,8 +34,7 @@ const FEATURES: Record<string, string[]> = {
     "Bold surprise mode",
     "Up to 3 re-rolls",
     "Gift history context",
-    "Auto-execute purchases",
-    "Autopilot mode",
+    "Autopilot picks & alerts",
   ],
   elite: [
     "Everything in Pro",

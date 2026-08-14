@@ -18,6 +18,15 @@ const CYAN = "#22d3ee";
 const CORAL = "#ff8fa3";
 const AMBER = "#ffc24b";
 
+// Agent auto-purchase ("Order This") is gated off until the browser-agent
+// purchasing system is actually live. The only wired retailer adapter today is
+// the MockAdapter, which fabricates a confirmation and ships nothing — showing
+// that button to paying users would advertise a non-functional feature. The
+// real, shipped path is the "Buy on X" links (onBuyNow → live Exa search),
+// which also matches the "Broflo is NOT a store" model. Flip this env var to
+// re-enable once real fulfillment exists.
+const AGENT_PURCHASING_ENABLED = process.env.NEXT_PUBLIC_AGENT_PURCHASING === "true";
+
 interface SuggestionsViewProps {
   eventId: string;
   personId: string;
@@ -435,7 +444,7 @@ export function SuggestionsView({
                     onSelect={handleSelect}
                     onDismiss={handleDismiss}
                     selecting={selecting}
-                    onOrderThis={tier !== "free" ? handleOrderThis : undefined}
+                    onOrderThis={AGENT_PURCHASING_ENABLED && tier !== "free" ? handleOrderThis : undefined}
                     orderStatus={orderInfo?.status ?? null}
                     orderPlacedAt={orderInfo?.placedAt ?? null}
                     onBuyNow={handleBuyNow}
