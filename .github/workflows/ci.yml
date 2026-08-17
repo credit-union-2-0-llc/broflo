@@ -123,6 +123,10 @@ jobs:
           NEXT_PUBLIC_STRIPE_PRO_ANNUAL_PRICE_ID: ${{ vars.NEXT_PUBLIC_STRIPE_PRO_ANNUAL_PRICE_ID }}
           NEXT_PUBLIC_STRIPE_ELITE_MONTHLY_PRICE_ID: ${{ vars.NEXT_PUBLIC_STRIPE_ELITE_MONTHLY_PRICE_ID }}
           NEXT_PUBLIC_STRIPE_ELITE_ANNUAL_PRICE_ID: ${{ vars.NEXT_PUBLIC_STRIPE_ELITE_ANNUAL_PRICE_ID }}
+          # Family — once these exist the /upgrade Family card unhides (the page
+          # filters it out when no Family price ID is set) and its checkout works.
+          NEXT_PUBLIC_STRIPE_FAMILY_MONTHLY_PRICE_ID: ${{ vars.NEXT_PUBLIC_STRIPE_FAMILY_MONTHLY_PRICE_ID }}
+          NEXT_PUBLIC_STRIPE_FAMILY_ANNUAL_PRICE_ID: ${{ vars.NEXT_PUBLIC_STRIPE_FAMILY_ANNUAL_PRICE_ID }}
 
       - name: Prepare deploy package
         run: |
@@ -221,6 +225,12 @@ jobs:
         run: pnpm --filter @broflo/api exec ts-node prisma/deploy-seed.ts
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # The seed writes these into Plan.stripePriceId* so the billing
+          # webhook's tierFromPriceId() can map a Family purchase → the "family"
+          # tier. Without them the plan row has no Family price and a real
+          # Family purchase would fail safe to "free" (see entitlements.service).
+          STRIPE_FAMILY_MONTHLY_PRICE_ID: ${{ vars.STRIPE_FAMILY_MONTHLY_PRICE_ID }}
+          STRIPE_FAMILY_ANNUAL_PRICE_ID: ${{ vars.STRIPE_FAMILY_ANNUAL_PRICE_ID }}
 
       - name: Build API
         run: pnpm build:api
