@@ -54,6 +54,30 @@ jobs:
         run: pnpm build:web
 
   # ─────────────────────────────────────────────
+  # CI: browser-agent (Python)
+  # ─────────────────────────────────────────────
+  browser-agent-tests:
+    # services/browser-agent is a Python subproject; the `ci` job above is
+    # entirely pnpm, so `pnpm test` never reached it and its suite ran in no
+    # CI job at all -- despite the subproject already shipping a
+    # requirements-dev.txt whose only purpose is pytest.
+    name: browser-agent tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/browser-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: services/browser-agent/requirements*.txt
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: pytest
+        run: python -m pytest tests/ -q
+
+  # ─────────────────────────────────────────────
   # Detect which services changed
   # ─────────────────────────────────────────────
   changes:
