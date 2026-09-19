@@ -64,7 +64,6 @@ line:cardNumber: '4242424242424242'
 # not real credentials, not real member/account IDs.
 # ---------------------------------------------------------------------------
 line:email: "a@b\.com"
-line:const token = authHeader\.slice\(7\);
 line:return \{ token: res\.body\.accessToken, userId: res\.body\.user\.id \};
 path:^apps/api/test/auth\.e2e-spec\.ts$
 line:the zip listing of Deploy Web job
