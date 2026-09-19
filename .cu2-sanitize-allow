@@ -12,6 +12,7 @@
 line:ACR_LOGIN_SERVER: cu2registry\.azurecr\.io
 line:--resource-group rg-broflo
 line:SP scoped to rg-broflo cannot pull from cu2registry in rg-cu2-shared yet
+line:rg-broflo-scoped SP \(AZURE_CREDENTIALS\) can read this app setting
 
 # ---------------------------------------------------------------------------
 # Public GitHub repo self-references. credit-union-2-0-llc/broflo is THIS
@@ -64,7 +65,6 @@ line:cardNumber: '4242424242424242'
 # not real credentials, not real member/account IDs.
 # ---------------------------------------------------------------------------
 line:email: "a@b\.com"
-line:const token = authHeader\.slice\(7\);
 line:return \{ token: res\.body\.accessToken, userId: res\.body\.user\.id \};
 path:^apps/api/test/auth\.e2e-spec\.ts$
 line:the zip listing of Deploy Web job
