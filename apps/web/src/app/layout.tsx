@@ -1,23 +1,35 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow_Condensed, DM_Sans, Space_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { Toaster } from "@/components/ui/sonner";
 import { SessionProvider } from "@/components/session-provider";
 import "./globals.css";
 
-const barlowCondensed = Barlow_Condensed({
-  subsets: ["latin"],
-  weight: ["700", "800", "900"],
+// Fonts are self-hosted (next/font/local) so production builds do not depend on
+// reaching fonts.googleapis.com at build time. Files live in ./fonts.
+const barlowCondensed = localFont({
+  src: [
+    { path: "./fonts/barlow-condensed-latin-700-normal.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/barlow-condensed-latin-800-normal.woff2", weight: "800", style: "normal" },
+    { path: "./fonts/barlow-condensed-latin-900-normal.woff2", weight: "900", style: "normal" },
+  ],
+  display: "swap",
   variable: "--font-display",
 });
 
-const dmSans = DM_Sans({
-  subsets: ["latin"],
+const dmSans = localFont({
+  src: [
+    { path: "./fonts/dm-sans-latin-wght-normal.woff2", weight: "100 1000", style: "normal" },
+  ],
+  display: "swap",
   variable: "--font-body",
 });
 
-const spaceMono = Space_Mono({
-  subsets: ["latin"],
-  weight: ["400", "700"],
+const spaceMono = localFont({
+  src: [
+    { path: "./fonts/space-mono-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/space-mono-latin-700-normal.woff2", weight: "700", style: "normal" },
+  ],
+  display: "swap",
   variable: "--font-mono",
 });
 

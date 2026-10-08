@@ -111,3 +111,23 @@ path:^tests/e2e/fixtures/photos/test-room\.jpg$
 # ---------------------------------------------------------------------------
 path:^apps/api/test/persons\.e2e-spec\.ts$
 path:^apps/api/test/photos\.e2e-spec\.ts$
+
+# ---------------------------------------------------------------------------
+# Self-hosted web fonts (next/font/local), apps/web/src/app/fonts/*.woff2 --
+# the scanner's "risky binary artifact" rule fires on any .woff2. Exact paths
+# only, one per file, so a new or swapped binary in that folder is still
+# flagged. Why they are safe to publish: all three families are open-licensed
+# under the SIL Open Font License 1.1 (read from each file's own font
+# metadata, name table IDs 0 and 14: Barlow Condensed, DM Sans and Space Mono
+# each carry their project copyright + an OFL license URL), the OFL permits
+# redistribution and embedding, and they are public Google Fonts, not
+# CU2-authored. Self-hosted so the production build does not have to reach
+# fonts.googleapis.com. Notice kept in apps/web/src/app/fonts/LICENSES.md.
+# Reviewed 2026-10-08; accepted, not fixed.
+# ---------------------------------------------------------------------------
+path:^apps/web/src/app/fonts/barlow-condensed-latin-700-normal\.woff2$
+path:^apps/web/src/app/fonts/barlow-condensed-latin-800-normal\.woff2$
+path:^apps/web/src/app/fonts/barlow-condensed-latin-900-normal\.woff2$
+path:^apps/web/src/app/fonts/dm-sans-latin-wght-normal\.woff2$
+path:^apps/web/src/app/fonts/space-mono-latin-400-normal\.woff2$
+path:^apps/web/src/app/fonts/space-mono-latin-700-normal\.woff2$
