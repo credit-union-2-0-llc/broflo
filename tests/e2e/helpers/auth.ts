@@ -37,7 +37,10 @@ async function fetchOtp(email: string): Promise<string> {
   const token = process.env.E2E_TEST_HATCH_TOKEN;
   if (!token) {
     throw new Error(
-      "E2E_TEST_HATCH_TOKEN not set — add to .env.test (and ensure the target api has E2E_TEST_HATCH_ENABLED=1 with a matching token + email allowlist)",
+      // The target api must also run with NODE_ENV !== 'production': the hatch
+      // is hard-disabled in production (isE2EHatchActive), so point E2E runs at
+      // a non-production (staging/preview) deployment, never prod.
+      "E2E_TEST_HATCH_TOKEN not set — add to .env.test (and ensure the target api has E2E_TEST_HATCH_ENABLED=1 with a matching token + email allowlist, and is NOT running NODE_ENV=production)",
     );
   }
   return fetchLatestOtp({

@@ -21,6 +21,21 @@ const pkg = JSON.parse(
 function validateProductionSecrets() {
   if (process.env.NODE_ENV !== "production") return;
   const log = new Logger("Bootstrap");
+
+  // Hard-refuse to boot production with the E2E test hatch armed. The hatch
+  // mounts TestingController (hands out live login OTPs) and lets requests skip
+  // the OTP rate limit — an authentication bypass. isE2EHatchActive() already
+  // makes it inert in production, but failing loudly at boot turns a silent
+  // misconfiguration into an obvious, audit-traceable deploy failure instead of
+  // a dormant control gap.
+  if (process.env.E2E_TEST_HATCH_ENABLED === "1") {
+    throw new Error(
+      "Fatal: E2E_TEST_HATCH_ENABLED=1 is not permitted in production " +
+        "(NODE_ENV=production). The E2E test hatch is an authentication bypass " +
+        "and must only run in non-production environments. Unset it.",
+    );
+  }
+
   const required = [
     "JWT_SECRET",
     "STRIPE_SECRET_KEY",

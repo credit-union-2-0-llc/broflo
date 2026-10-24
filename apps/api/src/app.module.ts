@@ -28,8 +28,12 @@ import { EntitlementsModule } from "./entitlements/entitlements.module";
 import { SurveyModule } from "./survey/survey.module";
 import { FamilyModule } from "./family/family.module";
 import { PriceWatchModule } from "./price-watch/price-watch.module";
+import { isE2EHatchActive } from "./auth/util/e2e-hatch";
 
-const TEST_HATCH_ENABLED = process.env.E2E_TEST_HATCH_ENABLED === "1";
+// Never mounts in production, even if E2E_TEST_HATCH_ENABLED=1 is set there by
+// mistake — the NODE_ENV guard lives in isE2EHatchActive(). main.ts also hard-
+// fails boot on that misconfiguration so it can never go unnoticed.
+const TEST_HATCH_ENABLED = isE2EHatchActive();
 
 @Module({
   imports: [

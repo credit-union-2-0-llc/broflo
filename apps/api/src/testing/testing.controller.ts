@@ -11,6 +11,7 @@ import type { Request } from "express";
 import * as crypto from "crypto";
 import { RedisService } from "../redis/redis.service";
 import { Public } from "../auth/decorators/public.decorator";
+import { isE2EHatchActive } from "../auth/util/e2e-hatch";
 
 /**
  * E2E test hatch — OTP retrieval for cross-browser login tests.
@@ -35,6 +36,14 @@ export class TestingController {
       req.ip ||
       ""
     ).toString();
+
+    // Defense in depth: this controller is only mounted when isE2EHatchActive(),
+    // but re-check at request time so it can never serve OTPs in production even
+    // if it were somehow registered there. Same 404 as every other failure mode.
+    if (!isE2EHatchActive()) {
+      this.log.warn(`[test-hatch] deny inactive: email=${emailLower} ip=${ip}`);
+      throw new HttpException("Not found", HttpStatus.NOT_FOUND);
+    }
 
     if (!this.tokenMatches(req)) {
       this.log.warn(`[test-hatch] deny token: email=${emailLower} ip=${ip}`);
