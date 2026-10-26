@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function AuthLayout({
   children,
 }: {
@@ -11,6 +13,11 @@ export default function AuthLayout({
         <div className="b3" />
       </div>
       <div className="w-full max-w-sm">{children}</div>
+      <footer className="mt-6 text-center text-xs text-muted-foreground">
+        <Link href="/terms" className="hover:text-foreground">Terms</Link>
+        <span className="mx-2">·</span>
+        <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
+      </footer>
     </div>
   );
 }
