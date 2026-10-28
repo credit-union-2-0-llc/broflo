@@ -44,8 +44,21 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Same packages, same runners as `pnpm test`, split so the api's jest also
+      # writes its structured result for the ops-platform scan job below (the
+      # human output still goes to the log). `exec jest --passWithNoTests` is
+      # apps/api's `test` script verbatim plus the report flags; every other
+      # package still runs its own `test` script exactly as before.
       - name: Test
-        run: pnpm test
+        run: |
+          mkdir -p "$RUNNER_TEMP/ops-evidence"
+          pnpm --filter @broflo/api exec jest --passWithNoTests --ci --json --outputFile="$RUNNER_TEMP/ops-evidence/jest-api.json"
+          pnpm --filter './apps/**' --filter './packages/**' --filter '!@broflo/api' run test
+
+      - name: Upload test evidence for ops-scan
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: ops-evidence-tests, path: "${{ runner.temp }}/ops-evidence", if-no-files-found: ignore, retention-days: 7 }
 
       - name: Build API
         run: pnpm build:api
@@ -75,7 +88,56 @@ jobs:
           cache-dependency-path: services/browser-agent/requirements*.txt
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - name: pytest
-        run: python -m pytest tests/ -q
+        run: |
+          mkdir -p "$RUNNER_TEMP/ops-evidence"
+          python -m pytest tests/ -q --junitxml="$RUNNER_TEMP/ops-evidence/pytest-browser-agent.xml"
+      - name: Upload test evidence for ops-scan
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: ops-evidence-tests-browser-agent, path: "${{ runner.temp }}/ops-evidence", if-no-files-found: ignore, retention-days: 7 }
+
+  # ─────────────────────────────────────────────
+  # ops-platform register: finding-policy (semgrep + gitleaks, advisory) and
+  # ops-scan, which posts the policy hits plus the jest (api) and pytest
+  # (browser-agent) results written above to ops-platform (app_id broflo, from
+  # ops-config.yml) and gates on the verdict. In this workflow, not its own,
+  # because artifacts do not cross workflow runs. Not a `needs` of any deploy.
+  # ─────────────────────────────────────────────
+  finding-policy:
+    name: finding-policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: mkdir -p "$RUNNER_TEMP/ops-evidence"
+      - uses: credit-union-2-0-llc/cu2-actions/finding-policy@69fa7532818bf43438d0a609b01832aa4eb0a801 # main = cu2-actions#32 (shift-left advisory rules, cu2-findings/2026-10-21), 2026-10-22
+        with:
+          blocking: "false"
+          results_path: ${{ runner.temp }}/ops-evidence/finding-policy.json
+      - name: Upload ops-scan evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: ops-evidence-policy, path: "${{ runner.temp }}/ops-evidence", if-no-files-found: ignore, retention-days: 7 }
+
+  ops-scan:
+    name: ops-platform scan
+    needs: [ci, browser-agent-tests, finding-policy]
+    if: always() && !contains(needs.*.result, 'cancelled') && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency: { group: "ops-scan-${{ github.ref }}", cancel-in-progress: true }
+    permissions: { contents: read, pull-requests: write }
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/download-artifact@v4
+        continue-on-error: true   # theater-ok: no artifact => evidence:none => the API records no_test_evidence and mints no test finding; it never reads as a pass
+        with: { pattern: "ops-evidence*", merge-multiple: true, path: ops-evidence }
+      - uses: credit-union-2-0-llc/cu2-actions/ops-scan@86685d6bd806225835627b2bf7d5cfa7aa49ab40 # main = cu2-actions#34 merge, ops-scan 0.5.1 (register triage unblocks), 2026-10-27
+        with:
+          ops_api_key: ${{ secrets.OPS_API_KEY }}
+          ops_api_base: ${{ secrets.OPS_API_URL }}
+          test_artifact: ops-evidence/jest-*.json,ops-evidence/pytest-*.xml
+          policy_artifact: ops-evidence/finding-policy.json
 
   # ─────────────────────────────────────────────
   # Detect which services changed
